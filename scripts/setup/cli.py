@@ -7,6 +7,8 @@ from dotenv import dotenv_values
 import os
 import subprocess
 import sys
+import serial.tools.list_ports
+import hid
 
 console = Console()
 
@@ -34,16 +36,53 @@ def setup_env():
         "Puerto del API (API_PORT):",
         default=current_env.get("API_PORT", "5000")
     ).ask()
-    
-    rf_port = questionary.text(
-        "Puerto Serial RF (ej. /dev/ttyUSB0 o COM3) (RF_PORT):",
-        default=current_env.get("RF_PORT", "/dev/ttyUSB0")
-    ).ask()
+    if not api_port: return
     
     rf_baud = questionary.text(
-        "Baudrate del Serial (RF_BAUD):",
-        default=current_env.get("RF_BAUD", "9600")
+        "Baudrate (solo aplica si usas Serial/COM):",
+        default=current_env.get("RF_BAUD", "115200")
     ).ask()
+    if not rf_baud: return
+    
+    conn_type = questionary.select(
+        "¿Qué tipo de conexión utiliza el Traductor Gateway?",
+        choices=[
+            "1. Conexión USB HID Nativa (Recomendado para YD-RP2040 / Raspberry Pico)",
+            "2. Conexión Serial COM (Recomendado para ESP8266 / ESP32 / Arduino)"
+        ]
+    ).ask()
+    if not conn_type: return
+
+    rf_port = ""
+    if "HID" in conn_type:
+        console.print("[dim]Buscando dispositivos USB HID conectados...[/dim]")
+        devices = hid.enumerate()
+        # Filtrar duplicados por VID:PID
+        unique_hids = {}
+        for d in devices:
+            key = f"HID:{d['vendor_id']:04x}:{d['product_id']:04x}"
+            if key not in unique_hids:
+                unique_hids[key] = f"{key} - {d.get('manufacturer_string', 'Unknown')} {d.get('product_string', 'Unknown')}"
+        
+        hid_choices = list(unique_hids.values())
+        if not hid_choices:
+            console.print("[red]❌ No se detectaron dispositivos USB HID. Conecta tu RP2040.[/red]")
+            return
+            
+        selected_hid = questionary.select("Selecciona el dispositivo Traductor HID:", choices=hid_choices).ask()
+        if not selected_hid: return
+        rf_port = selected_hid.split(" - ")[0]
+    else:
+        console.print("[dim]Buscando puertos COM conectados...[/dim]")
+        ports = serial.tools.list_ports.comports()
+        com_choices = [f"{p.device} - {p.description}" for p in ports]
+        if not com_choices:
+            console.print("[red]❌ No se detectaron puertos COM. Conecta tu Arduino/ESP.[/red]")
+            return
+            
+        selected_com = questionary.select("Selecciona el puerto COM del Traductor:", choices=com_choices).ask()
+        if not selected_com: return
+        rf_port = selected_com.split(" - ")[0]
     
     # Confirmar escritura
     if not questionary.confirm("¿Guardar esta configuración en el archivo .env?").ask():
