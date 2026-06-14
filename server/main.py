@@ -15,6 +15,8 @@ import time
 import json
 import os
 import dotenv
+import serial.tools.list_ports
+import hid
 
 from server.core.config import API_PORT, ENV_FILE
 from server.db.database import BaseModel
@@ -109,6 +111,41 @@ def api_settings():
         os.environ["RF_PORT"] = rf_port
     
     return jsonify({"ok": True})
+
+@app.route("/api/ports", methods=["GET"])
+def api_ports():
+    port_type = request.args.get("type", "COM")
+    results = []
+    
+    if port_type == "COM":
+        ports = serial.tools.list_ports.comports()
+        for p in ports:
+            # Formato: "COM3 - USB Serial Device"
+            results.append({
+                "id": p.device,
+                "label": f"{p.device} - {p.description}"
+            })
+    elif port_type == "HID":
+        try:
+            for device in hid.enumerate():
+                # Formato: "Logitech USB Receiver"
+                name = device.get('product_string', 'Unknown HID Device')
+                path = device.get('path', b'').decode('utf-8', errors='ignore')
+                vid = device.get('vendor_id', 0)
+                pid = device.get('product_id', 0)
+                # Para HID guardaremos un string identificador
+                ident = path if path else f"HID_{vid}_{pid}"
+                
+                # Evitar duplicados (hid.enumerate a veces repite)
+                if not any(r["id"] == ident for r in results):
+                    results.append({
+                        "id": ident,
+                        "label": name
+                    })
+        except Exception as e:
+            pass
+            
+    return jsonify(results)
 @app.route("/api/devices", methods=["GET"])
 def api_devices():
     return jsonify([d.to_dict() for d in Device.all()])

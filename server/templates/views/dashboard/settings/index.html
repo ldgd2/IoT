@@ -42,15 +42,36 @@
         <h2 style="font-size: 1.5rem; font-weight: 500; margin-bottom: 24px;">Hardware (Gateway)</h2>
         
         <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; gap: 24px; align-items: center; margin-bottom: 8px;">
+                <label style="font-weight: 500;">Tipo de Conexión:</label>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <label class="m3-control" style="gap: 8px; width: auto;">
+                        <input type="radio" name="port_type" value="COM" checked onchange="loadPorts('COM')">
+                        <div class="m3-radio"></div>
+                        <span style="font-size: 0.95rem;">Puerto Serial (COM)</span>
+                    </label>
+                    <label class="m3-control" style="gap: 8px; width: auto;">
+                        <input type="radio" name="port_type" value="HID" onchange="loadPorts('HID')">
+                        <div class="m3-radio"></div>
+                        <span style="font-size: 0.95rem;">USB Directo (HID)</span>
+                    </label>
+                </div>
+            </div>
+
             <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 8px;">Puerto Serial (COM / TTY)</label>
-                <input type="text" id="rf_port_input" value="{{ rf_port }}" placeholder="Ej: COM3 o /dev/ttyUSB0" 
-                       style="width: 100%; max-width: 300px; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit;">
-                <p style="font-size: 0.85rem; color: var(--md-text-variant); margin-top: 8px;">Este es el puerto USB donde está conectada la antena traductora de nRF24.</p>
+                <label style="display: block; font-weight: 500; margin-bottom: 8px;">Seleccionar Dispositivo</label>
+                <select id="rf_port_select" style="width: 100%; max-width: 400px; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem; appearance: auto;">
+                    <option value="{{ rf_port }}">Cargando dispositivos...</option>
+                </select>
+                <p style="font-size: 0.85rem; color: var(--md-text-variant); margin-top: 8px;">Selecciona la antena traductora de la lista de dispositivos conectados actualmente.</p>
             </div>
 
             <div style="margin-top: 16px;">
                 <button class="btn-m3 btn-filled ripple-btn" onclick="saveSettings()">Guardar Configuración</button>
+                <button class="btn-m3 btn-tonal ripple-btn" onclick="refreshPorts()" style="margin-left: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    Refrescar Lista
+                </button>
             </div>
             
             <div id="save-status" style="margin-top: 8px; font-weight: 500; display: none;"></div>
@@ -69,7 +90,47 @@
         document.querySelectorAll('[id^="chip-"]').forEach(el => el.children[0].style.borderColor = 'transparent');
         const activeChip = document.getElementById('chip-' + color);
         if(activeChip) activeChip.children[0].style.borderColor = 'var(--md-primary)';
+        
+        // Cargar puertos por defecto
+        loadPorts('COM');
     });
+
+    function loadPorts(type) {
+        const selectEl = document.getElementById('rf_port_select');
+        selectEl.innerHTML = '<option value="">Buscando dispositivos...</option>';
+        selectEl.disabled = true;
+
+        fetch('/api/ports?type=' + type)
+        .then(r => r.json())
+        .then(data => {
+            selectEl.innerHTML = '';
+            selectEl.disabled = false;
+            
+            if (data.length === 0) {
+                selectEl.innerHTML = '<option value="">No se encontraron dispositivos</option>';
+                return;
+            }
+            
+            const savedPort = "{{ rf_port }}"; // El puerto actual en .env
+            
+            data.forEach(port => {
+                const opt = document.createElement('option');
+                opt.value = port.id;
+                opt.innerText = port.label;
+                if (port.id === savedPort) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            selectEl.innerHTML = '<option value="">Error al buscar puertos</option>';
+            selectEl.disabled = false;
+        });
+    }
+
+    function refreshPorts() {
+        const type = document.querySelector('input[name="port_type"]:checked').value;
+        loadPorts(type);
+    }
 
     function toggleDarkMode(isDark) {
         const color = localStorage.getItem('m3-color') || 'warm';
@@ -86,7 +147,11 @@
     }
 
     function saveSettings() {
-        const port = document.getElementById('rf_port_input').value;
+        const selectEl = document.getElementById('rf_port_select');
+        const port = selectEl.value;
+        
+        if (!port) return alert("Selecciona un puerto válido primero.");
+
         const statusEl = document.getElementById('save-status');
         
         statusEl.style.display = 'block';
