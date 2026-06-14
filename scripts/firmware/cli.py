@@ -1,37 +1,113 @@
-import click
+import rich_click as click
 import subprocess
 import os
 from pathlib import Path
 from rich.console import Console
+from rich.panel import Panel
+import questionary
+import serial.tools.list_ports
 
 console = Console()
 ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
+
+def check_pio():
+    """Verifica si PlatformIO está instalado"""
+    try:
+        subprocess.run(["pio", "--version"], capture_output=True, check=True)
+        return True
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
 
 @click.group()
 def firmware():
     """Gestión y Compilación de Firmware C++ (PlatformIO)"""
     pass
 
-@firmware.command()
-@click.argument('dispositivo', type=click.Choice(['lights', 'translator', 'all'], case_sensitive=False))
-@click.option('--env', '-e', default='rp2040', help='Entorno de compilación (rp2040 o esp8266)')
-def build(dispositivo, env):
-    """Compila el firmware para un dispositivo específico"""
-    targets = ['lights', 'translator'] if dispositivo == 'all' else [dispositivo]
+@firmware.command(name="wizard")
+def firmware_wizard():
+    """Asistente interactivo de compilación y flasheo de firmware"""
+    console.print(Panel.fit("[bold cyan]🔨 Asistente de Compilación y Flasheo de Firmware[/bold cyan]", border_style="cyan"))
     
-    for t in targets:
-        proj_dir = ROOT_DIR / "devices" / t
-        console.print(f"[bold cyan]🔨 Compilando firmware para: {t} (Entorno: {env})[/bold cyan]")
+    if not check_pio():
+        console.print("[red]❌ Error: PlatformIO Core (pio) no está instalado o no está en el PATH.[/red]")
+        console.print("[yellow]Instálalo usando: pip install platformio[/yellow]")
+        return
         
-        try:
-            subprocess.run(["pio", "--version"], capture_output=True, check=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            console.print("[red]❌ Error: PlatformIO Core (pio) no está instalado o no está en el PATH.[/red]")
-            console.print("[yellow]Instálalo usando: pip install platformio[/yellow]")
+    # 1. Seleccionar la placa
+    placa = questionary.select(
+        "¿Para qué placa de desarrollo deseas compilar?",
+        choices=[
+            "YD-RP2040 (Raspberry Pi Pico)",
+            "ESP8266",
+            "ESP32",
+            "Arduino (Nano/Uno)"
+        ]
+    ).ask()
+    if not placa: return
+    
+    env_map = {
+        "YD-RP2040 (Raspberry Pi Pico)": "rp2040",
+        "ESP8266": "esp8266",
+        "ESP32": "esp32",
+        "Arduino (Nano/Uno)": "arduino_nano"
+    }
+    pio_env = env_map[placa]
+
+    # 2. Seleccionar dispositivos
+    device_choice = questionary.select(
+        "¿Qué firmware de dispositivo deseas compilar?",
+        choices=[
+            "Solo Luces (lights)",
+            "Solo Traductor Gateway (translator)",
+            "COMPILAR TODOS LOS DISPOSITIVOS"
+        ]
+    ).ask()
+    if not device_choice: return
+    
+    if "TODOS" in device_choice:
+        targets = ["lights", "translator"]
+    elif "Luces" in device_choice:
+        targets = ["lights"]
+    else:
+        targets = ["translator"]
+
+    # 3. Flujo condicional por Placa
+    if pio_env == "rp2040":
+        # Solo compilar para RP2040 (requiere arrastrar el UF2 a la carpeta)
+        for t in targets:
+            console.print(f"\n[bold yellow]🛠️  Compilando {t} para {placa}...[/bold yellow]")
+            proj_dir = ROOT_DIR / "devices" / t
+            res = subprocess.run(["pio", "run", "-e", pio_env], cwd=proj_dir)
+            if res.returncode == 0:
+                console.print(f"[green]✅ Compilación exitosa para {t}.[/green] [dim](Copia el archivo UF2 generado al disco RPI-RP2)[/dim]")
+            else:
+                console.print(f"[red]❌ Error compilando {t}[/red]")
+                
+    else:
+        # ESP/Arduino requieren seleccionar puerto COM
+        ports = serial.tools.list_ports.comports()
+        if not ports:
+            console.print("[red]❌ No se detectaron puertos COM conectados. Conecta tu placa e intenta de nuevo.[/red]")
             return
             
-        res = subprocess.run(["pio", "run", "-e", env], cwd=proj_dir)
-        if res.returncode == 0:
-            console.print(f"[green]✅ Compilación exitosa para {t}[/green]\n")
-        else:
-            console.print(f"[red]❌ Error compilando {t}[/red]\n")
+        port_choices = [f"{p.device} - {p.description}" for p in ports]
+        
+        for t in targets:
+            console.print(f"\n[bold magenta]👉 Dispositivo actual: {t.upper()}[/bold magenta]")
+            port_selection = questionary.select(
+                f"Selecciona el puerto COM donde está conectado el {t}:",
+                choices=port_choices
+            ).ask()
+            if not port_selection: return
+            
+            com_port = port_selection.split(" - ")[0]
+            
+            console.print(f"[bold yellow]🛠️  Compilando y subiendo {t} a {com_port}...[/bold yellow]")
+            proj_dir = ROOT_DIR / "devices" / t
+            
+            res = subprocess.run(["pio", "run", "-t", "upload", "--upload-port", com_port, "-e", pio_env], cwd=proj_dir)
+            
+            if res.returncode == 0:
+                console.print(f"[green]✅ Firmware subido exitosamente a {t} en {com_port}[/green]")
+            else:
+                console.print(f"[red]❌ Error al subir a {t}[/red]")

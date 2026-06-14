@@ -55,10 +55,7 @@ def show_main_menu():
             subprocess.run([sys.executable, "iot.py", "setup", "env"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
         elif choice.startswith("🔨"):
-            # Submenú simple
-            env_choice = questionary.select("Selecciona el entorno destino:", choices=["rp2040", "esp8266"]).ask()
-            if env_choice:
-                subprocess.run([sys.executable, "iot.py", "firmware", "build", "all", "-e", env_choice])
+            subprocess.run([sys.executable, "iot.py", "firmware", "wizard"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
 
 def show_service_menu():
