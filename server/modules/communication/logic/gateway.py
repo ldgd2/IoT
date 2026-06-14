@@ -28,14 +28,15 @@ class IoTGateway:
     o Serial COM (ESP8266/ESP32).
     """
     
-    # Formato de la estructura C++: < (Little-Endian), 4 bytes unsigned char, 4 ints unsigned de 32 bits
+    # Formato de la estructura C++: < (Little-Endian), 4 bytes unsigned char, 26 bytes array, 1 unsigned short (checksum)
     # uint8_t originId;
     # uint8_t destId;
     # uint8_t deviceType;
     # uint8_t command;
-    # uint32_t data[4];
-    STRUCT_FORMAT = '<BBBBIIII'
-    STRUCT_SIZE = struct.calcsize(STRUCT_FORMAT) # Debe ser 20 bytes
+    # uint8_t data[26];
+    # uint16_t checksum;
+    STRUCT_FORMAT = '<BBBB26sH'
+    STRUCT_SIZE = struct.calcsize(STRUCT_FORMAT) # 32 bytes
 
     def __init__(self, port_override=None):
         self.port_string = port_override or os.getenv("RF_PORT")
@@ -114,13 +115,15 @@ class IoTGateway:
             
         if self.mode == "HID":
             # Empaquetar bytes usando Struct para C++
-            binary_packet = struct.pack(self.STRUCT_FORMAT, 0, dest_id, device_type, command, *data[:4])
+            # Empaquetamos los primeros 26 bytes de data
+            data_bytes = bytes(data[:26] + [0]*(26-len(data)))
+            binary_packet = struct.pack(self.STRUCT_FORMAT, 0, dest_id, device_type, command, data_bytes, 0)
             
             # El reporte HID es de 64 bytes, rellenamos el resto con ceros
             # El primer byte de HID out report id a veces requiere ser 0x00
             report = bytearray(65)
             report[0] = 0x00 # Report ID
-            report[1:1+len(binary_packet)] = binary_packet
+            report[1:1+self.STRUCT_SIZE] = binary_packet
             
             try:
                 self.hid_device.write(report)
@@ -134,7 +137,7 @@ class IoTGateway:
             payload = {
                 "dest": dest_id,
                 "cmd": command,
-                "data": data[:4]
+                "data": data[:26]
             }
             try:
                 json_str = json.dumps(payload) + "\n"
@@ -169,13 +172,13 @@ class IoTGateway:
                         # Pero si es un paquete crudo (>= 20 bytes), lo parseamos
                         if len(data) >= self.STRUCT_SIZE:
                             unpacked = struct.unpack(self.STRUCT_FORMAT, bytes(data[:self.STRUCT_SIZE]))
-                            origin, dest, dev_type, cmd, d1, d2, d3, d4 = unpacked
+                            origin, dest, dev_type, cmd, data_bytes, checksum = unpacked
                             packet_dict = {
                                 "origin": origin,
                                 "dest": dest,
                                 "type": dev_type,
                                 "cmd": cmd,
-                                "data": [d1, d2, d3, d4]
+                                "data": list(data_bytes)
                             }
                             if self.on_packet_received:
                                 self.on_packet_received(packet_dict)

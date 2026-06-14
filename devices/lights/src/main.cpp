@@ -37,6 +37,28 @@ void setup() {
     radio.setDataRate(RF_DATARATE);
     
     Serial.println("Conectado! Node ID: " + String(NODE_ID));
+    
+    // Enviar paquete de auto-descubrimiento
+    RFPacket discover_pkt;
+    discover_pkt.originId = NODE_ID;
+    discover_pkt.destId = 0; // Master
+    discover_pkt.deviceType = DEV_TYPE_LIGHT;
+    discover_pkt.command = CMD_DISCOVER;
+    
+    String nodeName = "Luz Node " + String(NODE_ID);
+    discover_pkt.data[0] = nodeName.length();
+    for (int i = 0; i < nodeName.length() && i < 15; i++) {
+        discover_pkt.data[i+1] = nodeName[i];
+    }
+    // Set Feature Flags (Bitmask: Relay + Brightness)
+    discover_pkt.data[16] = FEATURE_RELAY | FEATURE_BRIGHTNESS;
+    
+    Serial.print("Tx Discovery... ");
+    if (!mesh.write(&discover_pkt, 'C', sizeof(discover_pkt), 0)) {
+        Serial.println("FAIL");
+    } else {
+        Serial.println("OK");
+    }
 }
 
 void loop() {

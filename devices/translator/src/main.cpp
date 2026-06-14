@@ -147,14 +147,17 @@ void loop() {
             usb_hid.sendReport(0, report_buf, sizeof(report_buf));
         }
 #else
-        StaticJsonDocument<256> doc;
+        StaticJsonDocument<512> doc;
         doc["origin"] = packet.originId;
         doc["dest"] = packet.destId;
         doc["type"] = packet.deviceType;
         doc["cmd"] = packet.command;
         
         JsonArray dataArray = doc.createNestedArray("data");
-        for(int i=0; i<4; i++) dataArray.add(packet.data[i]);
+        // Forward all 26 bytes of the payload so the Python server can decode strings/features
+        for(int i=0; i<26; i++) {
+            dataArray.add(packet.data[i]);
+        }
         
         serializeJson(doc, Serial);
         Serial.println();
