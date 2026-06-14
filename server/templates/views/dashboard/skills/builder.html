@@ -147,6 +147,14 @@
             </div>
         </div>
 
+        <div class="block" draggable="true" ondragstart="drag(event)" data-type="device_state">
+            <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></div>
+            <div class="block-content">
+                <div class="block-title">Estado de Dispositivo</div>
+                <div class="block-desc">Sensor o Estado (Doble clic)</div>
+            </div>
+        </div>
+
         <strong style="font-size: 0.9rem; color: var(--md-primary); margin-top: 16px;">Acciones</strong>
         
         <div class="block" draggable="true" ondragstart="drag(event)" data-type="action">
@@ -291,6 +299,27 @@
                 </select>
             `;
         }
+        else if (type === 'device_state') {
+            titleEl.innerText = "Estado de Dispositivo (Sensor/Botón)";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Si el dispositivo:</label>
+                <select id="cfg-dev-trigger" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="DEV_3" ${config.device === 'DEV_3' ? 'selected' : ''}>Sensor de Temperatura Sala</option>
+                    <option value="DEV_4" ${config.device === 'DEV_4' ? 'selected' : ''}>Sensor de Movimiento Pasillo</option>
+                    <option value="DEV_5" ${config.device === 'DEV_5' ? 'selected' : ''}>Botón Físico</option>
+                </select>
+                
+                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Cumple esta condición:</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="cfg-operator" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+                        <option value="==" ${config.operator === '==' ? 'selected' : ''}>Es igual a (==)</option>
+                        <option value=">" ${config.operator === '>' ? 'selected' : ''}>Es mayor a (>)</option>
+                        <option value="<" ${config.operator === '<' ? 'selected' : ''}>Es menor a (<)</option>
+                    </select>
+                    <input type="text" id="cfg-val" value="${config.val || ''}" placeholder="Ej: 25, ON" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+                </div>
+            `;
+        }
         else if (type === 'action') {
             titleEl.innerText = "Acción de Dispositivo";
             contentEl.innerHTML = `
@@ -332,6 +361,11 @@
         } else if (type === 'weather') {
             newConfig.weather = document.getElementById('cfg-weather').value;
             displayDesc = "Clima: " + newConfig.weather;
+        } else if (type === 'device_state') {
+            newConfig.device = document.getElementById('cfg-dev-trigger').value;
+            newConfig.operator = document.getElementById('cfg-operator').value;
+            newConfig.val = document.getElementById('cfg-val').value;
+            displayDesc = newConfig.device + " " + newConfig.operator + " " + newConfig.val;
         } else if (type === 'action') {
             newConfig.device = document.getElementById('cfg-dev').value;
             newConfig.cmd = document.getElementById('cfg-cmd').value;
