@@ -24,6 +24,7 @@ def show_main_menu():
                 "🗄️ Base de Datos (Migraciones y Backups)",
                 "🌐 Herramientas de Red (Escaner RF)",
                 "⚙️ Asistente de Configuración (.env)",
+                "🛠️ Instalar Dependencias (VENV y PIP)",
                 "🔨 Compilar Firmware C++",
                 questionary.Separator(),
                 "❌ Salir"
@@ -53,6 +54,9 @@ def show_main_menu():
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
         elif choice.startswith("⚙️"):
             subprocess.run([sys.executable, "iot.py", "setup", "env"])
+            console.input("\n[dim]Presiona Enter para continuar...[/dim]")
+        elif choice.startswith("🛠️"):
+            subprocess.run([sys.executable, "iot.py", "setup", "install-deps"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
         elif choice.startswith("🔨"):
             subprocess.run([sys.executable, "iot.py", "firmware", "wizard"])
