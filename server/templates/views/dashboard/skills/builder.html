@@ -474,16 +474,19 @@
     }
 
     /* GENERADOR DE AST */
-    function saveAST() {
-        const skillName = document.getElementById('skill_name').value;
-        if(!skillName) return alert("Por favor escribe un nombre para la Skill.");
-
-        let ast = {
+    function compileAST() {
+        let skillName = prompt("Nombre de la Automatización:", "Mi Nueva Skill");
+        if (!skillName) return;
+        
+        const ast = {
             name: skillName,
             conditions: [],
             actions: []
         };
 
+        const canvas = document.getElementById('canvas');
+        
+        // Condiciones
         document.querySelectorAll('#zone-conditions .dropped-block').forEach(el => {
             ast.conditions.push({
                 type: el.getAttribute('data-type'),
@@ -491,6 +494,7 @@
             });
         });
 
+        // Acciones
         document.querySelectorAll('#zone-actions .dropped-block').forEach(el => {
             ast.actions.push({
                 type: el.getAttribute('data-type'),
@@ -498,8 +502,26 @@
             });
         });
 
-        console.log("AST Generado:", ast);
-        alert("¡AST Generado exitosamente! Mira la consola (F12) para ver el JSON estructurado. \n\n" + JSON.stringify(ast, null, 2));
+        console.log("AST Compilado:", JSON.stringify(ast, null, 2));
+        
+        // Enviar al servidor
+        fetch('/api/skills', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: skillName, ast: ast })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.ok) {
+                alert("¡Lógica Compilada y Guardada exitosamente en el Evaluador!");
+                window.location.href = "/skills"; // Redirigir a la lista
+            } else {
+                alert("Error guardando la Skill.");
+            }
+        })
+        .catch(e => {
+            alert("Error de red: " + e);
+        });
     }
 </script>
 {% endblock %}

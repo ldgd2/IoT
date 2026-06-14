@@ -34,3 +34,12 @@ class RFLog(BaseModel):
     payload = Field("TEXT", default={})
     direction = Field("TEXT", default="RX")
     cmd = Field("TEXT", default="")
+
+class Skill(BaseModel):
+    __table__ = "skills"
+    
+    id = Field("INTEGER", primary_key=True)
+    name = Field("TEXT", default="Nueva Skill")
+    ast_json = Field("TEXT", default={})
+    is_active = Field("INTEGER", default=1)
+    created_at = Field("TEXT", default="")

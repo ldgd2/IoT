@@ -20,9 +20,12 @@ import hid
 
 from server.core.config import API_PORT, ENV_FILE
 from server.db.database import BaseModel
-from server.db.models import Device, RFLog
+from server.db.models import Device, RFLog, Skill
+from server.modules.automation.evaluator import evaluator
 
 app = Flask(__name__)
+evaluator.start()
+
 
 # Aseguramos de que las tablas existan al inicio invocando al padre
 BaseModel.migrate_all()
@@ -162,6 +165,26 @@ def api_device(device_id):
         return jsonify({"error": "not found"}), 404
     return jsonify(dev.to_dict())
 
+@app.route("/api/skills", methods=["GET", "POST"])
+def api_skills():
+    if request.method == "POST":
+        data = request.get_json(silent=True)
+        if not data or "name" not in data or "ast" not in data:
+            return jsonify({"error": "bad request"}), 400
+        
+        skill = Skill(
+            name=data["name"],
+            ast_json=data["ast"],
+            created_at=datetime.now().isoformat()
+        )
+        skill.save()
+        return jsonify({"ok": True, "id": getattr(skill, "id", "new")})
+    
+    # GET method
+    skills = [s.to_dict() for s in Skill.all()]
+    return jsonify(skills)
+
+
 
 @app.route("/api/ingest", methods=["POST"])
 def api_ingest():
@@ -191,6 +214,9 @@ def api_ingest():
         direction="RX"
     )
     log.save()
+
+    # Disparar Motor de Automatización en Tiempo Real
+    evaluator.evaluate_event(device_id, payload)
 
     return jsonify({"ok": True})
 
