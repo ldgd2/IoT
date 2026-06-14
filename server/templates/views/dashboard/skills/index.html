@@ -5,8 +5,60 @@
 {% block title %}Skills - Gerlex IoT{% endblock %}
 
 {% block content %}
-<div style="padding: 24px;">
-    {{ cards.m3_hero_card('Automatizaciones', 'Gestiona las Skills y rutinas inteligentes.', btn.m3_button('Crear Nueva Skill', 'filled')) }}
-    <p>Lista de Skills vendrá aquí...</p>
+<div style="padding: 24px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+        <div>
+            <h1 style="margin-bottom: 8px;">Mis Skills (Automatizaciones)</h1>
+            <p style="color: var(--md-text-variant);">Lógica condicional (AST) que corre en el backend.</p>
+        </div>
+        <a href="/skills/builder" style="text-decoration: none;">
+            <button class="btn-m3 btn-filled ripple-btn" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Crear Nueva Skill
+            </button>
+        </a>
+    </div>
+
+    <!-- TABLA DE SKILLS -->
+    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--md-outline-variant);">
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Nombre de la Skill</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Trigger (Cuándo)</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Acción (Qué)</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Estado</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Datos Mockeados por ahora -->
+                <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
+                    <td style="padding: 16px 24px; font-weight: 500;">Luces de Atardecer</td>
+                    <td style="padding: 16px 24px;">18:00 hrs</td>
+                    <td style="padding: 16px 24px;">Encender 'Luz Sala de Estar'</td>
+                    <td style="padding: 16px 24px;">
+                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-tertiary); color: var(--md-on-tertiary);">Activa</span>
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px; color: #d32f2f;">Eliminar</button>
+                    </td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
+                    <td style="padding: 16px 24px; font-weight: 500;">Alerta Frío Extremo</td>
+                    <td style="padding: 16px 24px;">Clima < 10°C</td>
+                    <td style="padding: 16px 24px;">Encender 'Relay Calefactor'</td>
+                    <td style="padding: 16px 24px;">
+                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-surface-variant); color: var(--md-on-surface-variant);">Pausada</span>
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px; color: #d32f2f;">Eliminar</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
 </div>
 {% endblock %}

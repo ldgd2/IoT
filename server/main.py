@@ -79,6 +79,10 @@ def log_view():
 def devices_view():
     return render_template("views/dashboard/devices/index.html", devices=Device.all())
 
+@app.route("/devices/new")
+def devices_wizard_view():
+    return render_template("views/dashboard/devices/wizard.html")
+
 @app.route("/skills")
 def skills_view():
     return render_template("views/dashboard/skills/index.html")
