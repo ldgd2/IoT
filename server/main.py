@@ -21,7 +21,7 @@ import hid
 from server.core.config import API_PORT, ENV_FILE
 from server.db.database import BaseModel
 from server.db.models import Device, RFLog
-from server.modules.automation.models import Skill
+from server.modules.automation.models.skill import Skill
 from server.modules.automation.evaluator import evaluator
 
 app = Flask(__name__)

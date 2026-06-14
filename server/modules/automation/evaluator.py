@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from server.db.models import Device
-from server.modules.automation.models import Skill
+from server.modules.automation.models.skill import Skill
 
 logger = logging.getLogger("AST_Evaluator")
 

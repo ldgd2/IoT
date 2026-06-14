@@ -1,16 +1,10 @@
-from sqlalchemy import Column, Integer, String, JSON, Boolean
-from server.core.database import Base
+from server.db.database import BaseModel, Field
 
-class Skill(Base):
-    """
-    Almacena el JSON AST completo (Pseint) de la rutina.
-    """
-    __tablename__ = "auto_skills"
+class Skill(BaseModel):
+    __table__ = "skills"
     
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    description = Column(String(255))
-    is_active = Column(Boolean, default=True)
-    
-    # JSON logic (El arbol AST que evalua el Engine)
-    ast_logic = Column(JSON, nullable=False) 
+    id = Field("INTEGER", primary_key=True)
+    name = Field("TEXT", default="Nueva Skill")
+    ast_json = Field("TEXT", default={})
+    is_active = Field("INTEGER", default=1)
+    created_at = Field("TEXT", default="")
