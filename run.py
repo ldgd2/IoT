@@ -603,9 +603,9 @@ def cmd_service_manage():
             print(f"  {C.CYAN}  [e]{C.RESET} Habilitar al inicio (enable)")
             print(f"  {C.CYAN}  [d]{C.RESET} Deshabilitar al inicio (disable)")
             print()
-            print(f"  {C.CYAN}  [l]{C.RESET} Ver logs en vivo  (journalctl -f)")
-            print(f"  {C.CYAN}  [L]{C.RESET} Ver ultimas 100 lineas de log")
-            print(f"  {C.CYAN}  [F]{C.RESET} Ver log del archivo  ({LOG_FILE.name})")
+            print(f"  {C.CYAN}  [l]{C.RESET} Ver logs del servidor en vivo (server.log)")
+            print(f"  {C.CYAN}  [j]{C.RESET} Ver eventos del sistema     (journalctl -f)")
+            print(f"  {C.CYAN}  [J]{C.RESET} Ver eventos del sistema     (ultimos 100)")
             print()
             print(f"  {C.CYAN}  [u]{C.RESET} Desinstalar servicio")
 
@@ -663,7 +663,7 @@ def cmd_service_manage():
             ok("Deshabilitado.") if r.returncode == 0 else err(r.stderr.strip())
             pause()
 
-        elif choice == "l":
+        elif choice == "j":
             step(f"journalctl -u {SERVICE_NAME} -f  (Ctrl+C para salir)")
             print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
             try:
@@ -676,7 +676,7 @@ def cmd_service_manage():
                 ok("Saliendo del log.")
             pause()
 
-        elif choice == "L":
+        elif choice == "J":
             step(f"Ultimas 100 lineas — journalctl -u {SERVICE_NAME}")
             print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
             subprocess.run(
@@ -685,7 +685,7 @@ def cmd_service_manage():
             )
             pause()
 
-        elif choice == "F":
+        elif choice == "l":
             step(f"Log de archivo: {LOG_FILE}  (Ctrl+C para salir)")
             print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
             if not LOG_FILE.exists():
