@@ -73,13 +73,26 @@ def firmware_wizard():
 
     # 3. Flujo condicional por Placa
     if pio_env == "rp2040":
-        # Solo compilar para RP2040 (requiere arrastrar el UF2 a la carpeta)
+        import shutil
+        out_dir = ROOT_DIR / "firmwareCompiled" / "device"
+        
+        # Solo compilar para RP2040 y mover el UF2
         for t in targets:
             console.print(f"\n[bold yellow]🛠️  Compilando {t} para {placa}...[/bold yellow]")
             proj_dir = ROOT_DIR / "devices" / t
             res = subprocess.run(["pio", "run", "-e", pio_env], cwd=proj_dir)
             if res.returncode == 0:
-                console.print(f"[green]✅ Compilación exitosa para {t}.[/green] [dim](Copia el archivo UF2 generado al disco RPI-RP2)[/dim]")
+                uf2_source = proj_dir / ".pio" / "build" / pio_env / "firmware.uf2"
+                dest_folder = out_dir / t
+                dest_folder.mkdir(parents=True, exist_ok=True)
+                dest_file = dest_folder / f"firmware_{t}.uf2"
+                
+                if uf2_source.exists():
+                    shutil.copy2(uf2_source, dest_file)
+                    console.print(f"[green]✅ Compilación exitosa para {t}.[/green]")
+                    console.print(f"[bold cyan]📁 Archivo UF2 exportado a: {dest_file}[/bold cyan]")
+                else:
+                    console.print(f"[red]❌ Error: Compilación exitosa pero no se encontró el archivo {uf2_source}[/red]")
             else:
                 console.print(f"[red]❌ Error compilando {t}[/red]")
                 
