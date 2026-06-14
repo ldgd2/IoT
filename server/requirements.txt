@@ -23,5 +23,5 @@ questionary>=2.0.1
 python-dotenv>=1.0.0
 
 platformio>=6.0.0
-
 hidapi>=0.14.0
+SQLAlchemy>=2.0.0
