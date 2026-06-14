@@ -90,7 +90,7 @@ def devices_wizard_view():
 
 @app.route("/skills")
 def skills_view():
-    return render_template("views/dashboard/skills/index.html")
+    return render_template("views/dashboard/skills/index.html", skills=Skill.all())
 
 @app.route("/skills/builder")
 def skills_builder_view():

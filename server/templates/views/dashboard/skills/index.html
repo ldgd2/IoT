@@ -33,29 +33,58 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Datos Mockeados por ahora -->
+                {% for skill in skills %}
                 <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
-                    <td style="padding: 16px 24px; font-weight: 500;">Luces de Atardecer</td>
-                    <td style="padding: 16px 24px;">18:00 hrs</td>
-                    <td style="padding: 16px 24px;">Encender 'Luz Sala de Estar'</td>
+                    <td style="padding: 16px 24px; font-weight: 500;">{{ skill.name }}</td>
                     <td style="padding: 16px 24px;">
-                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-tertiary); color: var(--md-on-tertiary);">Activa</span>
+                        {% if skill.ast_json and skill.ast_json.conditions %}
+                            {% set cond = skill.ast_json.conditions[0] %}
+                            {% if cond.type == 'time' %}
+                                {{ cond.time }} hrs
+                            {% elif cond.type == 'device_state' %}
+                                Evento en dispositivo
+                            {% elif cond.type == 'dev_sensor' %}
+                                Sensor {{ cond.operator }} {{ cond.val }}
+                            {% else %}
+                                {{ cond.type }}
+                            {% endif %}
+                        {% else %}
+                            <i>Manual</i>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        {% if skill.ast_json and skill.ast_json.actions %}
+                            {% set act = skill.ast_json.actions[0] %}
+                            {% if act.type == 'action_device' %}
+                                Mandar {{ act.cmd }}
+                            {% else %}
+                                {{ act.type }}
+                            {% endif %}
+                        {% else %}
+                            <i>Sin Acción</i>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        {% if skill.is_active == 1 %}
+                            <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-tertiary); color: var(--md-on-tertiary);">Activa</span>
+                        {% else %}
+                            <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-surface-variant); color: var(--md-on-surface-variant);">Inactiva</span>
+                        {% endif %}
                     </td>
                     <td style="padding: 16px 24px;">
                         <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px; color: #d32f2f;">Eliminar</button>
                     </td>
                 </tr>
-                <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
-                    <td style="padding: 16px 24px; font-weight: 500;">Alerta Frío Extremo</td>
-                    <td style="padding: 16px 24px;">Clima < 10°C</td>
-                    <td style="padding: 16px 24px;">Encender 'Relay Calefactor'</td>
-                    <td style="padding: 16px 24px;">
-                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-surface-variant); color: var(--md-on-surface-variant);">Pausada</span>
-                    </td>
-                    <td style="padding: 16px 24px;">
-                        <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px; color: #d32f2f;">Eliminar</button>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 48px; color: var(--md-text-variant);">
+                        No has creado ninguna automatización aún.<br><br>
+                        <a href="/skills/builder" style="text-decoration: none;">
+                            <button class="btn-m3 btn-filled ripple-btn">Crear mi primera Skill</button>
+                        </a>
                     </td>
                 </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
