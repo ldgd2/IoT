@@ -23,6 +23,7 @@ def show_main_menu():
                 "🔧 Gestión de Servicios (Systemd / Background)",
                 "🗄️ Base de Datos (Migraciones y Backups)",
                 "🌐 Herramientas de Red (Escaner RF)",
+                "⚙️ Asistente de Configuración (.env)",
                 questionary.Separator(),
                 "❌ Salir"
             ],
@@ -48,6 +49,9 @@ def show_main_menu():
             show_db_menu()
         elif choice.startswith("🌐"):
             subprocess.run([sys.executable, "iot.py", "network", "scan"])
+            console.input("\n[dim]Presiona Enter para continuar...[/dim]")
+        elif choice.startswith("⚙️"):
+            subprocess.run([sys.executable, "iot.py", "setup", "env"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
 
 def show_service_menu():

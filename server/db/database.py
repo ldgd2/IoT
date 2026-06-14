@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from typing import Any, Dict, List, TypeVar, Type, Optional
-from core.config import DB_FILE
+from server.core.config import DB_FILE
 
 T = TypeVar('T', bound='BaseModel')
 

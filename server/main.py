@@ -14,7 +14,7 @@ import threading
 import time
 import json
 
-from core.config import API_PORT
+from server.core.config import API_PORT
 from server.db.database import BaseModel
 from server.db.models import Device, RFLog
 

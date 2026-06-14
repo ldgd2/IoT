@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 console = Console()
-from core.config import SERVER_DIR, VENV_DIR
+from server.core.config import SERVER_DIR, VENV_DIR
 
 SERVICE_NAME = "iot-rf-gateway.service"
 
