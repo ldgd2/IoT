@@ -12,6 +12,10 @@ pyserial>=3.5            # Comunicación con módulo RF por serial (Arduino, etc
 rich>=13.0.0
 click>=8.0
 
+
+rich>=13.0.0
+click>=8.0
+
 rich-click>=1.7.0
 
 questionary>=2.0.1
@@ -19,3 +23,5 @@ questionary>=2.0.1
 python-dotenv>=1.0.0
 
 platformio>=6.0.0
+
+hidapi>=0.14.0
