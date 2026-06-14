@@ -1,0 +1,54 @@
+/* Paleta de Colores Material 3 (Warm/Light Theme) */
+:root {
+    --md-bg: #F5EBE1;
+    --md-surface: #F5EBE1;
+    --md-surface-container: #EBDDCE;
+    --md-primary: #6B4C12;
+    --md-on-primary: #FFFFFF;
+    --md-secondary: #F3B556;
+    --md-on-secondary: #3D2905;
+    --md-tertiary: #A2B159;
+    --md-on-tertiary: #FFFFFF;
+    --md-surface-variant: #F4D3A1;
+    --md-on-surface-variant: #4B330B;
+    --md-text: #251D14;
+    --md-text-variant: #5B4E42;
+    --md-outline: #897B6B;
+    --md-outline-variant: #D9C8B8;
+    --md-elevated: #FDF8F5;
+    
+    /* Radios de Material 3 */
+    --radius-full: 100px;
+    --radius-extra-large: 28px;
+    --radius-large: 16px;
+    --radius-medium: 12px;
+    
+    --md-easing: cubic-bezier(0.2, 0, 0, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background-color: var(--md-bg);
+    color: var(--md-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden; 
+    display: flex;
+    height: 100vh;
+}
+
+/* Contenido Principal (A la derecha de los drawers) */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 48px;
+}
+
+/* --- EFECTO RIPPLE (Animacion) --- */
+.ripple { 
+    position: absolute; border-radius: 50%; transform: scale(0); 
+    animation: ripple-anim 600ms linear; background-color: rgba(255, 255, 255, 0.3); 
+    pointer-events: none; 
+}
+@keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }

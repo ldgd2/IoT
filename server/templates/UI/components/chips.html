@@ -1,0 +1,19 @@
+<style>
+.m3-chip {
+    padding: 0 16px; height: 32px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 8px; font-size: 0.875rem; font-weight: 500;
+    cursor: pointer; transition: 0.2s; border: 1px solid var(--md-outline); color: var(--md-text);
+}
+.m3-chip.tonal { background: var(--md-surface-variant); border-color: transparent; }
+.m3-chip.input-chip { background: var(--md-elevated); border: 1px solid var(--md-outline-variant); border-radius: 8px; }
+.m3-chip svg { width: 18px; height: 18px; }
+</style>
+
+{% macro m3_chip(text, style='standard', icon='') %}
+<div class="m3-chip {{ style }} ripple-btn">
+    {% if icon %}
+        {{ icon|safe }}
+    {% endif %}
+    {{ text }}
+</div>
+{% endmacro %}

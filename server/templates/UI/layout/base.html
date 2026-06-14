@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gerlex IoT OS{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/m3-theme.css') }}">
+    <!-- Estilos especificos de componentes insertados desde la vista -->
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- Incluir Navigation Rail -->
+    {% include 'UI/layout/nav_rail.html' %}
+
+    <!-- Incluir Navigation Drawer (expandido) -->
+    {% include 'UI/layout/nav_drawer.html' %}
+
+    <!-- CONTENIDO DINAMICO DE LA VISTA -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/m3-core.js') }}"></script>
+    <script>
+        // Scripts especificos de cada vista
+        {% block extra_js %}{% endblock %}
+    </script>
+</body>
+</html>
