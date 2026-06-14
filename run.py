@@ -441,20 +441,52 @@ def cmd_status():
     pause()
 
 
-# ── 8. CREAR SERVICIO (Linux systemd) ────────────────────
-def cmd_service_linux():
-    separator("Crear Servicio systemd (Linux)")
+# ── 8. GESTIÓN SERVICIO systemd (Linux) ──────────────────
+SERVICE_NAME = "iot-rf-gateway"
+
+
+def _service_installed() -> bool:
+    """True si el .service existe en /etc/systemd/system."""
+    return Path(f"/etc/systemd/system/{SERVICE_NAME}.service").exists()
+
+
+def _systemctl(action: str, capture: bool = False):
+    """Ejecuta sudo systemctl <action> <SERVICE_NAME>."""
+    return subprocess.run(
+        ["sudo", "systemctl", action, SERVICE_NAME],
+        capture_output=capture, text=True
+    )
+
+
+def _service_active() -> bool:
+    r = subprocess.run(
+        ["systemctl", "is-active", SERVICE_NAME],
+        capture_output=True, text=True
+    )
+    return r.stdout.strip() == "active"
+
+
+def _service_enabled() -> bool:
+    r = subprocess.run(
+        ["systemctl", "is-enabled", SERVICE_NAME],
+        capture_output=True, text=True
+    )
+    return r.stdout.strip() == "enabled"
+
+
+def cmd_service_install():
+    """Instala el archivo .service en systemd y lo habilita."""
+    separator("Instalar Servicio systemd")
 
     if IS_WINDOWS:
         warn("Esta función solo está disponible en Linux.")
         pause()
         return
 
-    service_name = "iot-rf-gateway"
-    service_file = Path(f"/etc/systemd/system/{service_name}.service")
-    py_exec = python_bin()
+    service_file = Path(f"/etc/systemd/system/{SERVICE_NAME}.service")
+    py_exec  = python_bin()
     app_exec = str(SERVER_DIR / "app.py")
-    user = os.getenv("USER", "pi")
+    user     = os.getenv("USER", "pi")
 
     unit = textwrap.dedent(f"""\
         [Unit]
@@ -478,28 +510,199 @@ def cmd_service_linux():
 
     print()
     print(f"{C.GRAY}{unit}{C.RESET}")
-    print()
 
-    if not confirm(f"¿Instalar el servicio '{service_name}' en /etc/systemd/system/?"):
+    if not confirm(f"¿Instalar el servicio '{SERVICE_NAME}' en /etc/systemd/system/?"):
         return
 
     step("Escribiendo archivo de servicio (requiere sudo)...")
     try:
-        proc = subprocess.run(
+        subprocess.run(
             ["sudo", "tee", str(service_file)],
-            input=unit, text=True, check=True
+            input=unit, text=True, check=True, capture_output=True
         )
-        run_cmd(["sudo", "systemctl", "daemon-reload"])
-        run_cmd(["sudo", "systemctl", "enable", service_name])
-        ok(f"Servicio '{service_name}' instalado y habilitado.")
-        info("Comandos útiles:")
-        dim(f"  sudo systemctl start   {service_name}")
-        dim(f"  sudo systemctl stop    {service_name}")
-        dim(f"  sudo systemctl status  {service_name}")
-        dim(f"  journalctl -u {service_name} -f")
+        subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+        subprocess.run(["sudo", "systemctl", "enable", SERVICE_NAME], check=True)
+        ok(f"Servicio '{SERVICE_NAME}' instalado y habilitado.")
+        info("Usa la opcion [5] del menu para gestionarlo.")
     except subprocess.CalledProcessError as e:
         err(f"No se pudo instalar el servicio: {e}")
     pause()
+
+
+# Alias para compatibilidad con el menu anterior
+def cmd_service_linux():
+    cmd_service_manage()
+
+
+def _print_service_status():
+    """Imprime el estado compacto del servicio systemd."""
+    installed = _service_installed()
+    print()
+    print(f"  {C.BOLD}Servicio: {C.CYAN}{SERVICE_NAME}{C.RESET}")
+    if not installed:
+        print(f"  Instalado : {C.RED}No instalado{C.RESET}")
+        return
+    active  = _service_active()
+    enabled = _service_enabled()
+    active_str  = f"{C.GREEN}activo{C.RESET}"   if active  else f"{C.RED}inactivo{C.RESET}"
+    enabled_str = f"{C.GREEN}habilitado{C.RESET}" if enabled else f"{C.YELLOW}deshabilitado{C.RESET}"
+    print(f"  Instalado : {C.GREEN}Si{C.RESET}")
+    print(f"  Estado    : {active_str}")
+    print(f"  Inicio    : {enabled_str}")
+    print()
+
+    # systemctl status (compacto)
+    r = subprocess.run(
+        ["systemctl", "status", SERVICE_NAME, "--no-pager", "-l", "-n", "5"],
+        capture_output=True, text=True
+    )
+    for line in r.stdout.splitlines():
+        print(f"  {C.GRAY}{line}{C.RESET}")
+
+
+def cmd_service_manage():
+    """Submenú completo de gestión del servicio systemd."""
+    if IS_WINDOWS:
+        warn("Esta función solo está disponible en Linux.")
+        pause()
+        return
+
+    while True:
+        os.system("clear")
+        banner()
+        installed = _service_installed()
+        _print_service_status()
+
+        print()
+        separator("Gestion del Servicio systemd")
+        print()
+
+        if not installed:
+            print(f"  {C.CYAN}  [a]{C.RESET} Instalar servicio")
+        else:
+            active = _service_active()
+            if active:
+                print(f"  {C.CYAN}  [p]{C.RESET} Detener servicio")
+                print(f"  {C.CYAN}  [r]{C.RESET} Reiniciar servicio")
+            else:
+                print(f"  {C.CYAN}  [s]{C.RESET} Iniciar servicio")
+
+            print(f"  {C.CYAN}  [e]{C.RESET} Habilitar al inicio (enable)")
+            print(f"  {C.CYAN}  [d]{C.RESET} Deshabilitar al inicio (disable)")
+            print()
+            print(f"  {C.CYAN}  [l]{C.RESET} Ver logs en vivo  (journalctl -f)")
+            print(f"  {C.CYAN}  [L]{C.RESET} Ver ultimas 100 lineas de log")
+            print(f"  {C.CYAN}  [F]{C.RESET} Ver log del archivo  ({LOG_FILE.name})")
+            print()
+            print(f"  {C.CYAN}  [u]{C.RESET} Desinstalar servicio")
+
+        print()
+        print(f"  {C.GRAY}  [q]{C.RESET} Volver al menu principal")
+        print()
+        separator()
+        print()
+
+        choice = input(f"  {C.BOLD}Opcion:{C.RESET} ").strip()
+
+        # ── acciones ──
+        if choice == "q":
+            break
+
+        elif choice == "a":
+            cmd_service_install()
+
+        elif choice == "s":
+            step(f"Iniciando {SERVICE_NAME}...")
+            r = _systemctl("start", capture=True)
+            if r.returncode == 0:
+                ok("Servicio iniciado.")
+            else:
+                err(r.stderr.strip() or "Error al iniciar.")
+            pause()
+
+        elif choice == "p":
+            step(f"Deteniendo {SERVICE_NAME}...")
+            r = _systemctl("stop", capture=True)
+            if r.returncode == 0:
+                ok("Servicio detenido.")
+            else:
+                err(r.stderr.strip() or "Error al detener.")
+            pause()
+
+        elif choice == "r":
+            step(f"Reiniciando {SERVICE_NAME}...")
+            r = _systemctl("restart", capture=True)
+            if r.returncode == 0:
+                ok("Servicio reiniciado.")
+            else:
+                err(r.stderr.strip() or "Error al reiniciar.")
+            pause()
+
+        elif choice == "e":
+            step(f"Habilitando {SERVICE_NAME} al inicio...")
+            r = _systemctl("enable", capture=True)
+            ok("Habilitado.") if r.returncode == 0 else err(r.stderr.strip())
+            pause()
+
+        elif choice == "d":
+            step(f"Deshabilitando {SERVICE_NAME} del inicio...")
+            r = _systemctl("disable", capture=True)
+            ok("Deshabilitado.") if r.returncode == 0 else err(r.stderr.strip())
+            pause()
+
+        elif choice == "l":
+            step(f"journalctl -u {SERVICE_NAME} -f  (Ctrl+C para salir)")
+            print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
+            try:
+                subprocess.run(
+                    ["sudo", "journalctl", "-u", SERVICE_NAME,
+                     "-f", "--no-pager", "-n", "40"]
+                )
+            except KeyboardInterrupt:
+                print()
+                ok("Saliendo del log.")
+            pause()
+
+        elif choice == "L":
+            step(f"Ultimas 100 lineas — journalctl -u {SERVICE_NAME}")
+            print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
+            subprocess.run(
+                ["sudo", "journalctl", "-u", SERVICE_NAME,
+                 "--no-pager", "-n", "100"]
+            )
+            pause()
+
+        elif choice == "F":
+            step(f"Log de archivo: {LOG_FILE}  (Ctrl+C para salir)")
+            print(f"  {C.GRAY}{'─'*52}{C.RESET}\n")
+            if not LOG_FILE.exists():
+                warn(f"No existe aun: {LOG_FILE}")
+            else:
+                try:
+                    subprocess.run(["tail", "-n", "60", "-f", str(LOG_FILE)])
+                except KeyboardInterrupt:
+                    print()
+                    ok("Saliendo del log.")
+            pause()
+
+        elif choice == "u":
+            if not confirm(f"¿Desinstalar el servicio '{SERVICE_NAME}'?"):
+                continue
+            step("Desinstalando...")
+            try:
+                _systemctl("stop")
+                _systemctl("disable")
+                svc_path = Path(f"/etc/systemd/system/{SERVICE_NAME}.service")
+                subprocess.run(["sudo", "rm", "-f", str(svc_path)], check=True)
+                subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+                ok("Servicio desinstalado correctamente.")
+            except subprocess.CalledProcessError as e:
+                err(f"Error al desinstalar: {e}")
+            pause()
+
+        else:
+            warn(f"Opcion invalida: '{choice}'")
+            time.sleep(0.5)
 
 
 # ── 9. CREAR TAREA PROGRAMADA (Windows) ──────────────────
@@ -684,8 +887,9 @@ MENU_ITEMS = [
     ("1", "Instalar dependencias",           cmd_install,                 "setup"),
     ("2", "Crear entorno virtual (.venv)",   cmd_venv,                    "setup"),
     ("─", None,                              None,                        None),
-    ("3", "Servicio auto-inicio (Linux/RPi)",cmd_service_linux,           "service"),
-    ("4", "Tarea programada (Windows)",      cmd_service_windows,         "service"),
+    ("3", "Instalar servicio  (Linux/RPi)",  cmd_service_install,         "service"),
+    ("5", "Gestionar servicio (Linux/RPi)",  cmd_service_manage,          "service"),
+    ("4", "Tarea programada   (Windows)",    cmd_service_windows,         "service"),
     ("─", None,                              None,                        None),
     ("d", "Ver dispositivos (live)",         cmd_devices,                 "tools"),
     ("t", "Simular trama RF",                cmd_simulate_rf,             "tools"),
@@ -769,17 +973,23 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
             Comandos disponibles:
-              start      Arrancar servidor en segundo plano
-              start-fg   Arrancar servidor en primer plano
-              stop       Detener servidor
-              restart    Reiniciar servidor
-              status     Ver estado del sistema
-              logs       Ver logs en vivo
-              install    Instalar dependencias
-              venv       Crear entorno virtual
-              service    Instalar servicio del sistema
-              devices    Listar dispositivos
-              simulate   Simular trama RF
+              start        Arrancar servidor en segundo plano
+              start-fg     Arrancar servidor en primer plano
+              stop         Detener servidor
+              restart      Reiniciar servidor
+              status       Ver estado del sistema
+              logs         Ver logs en vivo
+              install      Instalar dependencias
+              venv         Crear entorno virtual
+              service      Instalar servicio systemd (Linux)
+              svc-manage   Submenú gestión del servicio systemd
+              svc-start    Iniciar servicio systemd
+              svc-stop     Detener servicio systemd
+              svc-restart  Reiniciar servicio systemd
+              svc-status   Estado del servicio systemd
+              svc-logs     Logs en vivo del servicio (journalctl)
+              devices      Listar dispositivos
+              simulate     Simular trama RF
         """)
     )
     parser.add_argument("command", nargs="?", help="Comando a ejecutar")
@@ -793,11 +1003,17 @@ COMMAND_MAP = {
     "restart":  cmd_restart,
     "status":   cmd_status,
     "logs":     cmd_logs,
-    "install":  cmd_install,
-    "venv":     cmd_venv,
-    "service":  lambda: cmd_service_linux() if IS_LINUX else cmd_service_windows(),
-    "devices":  cmd_devices,
-    "simulate": cmd_simulate_rf,
+    "install":    cmd_install,
+    "venv":        cmd_venv,
+    "service":     lambda: cmd_service_install() if IS_LINUX else cmd_service_windows(),
+    "svc-manage":  cmd_service_manage,
+    "svc-start":   lambda: _systemctl("start")   if IS_LINUX else warn("Solo Linux"),
+    "svc-stop":    lambda: _systemctl("stop")    if IS_LINUX else warn("Solo Linux"),
+    "svc-restart": lambda: _systemctl("restart") if IS_LINUX else warn("Solo Linux"),
+    "svc-status":  lambda: _print_service_status() or pause(),
+    "svc-logs":    lambda: subprocess.run(["sudo","journalctl","-u",SERVICE_NAME,"-f","--no-pager","-n","60"]) if IS_LINUX else warn("Solo Linux"),
+    "devices":     cmd_devices,
+    "simulate":    cmd_simulate_rf,
 }
 
 
