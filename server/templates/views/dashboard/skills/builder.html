@@ -1,142 +1,376 @@
 {% extends "UI/layout/base.html" %}
 
-{% block title %}Skill Builder - Gerlex IoT{% endblock %}
+{% block title %}Skill Builder Visual - Gerlex IoT{% endblock %}
 
 {% block content %}
-<div style="padding: 24px; max-width: 800px; margin: 0 auto;">
-    
-    <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 16px;">
-        <a href="/skills" style="color: var(--md-text); text-decoration: none;">
-            <div class="icon-btn standard ripple-btn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+<style>
+    .builder-container {
+        display: flex;
+        height: calc(100vh - 80px);
+        gap: 24px;
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .toolbox {
+        width: 280px;
+        background: var(--md-surface-container);
+        border-radius: var(--radius-large);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+    }
+    .canvas {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        overflow-y: auto;
+    }
+    .drop-zone {
+        background: var(--md-surface);
+        border: 2px dashed var(--md-outline-variant);
+        border-radius: var(--radius-large);
+        padding: 24px;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: background 0.3s;
+    }
+    .drop-zone.drag-over {
+        background: var(--md-surface-variant);
+        border-color: var(--md-primary);
+    }
+    .block {
+        background: var(--md-elevated);
+        border: 1px solid var(--md-outline-variant);
+        border-radius: var(--radius-medium);
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        cursor: grab;
+        user-select: none;
+        transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .block:active {
+        cursor: grabbing;
+        transform: scale(0.98);
+    }
+    .block .icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--md-surface-variant);
+        color: var(--md-on-surface-variant);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .block-content {
+        flex: 1;
+    }
+    .block-title {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    .block-desc {
+        font-size: 0.85rem;
+        color: var(--md-text-variant);
+    }
+    .dropped-block {
+        background: var(--md-tertiary);
+        color: var(--md-on-tertiary);
+        border: none;
+        cursor: pointer;
+    }
+    .dropped-block .icon {
+        background: rgba(255,255,255,0.2);
+        color: white;
+    }
+    .dropped-block .block-desc {
+        color: rgba(255,255,255,0.8);
+    }
+
+    /* Modal MD3 */
+    .md3-dialog-backdrop {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .md3-dialog {
+        background: var(--md-surface-container);
+        border-radius: 28px;
+        padding: 24px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+</style>
+
+<div class="builder-container">
+    <!-- CAJA DE HERRAMIENTAS (TOOLBOX) -->
+    <div class="toolbox">
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Módulos</h2>
+        <p style="font-size: 0.85rem; color: var(--md-text-variant); margin-bottom: 16px;">Arrastra los bloques al lienzo.</p>
+        
+        <strong style="font-size: 0.9rem; color: var(--md-primary);">Triggers / Condiciones</strong>
+        
+        <div class="block" draggable="true" ondragstart="drag(event)" data-type="time">
+            <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+            <div class="block-content">
+                <div class="block-title">Tiempo (Reloj)</div>
+                <div class="block-desc">Doble clic para configurar</div>
             </div>
-        </a>
-        <div>
-            <h1 style="margin-bottom: 4px;">Crear Nueva Skill</h1>
-            <p style="color: var(--md-text-variant);">Constructor visual paso a paso de automatizaciones AST.</p>
+        </div>
+
+        <div class="block" draggable="true" ondragstart="drag(event)" data-type="date">
+            <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+            <div class="block-content">
+                <div class="block-title">Fecha / Calendario</div>
+                <div class="block-desc">Doble clic para configurar</div>
+            </div>
+        </div>
+
+        <div class="block" draggable="true" ondragstart="drag(event)" data-type="weather">
+            <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19C19.985 19 22 16.985 22 14.5C22 12.18 20.255 10.25 18 10.03C17.52 7.17 15.01 5 12 5C9.28 5 6.96 6.82 6.18 9.29C3.81 9.53 2 11.53 2 14C2 16.76 4.24 19 7 19H17.5Z"></path></svg></div>
+            <div class="block-content">
+                <div class="block-title">Clima</div>
+                <div class="block-desc">Doble clic para configurar</div>
+            </div>
+        </div>
+
+        <strong style="font-size: 0.9rem; color: var(--md-primary); margin-top: 16px;">Acciones</strong>
+        
+        <div class="block" draggable="true" ondragstart="drag(event)" data-type="action">
+            <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+            <div class="block-content">
+                <div class="block-title">Controlar Dispositivo</div>
+                <div class="block-desc">Doble clic para configurar</div>
+            </div>
         </div>
     </div>
 
-    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 32px; overflow: hidden; position: relative;">
+    <!-- LIENZO (CANVAS) -->
+    <div class="canvas">
         
-        <!-- STEP INDICATOR -->
-        <div style="display: flex; gap: 8px; margin-bottom: 32px;">
-            <div id="sk-ind-1" style="flex: 1; height: 6px; background: var(--md-primary); border-radius: 3px; transition: 0.3s;"></div>
-            <div id="sk-ind-2" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
-            <div id="sk-ind-3" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
-            <div id="sk-ind-4" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1 style="margin-bottom: 4px;">Constructor de Lógica</h1>
+                <input type="text" id="skill_name" placeholder="Escribe el nombre de esta Skill..." style="font-size: 1.1rem; border: none; background: transparent; color: var(--md-text); outline: none; width: 400px; padding: 4px 0; border-bottom: 1px solid var(--md-outline);">
+            </div>
+            <button class="btn-m3 btn-filled ripple-btn" onclick="saveAST()">Guardar y Compilar AST</button>
         </div>
 
-        <!-- STEP 1: TRIGGER -->
-        <div id="sk-step-1" class="wizard-step" style="display: block;">
-            <h2>Paso 1: ¿Cuándo? (Trigger)</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Selecciona el evento que iniciará esta rutina.</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-                <label class="m3-control" style="background: var(--md-surface); padding: 16px; border-radius: var(--radius-medium); border: 1px solid var(--md-outline-variant); gap: 12px;">
-                    <input type="radio" name="trigger_type" value="time" checked>
-                    <div class="m3-radio"></div>
-                    <div>
-                        <strong>Hora Específica</strong><br>
-                        <span style="font-size: 0.85rem; color: var(--md-text-variant);">Ej: Todos los días a las 18:00</span>
-                    </div>
-                </label>
-                <label class="m3-control" style="background: var(--md-surface); padding: 16px; border-radius: var(--radius-medium); border: 1px solid var(--md-outline-variant); gap: 12px;">
-                    <input type="radio" name="trigger_type" value="sensor">
-                    <div class="m3-radio"></div>
-                    <div>
-                        <strong>Cambio en Sensor</strong><br>
-                        <span style="font-size: 0.85rem; color: var(--md-text-variant);">Ej: Si Temperatura > 25°C</span>
-                    </div>
-                </label>
-            </div>
-            
-            <div style="display: flex; justify-content: flex-end;">
-                <button class="btn-m3 btn-filled ripple-btn" onclick="nextSkStep(2)">Siguiente</button>
+        <div>
+            <h3 style="margin-bottom: 12px; color: var(--md-primary);">CUANDO SUCEDA ESTO (Condiciones)</h3>
+            <div class="drop-zone" id="zone-conditions" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, 'condition')">
+                <p style="color: var(--md-text-variant); text-align: center; margin-top: 60px; pointer-events: none;">Arrastra módulos de Tiempo, Clima o Sensores aquí</p>
             </div>
         </div>
 
-        <!-- STEP 2: CONDITION -->
-        <div id="sk-step-2" class="wizard-step" style="display: none;">
-            <h2>Paso 2: Condiciones Extras (Opcional)</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">¿Debe cumplirse algo más para que se ejecute la acción?</p>
-            
-            <div style="background: var(--md-surface); padding: 24px; border-radius: var(--radius-medium); margin-bottom: 24px;">
-                <label class="m3-control" style="gap: 12px;">
-                    <input type="checkbox" id="cond_weather">
-                    <div class="m3-checkbox"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
-                    <span>Solo si está lloviendo (API Clima)</span>
-                </label>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between;">
-                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextSkStep(1)">Atrás</button>
-                <button class="btn-m3 btn-filled ripple-btn" onclick="nextSkStep(3)">Siguiente</button>
+        <div>
+            <h3 style="margin-bottom: 12px; color: var(--md-primary);">HAZ ESTO (Acciones)</h3>
+            <div class="drop-zone" id="zone-actions" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, 'action')">
+                <p style="color: var(--md-text-variant); text-align: center; margin-top: 60px; pointer-events: none;">Arrastra módulos de Control de Dispositivos aquí</p>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- STEP 3: ACTION -->
-        <div id="sk-step-3" class="wizard-step" style="display: none;">
-            <h2>Paso 3: ¿Qué Hacer? (Acción)</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Selecciona el dispositivo a controlar y su nuevo estado.</p>
-            
-            <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-                <div style="flex: 1;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 8px;">Dispositivo</label>
-                    <select style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit;">
-                        <option>Luz Sala de Estar</option>
-                        <option>Relay Jardín</option>
-                    </select>
-                </div>
-                <div style="flex: 1;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 8px;">Estado</label>
-                    <select style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit;">
-                        <option>Encender (ON)</option>
-                        <option>Apagar (OFF)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between;">
-                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextSkStep(2)">Atrás</button>
-                <button class="btn-m3 btn-filled ripple-btn" onclick="nextSkStep(4)">Siguiente</button>
-            </div>
+<!-- MODAL MD3 DE CONFIGURACION -->
+<div class="md3-dialog-backdrop" id="config-dialog">
+    <div class="md3-dialog">
+        <h2 id="dialog-title" style="margin-bottom: 16px; font-weight: 500;">Configurar</h2>
+        <div id="dialog-content" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <!-- Contenido dinámico (Inputs de tiempo, selects, etc) -->
         </div>
-
-        <!-- STEP 4: SAVE -->
-        <div id="sk-step-4" class="wizard-step" style="display: none;">
-            <h2>Paso 4: Guardar Skill</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Asigna un nombre a tu nueva habilidad y compilaremos el JSON del AST.</p>
-            
-            <div style="margin-bottom: 24px;">
-                <label style="display: block; font-weight: 500; margin-bottom: 8px;">Nombre de la Skill</label>
-                <input type="text" placeholder="Ej: Prender luces al atardecer" style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem;">
-            </div>
-            
-            <div style="display: flex; justify-content: space-between;">
-                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextSkStep(3)">Atrás</button>
-                <button class="btn-m3 btn-filled ripple-btn" onclick="finishSkWizard()">Compilar y Guardar</button>
-            </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button class="btn-m3 btn-text ripple-btn" onclick="closeDialog()">Cancelar</button>
+            <button class="btn-m3 btn-filled ripple-btn" onclick="saveDialog()">Confirmar</button>
         </div>
-
     </div>
 </div>
 
 <script>
-    function nextSkStep(step) {
-        document.querySelectorAll('.wizard-step').forEach(el => el.style.display = 'none');
-        document.getElementById('sk-step-' + step).style.display = 'block';
-        
-        for(let i=1; i<=4; i++) {
-            const ind = document.getElementById('sk-ind-' + i);
-            if(i <= step) ind.style.background = 'var(--md-primary)';
-            else ind.style.background = 'var(--md-outline-variant)';
-        }
+    let draggedType = null;
+    let draggedHTML = null;
+    let activeEditingNode = null;
+
+    function drag(ev) {
+        draggedType = ev.target.getAttribute('data-type');
+        draggedHTML = ev.target.innerHTML;
     }
 
-    function finishSkWizard() {
-        alert("¡Skill AST compilada y guardada en SQLite!");
-        window.location.href = "/skills";
+    function allowDrop(ev) {
+        ev.preventDefault();
+        ev.currentTarget.classList.add('drag-over');
+    }
+
+    function leaveDrop(ev) {
+        ev.currentTarget.classList.remove('drag-over');
+    }
+
+    function drop(ev, zoneType) {
+        ev.preventDefault();
+        ev.currentTarget.classList.remove('drag-over');
+
+        // Validacion simple: Triggers a conditions, Action a actions
+        if (zoneType === 'condition' && draggedType === 'action') {
+            alert("Los bloques de acción deben ir en la zona 'HAZ ESTO'.");
+            return;
+        }
+        if (zoneType === 'action' && draggedType !== 'action') {
+            alert("Los bloques de condiciones/tiempo deben ir en la zona 'CUANDO SUCEDA ESTO'.");
+            return;
+        }
+
+        // Quitar el texto de placeholder si existe
+        const placeholder = ev.currentTarget.querySelector('p');
+        if (placeholder) placeholder.style.display = 'none';
+
+        // Crear el nuevo nodo
+        const newNode = document.createElement('div');
+        newNode.className = 'block dropped-block';
+        newNode.innerHTML = draggedHTML;
+        newNode.setAttribute('data-type', draggedType);
+        newNode.setAttribute('data-config', '{}'); // JSON de config guardado
+        
+        // Evento de doble clic para editar
+        newNode.ondblclick = function() {
+            openDialog(newNode);
+        };
+
+        // Agregar indicación visual de doble clic si acaba de soltar
+        newNode.querySelector('.block-desc').innerText = "Haz doble clic para configurar";
+
+        ev.currentTarget.appendChild(newNode);
+    }
+
+    /* SISTEMA DE DIALOGOS MD3 DINAMICOS */
+    function openDialog(node) {
+        activeEditingNode = node;
+        const type = node.getAttribute('data-type');
+        const configStr = node.getAttribute('data-config');
+        const config = JSON.parse(configStr || '{}');
+
+        const titleEl = document.getElementById('dialog-title');
+        const contentEl = document.getElementById('dialog-content');
+        contentEl.innerHTML = ''; // Limpiar
+
+        if (type === 'time') {
+            titleEl.innerText = "Configurar Hora";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Selecciona la hora de ejecución</label>
+                <input type="time" id="cfg-time" value="${config.time || '12:00'}" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.2rem; background: var(--md-surface); color: var(--md-text);">
+            `;
+        } 
+        else if (type === 'date') {
+            titleEl.innerText = "Configurar Fecha";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Selecciona la fecha del calendario</label>
+                <input type="date" id="cfg-date" value="${config.date || ''}" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.2rem; background: var(--md-surface); color: var(--md-text);">
+            `;
+        }
+        else if (type === 'weather') {
+            titleEl.innerText = "Condición de Clima";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Ejecutar solo si el clima está:</label>
+                <select id="cfg-weather" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.1rem; background: var(--md-surface); color: var(--md-text);">
+                    <option value="soleado" ${config.weather === 'soleado' ? 'selected' : ''}>Soleado / Despejado</option>
+                    <option value="nublado" ${config.weather === 'nublado' ? 'selected' : ''}>Nublado</option>
+                    <option value="lluvioso" ${config.weather === 'lluvioso' ? 'selected' : ''}>Lluvioso</option>
+                    <option value="frio" ${config.weather === 'frio' ? 'selected' : ''}>Frío / Nieve</option>
+                </select>
+            `;
+        }
+        else if (type === 'action') {
+            titleEl.innerText = "Acción de Dispositivo";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Dispositivo Destino:</label>
+                <select id="cfg-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="DEV_1">Luz Principal</option>
+                    <option value="DEV_2">Relay Jardín</option>
+                </select>
+                
+                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Comando a enviar:</label>
+                <select id="cfg-cmd" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="ON">Encender (ON)</option>
+                    <option value="OFF">Apagar (OFF)</option>
+                    <option value="TOGGLE">Alternar (Toggle)</option>
+                </select>
+            `;
+        }
+
+        document.getElementById('config-dialog').style.display = 'flex';
+    }
+
+    function closeDialog() {
+        document.getElementById('config-dialog').style.display = 'none';
+        activeEditingNode = null;
+    }
+
+    function saveDialog() {
+        if (!activeEditingNode) return;
+        const type = activeEditingNode.getAttribute('data-type');
+        let newConfig = {};
+        let displayDesc = "";
+
+        if (type === 'time') {
+            newConfig.time = document.getElementById('cfg-time').value;
+            displayDesc = "A las " + newConfig.time;
+        } else if (type === 'date') {
+            newConfig.date = document.getElementById('cfg-date').value;
+            displayDesc = "El " + newConfig.date;
+        } else if (type === 'weather') {
+            newConfig.weather = document.getElementById('cfg-weather').value;
+            displayDesc = "Clima: " + newConfig.weather;
+        } else if (type === 'action') {
+            newConfig.device = document.getElementById('cfg-dev').value;
+            newConfig.cmd = document.getElementById('cfg-cmd').value;
+            displayDesc = newConfig.cmd + " -> " + newConfig.device;
+        }
+
+        activeEditingNode.setAttribute('data-config', JSON.stringify(newConfig));
+        activeEditingNode.querySelector('.block-desc').innerText = displayDesc;
+        
+        closeDialog();
+    }
+
+    /* GENERADOR DE AST */
+    function saveAST() {
+        const skillName = document.getElementById('skill_name').value;
+        if(!skillName) return alert("Por favor escribe un nombre para la Skill.");
+
+        let ast = {
+            name: skillName,
+            conditions: [],
+            actions: []
+        };
+
+        document.querySelectorAll('#zone-conditions .dropped-block').forEach(el => {
+            ast.conditions.push({
+                type: el.getAttribute('data-type'),
+                config: JSON.parse(el.getAttribute('data-config') || '{}')
+            });
+        });
+
+        document.querySelectorAll('#zone-actions .dropped-block').forEach(el => {
+            ast.actions.push({
+                type: el.getAttribute('data-type'),
+                config: JSON.parse(el.getAttribute('data-config') || '{}')
+            });
+        });
+
+        console.log("AST Generado:", ast);
+        alert("¡AST Generado exitosamente! Mira la consola (F12) para ver el JSON estructurado. \n\n" + JSON.stringify(ast, null, 2));
     }
 </script>
 {% endblock %}

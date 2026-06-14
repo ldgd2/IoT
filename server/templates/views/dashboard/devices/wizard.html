@@ -25,56 +25,36 @@
         <div style="display: flex; gap: 8px; margin-bottom: 32px;">
             <div id="ind-1" style="flex: 1; height: 6px; background: var(--md-primary); border-radius: 3px; transition: 0.3s;"></div>
             <div id="ind-2" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
-            <div id="ind-3" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
         </div>
 
-        <!-- STEP 1: ESCANEO -->
+        <!-- STEP 1: ESCANEO Y DETECCION -->
         <div id="step-1" class="wizard-step" style="display: block;">
             <h2>Paso 1: Buscar Dispositivos</h2>
             <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Pon tu dispositivo en modo vinculación (pulsa el botón físico del nodo).</p>
             
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 0; background: var(--md-surface); border-radius: var(--radius-medium); border: 2px dashed var(--md-outline-variant); margin-bottom: 24px;">
+            <div id="scan-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 0; background: var(--md-surface); border-radius: var(--radius-medium); border: 2px dashed var(--md-outline-variant); margin-bottom: 24px;">
                 <div class="progress-circ indeterminate" style="margin-bottom: 16px;"></div>
                 <p>Escuchando red Mesh...</p>
             </div>
+
+            <!-- RESULTADO DEL ESCANEO (Oculto al inicio) -->
+            <div id="scan-result" style="display: none; padding: 24px; background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-medium); margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <div>
+                    <strong style="display: block; font-size: 1.1rem; margin-bottom: 4px;">¡Dispositivo Encontrado!</strong>
+                    <span>ID: <strong id="found-id">DEV_9X2A</strong> | Tipo Auto-Detectado: <strong id="found-type">Foco / Luz</strong></span>
+                </div>
+            </div>
             
             <div style="display: flex; justify-content: flex-end;">
-                <button class="btn-m3 btn-filled ripple-btn" onclick="nextStep(2)">Simular Encontrado</button>
+                <button id="btn-sim-scan" class="btn-m3 btn-tonal ripple-btn" onclick="simulateScan()">Simular Detección</button>
+                <button id="btn-next-1" class="btn-m3 btn-filled ripple-btn" onclick="nextStep(2)" style="display: none; margin-left: 12px;">Siguiente</button>
             </div>
         </div>
 
-        <!-- STEP 2: TIPO -->
+        <!-- STEP 2: NOMBRE -->
         <div id="step-2" class="wizard-step" style="display: none;">
-            <h2>Paso 2: Configurar Tipo</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Hemos detectado el nodo con ID <strong style="color: var(--md-primary);">DEV_9X2A</strong>. ¿Qué es?</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-                <label class="m3-control" style="width: auto; background: var(--md-surface); padding: 16px; border-radius: var(--radius-medium); border: 1px solid var(--md-outline-variant); flex-direction: column; gap: 12px;">
-                    <input type="radio" name="dev_type" value="light" checked>
-                    <div class="m3-radio"></div>
-                    <span>Luz / Foco</span>
-                </label>
-                <label class="m3-control" style="width: auto; background: var(--md-surface); padding: 16px; border-radius: var(--radius-medium); border: 1px solid var(--md-outline-variant); flex-direction: column; gap: 12px;">
-                    <input type="radio" name="dev_type" value="sensor">
-                    <div class="m3-radio"></div>
-                    <span>Sensor (Temp/Hum)</span>
-                </label>
-                <label class="m3-control" style="width: auto; background: var(--md-surface); padding: 16px; border-radius: var(--radius-medium); border: 1px solid var(--md-outline-variant); flex-direction: column; gap: 12px;">
-                    <input type="radio" name="dev_type" value="relay">
-                    <div class="m3-radio"></div>
-                    <span>Relay / Enchufe</span>
-                </label>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between;">
-                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextStep(1)">Atrás</button>
-                <button class="btn-m3 btn-filled ripple-btn" onclick="nextStep(3)">Siguiente</button>
-            </div>
-        </div>
-
-        <!-- STEP 3: NOMBRE -->
-        <div id="step-3" class="wizard-step" style="display: none;">
-            <h2>Paso 3: Identificación</h2>
+            <h2>Paso 2: Identificación</h2>
             <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Asígnale un nombre fácil de recordar para tus automatizaciones.</p>
             
             <div style="margin-bottom: 24px;">
@@ -83,7 +63,7 @@
             </div>
             
             <div style="display: flex; justify-content: space-between;">
-                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextStep(2)">Atrás</button>
+                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextStep(1)">Atrás</button>
                 <button class="btn-m3 btn-filled ripple-btn" onclick="finishWizard()">Guardar Dispositivo</button>
             </div>
         </div>
@@ -92,6 +72,16 @@
 </div>
 
 <script>
+    // Inicialmente ocultar el result-box (porque en el step 1 está display:block, pero via JS lo controlamos)
+    document.getElementById('scan-result').style.display = 'none';
+
+    function simulateScan() {
+        document.getElementById('scan-container').style.display = 'none';
+        document.getElementById('scan-result').style.display = 'flex';
+        document.getElementById('btn-sim-scan').style.display = 'none';
+        document.getElementById('btn-next-1').style.display = 'block';
+    }
+
     function nextStep(step) {
         // Ocultar todos
         document.querySelectorAll('.wizard-step').forEach(el => el.style.display = 'none');
@@ -99,7 +89,7 @@
         document.getElementById('step-' + step).style.display = 'block';
         
         // Actualizar indicadores
-        for(let i=1; i<=3; i++) {
+        for(let i=1; i<=2; i++) {
             const ind = document.getElementById('ind-' + i);
             if(i <= step) ind.style.background = 'var(--md-primary)';
             else ind.style.background = 'var(--md-outline-variant)';
