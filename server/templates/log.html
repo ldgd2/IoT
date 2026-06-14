@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}RF Log — IoT RF Gateway{% endblock %}
+
+{% block head %}
+<style>
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+  }
+
+  .log-table thead th {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+
+  .log-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  .log-table tbody tr:hover { background: var(--bg-elevated); }
+
+  .log-table td {
+    padding: 0.55rem 1rem;
+    vertical-align: middle;
+    color: var(--text-secondary);
+  }
+
+  .log-table td.ts   { color: var(--text-muted); white-space: nowrap; }
+  .log-table td.id   { color: var(--accent); }
+  .log-table td.rssi { color: var(--text-primary); }
+  .log-table td.dir  { }
+  .log-table td.data { color: var(--text-secondary); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .dir-rx { color: var(--success); }
+  .dir-tx { color: var(--warning); }
+
+  .log-wrapper {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    overflow-y: auto;
+    max-height: 70vh;
+  }
+
+  .log-toolbar {
+    display: flex; gap: 0.75rem; align-items: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+
+  .filter-input {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 220px;
+  }
+
+  .filter-input:focus { border-color: var(--accent); }
+  .filter-input::placeholder { color: var(--text-muted); }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header animate">
+  <h1 class="page-title">RF Log</h1>
+  <p class="page-subtitle">Historial de mensajes recibidos y transmitidos por radiofrecuencia</p>
+</div>
+
+<div class="log-toolbar animate">
+  <input class="filter-input" type="text" id="filter-input"
+    placeholder="Filtrar por ID o datos..." oninput="filterLog()">
+  <button class="btn btn-ghost" onclick="location.reload()">⟳ Recargar</button>
+  <a href="/" class="btn btn-ghost">← Dashboard</a>
+  <span id="log-count" class="text-xs text-muted"></span>
+</div>
+
+<div class="log-wrapper animate" style="animation-delay:0.1s">
+  {% if log %}
+  <table class="log-table" id="log-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Device ID</th>
+        <th>Dir</th>
+        <th>RSSI</th>
+        <th>Payload / Datos</th>
+      </tr>
+    </thead>
+    <tbody id="log-body">
+      {% for entry in log %}
+      <tr>
+        <td class="ts">{{ entry.ts[11:23] if entry.ts else '—' }}</td>
+        <td class="id">{{ entry.device_id }}</td>
+        <td class="dir">
+          <span class="{{ 'dir-rx' if entry.get('direction') != 'TX' else 'dir-tx' }}">
+            {{ entry.get('direction', 'RX') }}
+          </span>
+        </td>
+        <td class="rssi">{{ entry.rssi or '—' }}</td>
+        <td class="data" title="{{ entry.payload | tojson }}">
+          {{ entry.payload | tojson }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    📡 No hay mensajes RF registrados aún.<br>
+    Los mensajes aparecerán aquí cuando los dispositivos transmitan datos.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const rows = document.querySelectorAll('#log-body tr');
+  const countEl = document.getElementById('log-count');
+  if (countEl) countEl.textContent = `${rows.length} entradas`;
+
+  function filterLog() {
+    const q = document.getElementById('filter-input').value.toLowerCase();
+    let visible = 0;
+    rows.forEach(row => {
+      const match = row.textContent.toLowerCase().includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    countEl.textContent = `${visible} / ${rows.length} entradas`;
+  }
+</script>
+{% endblock %}

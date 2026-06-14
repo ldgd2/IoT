@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — IoT RF Gateway{% endblock %}
+
+{% block head %}
+<style>
+  /* ═══════ DEVICE GRID ═══════ */
+  .devices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.1rem;
+  }
+
+  .device-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.3rem;
+    box-shadow: var(--shadow-card);
+    transition: all 0.25s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    animation: fade-in-up 0.4s ease both;
+  }
+
+  .device-card:hover {
+    border-color: var(--border-accent);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
+  }
+
+  .device-card.offline {
+    opacity: 0.55;
+    filter: grayscale(30%);
+  }
+
+  .device-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .device-icon {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .device-icon.light   { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.2); }
+  .device-icon.sensor  { background: rgba(0,212,255,0.08); border-color: var(--border-accent); }
+  .device-icon.relay   { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.2); }
+
+  .device-meta { flex: 1; padding: 0 0.8rem; }
+
+  .device-name {
+    font-weight: 600; font-size: 0.95rem;
+    line-height: 1.2;
+    color: var(--text-primary);
+  }
+
+  .device-id {
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* ═══════ STATE VALUES ═══════ */
+  .state-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .state-item {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.6rem;
+    text-align: center;
+  }
+
+  .state-key {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+  }
+
+  .state-val {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+    margin-top: 1px;
+  }
+
+  .state-val.on  { color: var(--success); }
+  .state-val.off { color: var(--text-muted); }
+
+  /* ═══════ CARD FOOTER ═══════ */
+  .device-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .rssi-info {
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* ═══════ SECTION TITLE ═══════ */
+  .section-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ═══════ QUICK ACTIONS ═══════ */
+  .quick-actions {
+    display: flex; gap: 0.75rem; flex-wrap: wrap;
+    margin-bottom: 2rem;
+  }
+
+  /* ═══════ RF MINI LOG ═══════ */
+  .mini-log {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0;
+    overflow: hidden;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .mini-log-item {
+    display: grid;
+    grid-template-columns: 80px 90px 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    transition: background 0.15s;
+  }
+
+  .mini-log-item:last-child { border-bottom: none; }
+  .mini-log-item:hover { background: var(--bg-elevated); }
+
+  .mini-log-ts   { color: var(--text-muted); }
+  .mini-log-id   { color: var(--accent); }
+  .mini-log-data { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ═══════ 2-COL LAYOUT ═══════ */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header animate">
+  <h1 class="page-title">Dashboard</h1>
+  <p class="page-subtitle">Control y monitoreo de dispositivos RF en tiempo real</p>
+</div>
+
+<!-- ═══ STATS ═══ -->
+<div class="stats-grid animate" id="stats-container">
+  <div class="stat-card">
+    <span class="stat-label">Total Dispositivos</span>
+    <span class="stat-value accent" id="stat-total">{{ devices | length }}</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">En línea</span>
+    <span class="stat-value success" id="stat-online">
+      {{ devices | selectattr('status', 'equalto', 'online') | list | length }}
+    </span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Fuera de línea</span>
+    <span class="stat-value" id="stat-offline">
+      {{ devices | selectattr('status', 'equalto', 'offline') | list | length }}
+    </span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Mensajes RF</span>
+    <span class="stat-value" id="stat-msgs">—</span>
+  </div>
+</div>
+
+<!-- ═══ QUICK ACTIONS ═══ -->
+<div class="quick-actions">
+  <button class="btn btn-primary" onclick="refreshAll()">⟳ Actualizar</button>
+  <a href="/log" class="btn btn-ghost">📋 RF Log completo</a>
+  <button class="btn btn-ghost" onclick="testIngest()">📤 Simular RF</button>
+</div>
+
+<div class="two-col">
+  <!-- ═══ DEVICE CARDS ═══ -->
+  <div>
+    <div class="section-title">Dispositivos registrados</div>
+    <div class="devices-grid" id="devices-grid">
+      {% for dev in devices %}
+      {% set icons = {'light': '💡', 'sensor': '🌡️', 'relay': '⚡', 'generic': '📦'} %}
+      <a href="/device/{{ dev.device_id }}"
+         class="device-card {% if dev.status == 'offline' %}offline{% endif %}"
+         id="card-{{ dev.device_id }}"
+         style="animation-delay: {{ loop.index0 * 0.06 }}s">
+
+        <div class="device-card-header">
+          <div class="device-icon {{ dev.device_type }}">
+            {{ icons.get(dev.device_type, '📦') }}
+          </div>
+          <div class="device-meta">
+            <div class="device-name">{{ dev.name }}</div>
+            <div class="device-id">{{ dev.device_id }}</div>
+          </div>
+          <span class="badge badge-{{ dev.status }}">
+            <span class="badge-dot"></span>{{ dev.status }}
+          </span>
+        </div>
+
+        <!-- State values -->
+        <div class="state-grid">
+          {% for k, v in dev.state.items() %}
+          <div class="state-item">
+            <span class="state-key">{{ k }}</span>
+            <span class="state-val {% if v == true %}on{% elif v == false %}off{% endif %}">
+              {% if v == true %}ON
+              {% elif v == false %}OFF
+              {% elif v is number %}{{ "%.1f"|format(v) }}
+              {% else %}{{ v }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="device-card-footer">
+          <div class="rssi-info">
+            {% set lvl = 2 %}
+            <div class="rssi-bar" data-level="{{ lvl }}">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span>{{ dev.rssi }} dBm</span>
+          </div>
+          <span class="text-mono">
+            {% if dev.last_seen %}{{ dev.last_seen[11:19] }}{% else %}—{% endif %}
+          </span>
+        </div>
+      </a>
+      {% else %}
+      <p class="text-secondary">No hay dispositivos registrados aún.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ═══ MINI LOG ═══ -->
+  <div>
+    <div class="section-title">Últimos mensajes RF</div>
+    <div class="mini-log" id="mini-log">
+      <div class="mini-log-item">
+        <span class="mini-log-ts text-muted">—</span>
+        <span class="mini-log-id">Esperando...</span>
+        <span class="mini-log-data">Sin datos</span>
+      </div>
+    </div>
+    <p class="text-xs text-muted mt-1">Auto-refresca cada 5 s</p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Refresh stats via API ──
+  async function refreshStats() {
+    try {
+      const r = await fetch('/api/stats');
+      const d = await r.json();
+      document.getElementById('stat-total').textContent  = d.total;
+      document.getElementById('stat-online').textContent = d.online;
+      document.getElementById('stat-offline').textContent = d.offline;
+      document.getElementById('stat-msgs').textContent   = d.log_len;
+    } catch(e) {}
+  }
+
+  // ── Refresh mini log ──
+  async function refreshLog() {
+    try {
+      const r = await fetch('/api/devices');
+      const devs = await r.json();
+
+      const logEl = document.getElementById('mini-log');
+      logEl.innerHTML = '';
+
+      // Show recent device updates as "log" entries
+      const sorted = devs.sort((a,b) =>
+        (b.last_seen||'').localeCompare(a.last_seen||''));
+
+      sorted.slice(0, 20).forEach(dev => {
+        const item = document.createElement('div');
+        item.className = 'mini-log-item';
+        item.innerHTML = `
+          <span class="mini-log-ts">${(dev.last_seen||'').slice(11,19) || '—'}</span>
+          <span class="mini-log-id">${dev.id}</span>
+          <span class="mini-log-data">${JSON.stringify(dev.state)}</span>
+        `;
+        logEl.appendChild(item);
+      });
+    } catch(e) {}
+  }
+
+  // ── Simulate RF ingest ──
+  async function testIngest() {
+    const devIds = ['dev_001','dev_002','dev_003','dev_004','dev_005'];
+    const id = devIds[Math.floor(Math.random() * devIds.length)];
+    await fetch('/api/ingest', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        id,
+        rssi: Math.round(-40 - Math.random()*50),
+        payload: { on: Math.random() > 0.5, ts: Date.now() }
+      })
+    });
+    refreshAll();
+  }
+
+  function refreshAll() {
+    refreshStats();
+    refreshLog();
+  }
+
+  refreshAll();
+  setInterval(refreshAll, 5000);
+</script>
+{% endblock %}

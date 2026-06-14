@@ -1,0 +1,10 @@
+# IoT RF Gateway — Dependencias mínimas
+# Compatible con Raspberry Pi / hardware ultra-bajo recurso
+
+flask>=2.3,<4.0          # WSGI ultra-liviano
+pyserial>=3.5            # Comunicación con módulo RF por serial (Arduino, etc.)
+
+# Opcionales según módulo RF
+# RPi.GPIO>=0.7           # GPIO Raspberry Pi
+# spidev>=3.5             # SPI para nRF24/LoRa
+# pyrf24>=1.0             # nRF24L01+
