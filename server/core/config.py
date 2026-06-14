@@ -19,3 +19,7 @@ DB_FILE.parent.mkdir(exist_ok=True)
 API_PORT = int(os.getenv("API_PORT", 5000))
 RF_PORT = os.getenv("RF_PORT", "/dev/ttyUSB0")
 RF_BAUD = int(os.getenv("RF_BAUD", 9600))
+
+# Coordenadas por defecto para el Clima (Ej: La Paz, Bolivia)
+LATITUDE = float(os.getenv("LATITUDE", -16.5000))
+LONGITUDE = float(os.getenv("LONGITUDE", -68.1193))
