@@ -20,7 +20,8 @@ import hid
 
 from server.core.config import API_PORT, ENV_FILE
 from server.db.database import BaseModel
-from server.db.models import Device, RFLog
+from server.modules.devices.models.device import Device
+from server.modules.communication.models.rflog import RFLog
 from server.modules.automation.models.skill import Skill
 from server.modules.automation.evaluator import evaluator
 
