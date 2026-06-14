@@ -1,54 +1,95 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <RF24.h>
+#include <RF24Network.h>
+#include <RF24Mesh.h>
 #include "../config/Protocol.h"
 #include "../config/RadioConfig.h"
 
+// Inicialización de la red Mesh
 RF24 radio(CE_PIN, CSN_PIN);
-const uint64_t rxAddress = 0xB3B4B5B6F1LL;
-const uint64_t txAddress = 0x7878787878LL;
+RF24Network network(radio);
+RF24Mesh mesh(radio, network);
 
-#define MY_NODE_ID 0x02
+// Este es el Node ID de esta luz específica (1 a 255)
+// Para propósitos de este ejemplo es 1, pero cada placa debe tener uno único.
+#define NODE_ID 1
+
+const int RELAY_PIN = 5; 
+unsigned long lastHeartbeat = 0;
+bool relayState = false;
 
 void setup() {
     Serial.begin(115200);
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, LOW);
     
-    if (!radio.begin()) {
-        Serial.println("Error de Hardware NRF24");
-        while (1) {}
+    // Configurar Node ID y empezar Mesh
+    mesh.setNodeID(NODE_ID);
+    
+    Serial.println("Conectando a la red Mesh...");
+    if (!mesh.begin()) {
+        Serial.println("Error iniciando radio SPI.");
+        while(1){}
     }
     
-    radio.setChannel(RF_CHANNEL);
-    radio.setDataRate(RF_DATARATE);
     radio.setPALevel(RF24_PA_MAX);
+    radio.setDataRate(RF_DATARATE);
     
-    radio.openWritingPipe(txAddress);
-    radio.openReadingPipe(1, rxAddress);
-    radio.startListening();
-    
-    Serial.println("Nodo de Luz Listo");
+    Serial.println("Conectado! Node ID: " + String(NODE_ID));
 }
 
 void loop() {
-    // Escuchar comandos de RF en la colmena
-    if (radio.available()) {
+    // 1. Mantener conexión con la red Mesh (Renovar DHCP si perdemos conexión)
+    mesh.update();
+    
+    if (!mesh.checkConnection()) {
+        Serial.println("Conexion perdida, renovando direccion...");
+        mesh.renewAddress();
+    }
+    
+    // 2. Leer comandos entrantes
+    if (network.available()) {
+        RF24NetworkHeader header;
         RFPacket packet;
-        radio.read(&packet, sizeof(packet));
+        network.read(header, &packet, sizeof(packet));
         
-        if (packet.destId == MY_NODE_ID || packet.destId == 0xFF) {
-            Serial.print("Paquete RF recibido. Comando: ");
-            Serial.println(packet.command);
-            
-            if (packet.command == CMD_ON) {
-                // Aca activariamos el Relé/Triac
-                Serial.println(">> LUZ ENCENDIDA");
-            } else if (packet.command == CMD_OFF) {
-                // Aca desactivariamos el Relé
-                Serial.println(">> LUZ APAGADA");
-            } else if (packet.command == CMD_HEARTBEAT) {
-                // Ping del Gateway
-                Serial.println(">> Heartbeat del Gateway detectado, red estable.");
+        Serial.print("Rx Cmd: ");
+        Serial.print(packet.command);
+        Serial.print(" from: ");
+        Serial.println(mesh.getNodeID(header.from_node));
+        
+        // Ejecutar comando
+        if (packet.command == CMD_ON) {
+            relayState = true;
+            digitalWrite(RELAY_PIN, HIGH);
+        } else if (packet.command == CMD_OFF) {
+            relayState = false;
+            digitalWrite(RELAY_PIN, LOW);
+        } else if (packet.command == CMD_TOGGLE) {
+            relayState = !relayState;
+            digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+        }
+    }
+    
+    // 3. Heartbeat cada 60s hacia el Master (Node ID 0)
+    if (millis() - lastHeartbeat > 60000) {
+        lastHeartbeat = millis();
+        RFPacket hb;
+        hb.originId = NODE_ID;
+        hb.destId = 0; // Master
+        hb.deviceType = DEV_TYPE_LIGHT;
+        hb.command = CMD_HEARTBEAT;
+        hb.data[0] = relayState ? 1 : 0; // Enviar estado actual en el heartbeat
+        
+        Serial.print("Tx Heartbeat... ");
+        if (!mesh.write(&hb, 'C', sizeof(hb), 0)) {
+            Serial.println("Fallo al enviar heartbeat. Verificando conexion...");
+            if (!mesh.checkConnection()) {
+                mesh.renewAddress();
             }
+        } else {
+            Serial.println("OK");
         }
     }
 }
