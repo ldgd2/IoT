@@ -21,7 +21,24 @@ document.addEventListener('mousedown', function (e) {
         
         button.appendChild(circle);
         
-        // Eliminar del DOM después de la animación para no consumir RAM
+        // Eliminar del DOM despues de la animacion para no consumir RAM
         setTimeout(() => circle.remove(), 600);
     }
+});
+
+// --- MOTOR DE TEMAS M3 ---
+function applyTheme(theme, color) {
+    document.body.className = ''; // Reset
+    if (theme === 'dark') document.body.classList.add('theme-dark');
+    if (color && color !== 'warm') document.body.classList.add('color-' + color);
+    
+    localStorage.setItem('m3-theme', theme);
+    localStorage.setItem('m3-color', color);
+}
+
+// Cargar tema guardado al iniciar
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('m3-theme') || 'light';
+    const savedColor = localStorage.getItem('m3-color') || 'warm';
+    applyTheme(savedTheme, savedColor);
 });

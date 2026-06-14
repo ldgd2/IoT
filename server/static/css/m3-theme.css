@@ -1,4 +1,5 @@
-/* Paleta de Colores Material 3 (Warm/Light Theme basado en la imagen) */
+/* Paletas de Colores Material 3 */
+/* Por defecto: Warm Light (Basado en la imagen original) */
 :root {
     --md-bg: #F5EBE1;
     --md-surface: #F5EBE1;
@@ -16,6 +17,115 @@
     --md-outline: #897B6B;
     --md-outline-variant: #D9C8B8;
     --md-elevated: #FDF8F5;
+    
+    /* Radios de Material 3 */
+    --radius-full: 100px;
+    --radius-extra-large: 28px;
+    --radius-large: 16px;
+    --radius-medium: 12px;
+    
+    --md-easing: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* --- TEMA OSCURO WARM --- */
+body.theme-dark {
+    --md-bg: #201A15;
+    --md-surface: #201A15;
+    --md-surface-container: #2A231C;
+    --md-primary: #DAB981;
+    --md-on-primary: #3B2800;
+    --md-secondary: #E3C18E;
+    --md-on-secondary: #402D05;
+    --md-tertiary: #BDCD72;
+    --md-on-tertiary: #273500;
+    --md-surface-variant: #4F4539;
+    --md-on-surface-variant: #D3C4B4;
+    --md-text: #EAE1D9;
+    --md-text-variant: #CDC4B8;
+    --md-outline: #968E82;
+    --md-outline-variant: #4A433A;
+    --md-elevated: #28221D;
+}
+
+/* --- TEMA CLARO AZUL --- */
+body.color-blue {
+    --md-bg: #FDFBFF;
+    --md-surface: #FDFBFF;
+    --md-surface-container: #EAE6F3;
+    --md-primary: #0061A4;
+    --md-on-primary: #FFFFFF;
+    --md-secondary: #535F70;
+    --md-on-secondary: #FFFFFF;
+    --md-tertiary: #6B5778;
+    --md-on-tertiary: #FFFFFF;
+    --md-surface-variant: #DFE2EB;
+    --md-on-surface-variant: #43474E;
+    --md-text: #1A1C1E;
+    --md-text-variant: #43474E;
+    --md-outline: #73777F;
+    --md-outline-variant: #C3C6CF;
+    --md-elevated: #F4F3FA;
+}
+
+/* --- TEMA OSCURO AZUL --- */
+body.theme-dark.color-blue {
+    --md-bg: #1A1C1E;
+    --md-surface: #1A1C1E;
+    --md-surface-container: #202428;
+    --md-primary: #9ECAFF;
+    --md-on-primary: #003258;
+    --md-secondary: #BBC7DB;
+    --md-on-secondary: #253140;
+    --md-tertiary: #D6BEE4;
+    --md-on-tertiary: #3B2948;
+    --md-surface-variant: #43474E;
+    --md-on-surface-variant: #C3C6CF;
+    --md-text: #E2E2E6;
+    --md-text-variant: #C3C6CF;
+    --md-outline: #8D9199;
+    --md-outline-variant: #43474E;
+    --md-elevated: #23272C;
+}
+
+/* --- TEMA CLARO VERDE --- */
+body.color-green {
+    --md-bg: #FCFDF6;
+    --md-surface: #FCFDF6;
+    --md-surface-container: #E9EFE0;
+    --md-primary: #386A1E;
+    --md-on-primary: #FFFFFF;
+    --md-secondary: #55624C;
+    --md-on-secondary: #FFFFFF;
+    --md-tertiary: #386666;
+    --md-on-tertiary: #FFFFFF;
+    --md-surface-variant: #DFE4D8;
+    --md-on-surface-variant: #43483F;
+    --md-text: #1A1C18;
+    --md-text-variant: #43483F;
+    --md-outline: #74796D;
+    --md-outline-variant: #C3C8BC;
+    --md-elevated: #F3F6EB;
+}
+
+/* --- TEMA OSCURO VERDE --- */
+body.theme-dark.color-green {
+    --md-bg: #1A1C18;
+    --md-surface: #1A1C18;
+    --md-surface-container: #20241E;
+    --md-primary: #9CD57B;
+    --md-on-primary: #123800;
+    --md-secondary: #BBCBB0;
+    --md-on-secondary: #283421;
+    --md-tertiary: #A0CFCF;
+    --md-on-tertiary: #003737;
+    --md-surface-variant: #43483F;
+    --md-on-surface-variant: #C3C8BC;
+    --md-text: #E2E3DD;
+    --md-text-variant: #C3C8BC;
+    --md-outline: #8D9286;
+    --md-outline-variant: #43483F;
+    --md-elevated: #262B23;
+}
     
     /* Radios de Material 3 */
     --radius-full: 100px;
