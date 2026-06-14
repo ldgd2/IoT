@@ -1,19 +1,51 @@
 <!-- ACCIONES / RESPUESTAS -->
 <strong style="font-size: 0.9rem; color: var(--md-primary); border-bottom: 1px solid var(--md-outline-variant); padding-bottom: 8px; margin-top: 16px;">ACCIONES / RESPUESTAS</strong>
 
-<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_device" data-zone="action">
-    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_light" data-zone="action">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></div>
     <div class="block-content">
-        <div class="block-title">Controlar Dispositivo</div>
-        <div class="block-desc">Prender / Apagar / Alternar</div>
+        <div class="block-title">Luces (ON/OFF)</div>
+        <div class="block-desc">Control básico de iluminación</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_dimmer" data-zone="action">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></div>
+    <div class="block-content">
+        <div class="block-title">Atenuador (Dimmer)</div>
+        <div class="block-desc">Ajustar brillo de luces (% intensidad)</div>
     </div>
 </div>
 
 <div class="block" draggable="true" ondragstart="drag(event)" data-type="action_color" data-zone="action">
-    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 0-10 10c0 5.52 4.48 10 10 10 5.52 0 10-4.48 10-10"></path></svg></div>
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 0-10 10c0 5.52 4.48 10 10 10 5.52 0 10-4.48 10-10"></path></svg></div>
     <div class="block-content">
-        <div class="block-title">Cambiar Color / Brillo</div>
-        <div class="block-desc">Para luces y tiras LED</div>
+        <div class="block-title">Color RGB (Tiras LED)</div>
+        <div class="block-desc">Cambiar paleta de colores</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_plug" data-zone="action">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line></svg></div>
+    <div class="block-content">
+        <div class="block-title">Enchufe / Relay</div>
+        <div class="block-desc">Activar corriente de electrodoméstico</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_buzzer" data-zone="action">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg></div>
+    <div class="block-content">
+        <div class="block-title">Sirena / Buzzer</div>
+        <div class="block-desc">Hacer sonar una alarma</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="action_scene" data-zone="action">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+    <div class="block-content">
+        <div class="block-title">Activar Escena</div>
+        <div class="block-desc">Invocar varios dispositivos a la vez</div>
     </div>
 </div>
 
@@ -26,7 +58,7 @@
 </div>
 
 <div class="block" draggable="true" ondragstart="drag(event)" data-type="action_delay" data-zone="action">
-    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line></svg></div>
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
     <div class="block-content">
         <div class="block-title">Esperar (Pausa)</div>
         <div class="block-desc">Detener ejecución por X minutos</div>

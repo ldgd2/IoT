@@ -25,18 +25,44 @@
     </div>
 </div>
 
-<div class="block" draggable="true" ondragstart="drag(event)" data-type="device_state" data-zone="condition">
-    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></div>
-    <div class="block-content">
-        <div class="block-title">Estado de Sensor</div>
-        <div class="block-desc">Temperatura, Presencia, Botón...</div>
-    </div>
-</div>
-
 <div class="block" draggable="true" ondragstart="drag(event)" data-type="location" data-zone="condition">
     <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div>
     <div class="block-content">
         <div class="block-title">Ubicación (GPS)</div>
         <div class="block-desc">Al llegar o salir de casa</div>
+    </div>
+</div>
+
+<strong style="font-size: 0.8rem; color: var(--md-text-variant); margin-top: 8px;">DISPOSITIVOS IOT COMO EVENTO</strong>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="dev_sensor" data-zone="condition">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></div>
+    <div class="block-content">
+        <div class="block-title">Sensor Analógico</div>
+        <div class="block-desc">Temperatura, Humedad, Luz</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="dev_motion" data-zone="condition">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"></circle><path d="m9 20 3-6 3 6"></path><path d="m6 8 6 2 6-2"></path><path d="M12 10v4"></path></svg></div>
+    <div class="block-content">
+        <div class="block-title">Sensor de Presencia</div>
+        <div class="block-desc">Si detecta movimiento (PIR)</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="dev_button" data-zone="condition">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg></div>
+    <div class="block-content">
+        <div class="block-title">Interruptor / Botón</div>
+        <div class="block-desc">Al ser presionado físicamente</div>
+    </div>
+</div>
+
+<div class="block" draggable="true" ondragstart="drag(event)" data-type="dev_plug" data-zone="condition">
+    <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="8" width="12" height="12" rx="2" ry="2"></rect><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="12" y1="12" x2="12" y2="16"></line></svg></div>
+    <div class="block-content">
+        <div class="block-title">Enchufe / Energía</div>
+        <div class="block-desc">Si el consumo supera un límite</div>
     </div>
 </div>

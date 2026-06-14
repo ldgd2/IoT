@@ -270,14 +270,14 @@
                 </select>
             `;
         }
-        else if (type === 'device_state') {
-            titleEl.innerText = "Leer Estado de Dispositivo";
+        else if (['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'].includes(type)) {
+            titleEl.innerText = "Leer Valor de Sensor / Dispositivo";
             contentEl.innerHTML = `
                 <label style="font-size: 0.9rem; color: var(--md-text-variant);">Elige el dispositivo:</label>
                 <select id="cfg-dev-trigger" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
                     <option value="DEV_PIR" ${config.device === 'DEV_PIR' ? 'selected' : ''}>Sensor de Movimiento Sala</option>
                     <option value="DEV_TEMP" ${config.device === 'DEV_TEMP' ? 'selected' : ''}>Termómetro Jardín</option>
-                    <option value="DEV_BTN" ${config.device === 'DEV_BTN' ? 'selected' : ''}>Botón de Pánico</option>
+                    <option value="DEV_PLUG" ${config.device === 'DEV_PLUG' ? 'selected' : ''}>Consumo Enchufe</option>
                 </select>
                 
                 <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Condición requerida:</label>
@@ -291,7 +291,23 @@
                 </div>
             `;
         }
-        else if (type === 'action_device') {
+        else if (type === 'dev_button') {
+            titleEl.innerText = "Evento de Botón / Interruptor";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Elige el Botón Físico:</label>
+                <select id="cfg-dev-btn" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="BTN_SALA" ${config.device === 'BTN_SALA' ? 'selected' : ''}>Interruptor Pared Sala</option>
+                    <option value="BTN_PANIC" ${config.device === 'BTN_PANIC' ? 'selected' : ''}>Botón Pánico</option>
+                </select>
+                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Acción requerida:</label>
+                <select id="cfg-btn-action" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="single_click" ${config.action === 'single_click' ? 'selected' : ''}>1 Clic</option>
+                    <option value="double_click" ${config.action === 'double_click' ? 'selected' : ''}>Doble Clic</option>
+                    <option value="hold" ${config.action === 'hold' ? 'selected' : ''}>Mantener Presionado</option>
+                </select>
+            `;
+        }
+        else if (['action_device', 'action_light', 'action_plug'].includes(type)) {
             titleEl.innerText = "Acción: Dispositivo";
             contentEl.innerHTML = `
                 <label style="font-size: 0.9rem; color: var(--md-text-variant);">Dispositivo Destino:</label>
@@ -309,6 +325,24 @@
                 </select>
             `;
         }
+        else if (type === 'action_dimmer') {
+            titleEl.innerText = "Acción: Atenuador (Dimmer)";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Seleccionar Luz Dimmable:</label>
+                <select id="cfg-dimmer-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="DEV_DIM1">Foco Comedor</option>
+                </select>
+                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Nivel de Brillo (0-100%):</label>
+                <input type="range" id="cfg-dimmer-val" value="${config.brightness || '50'}" min="0" max="100" style="width: 100%; margin-top: 8px;">
+                <div style="text-align: center; font-weight: bold; margin-top: 4px;" id="cfg-dimmer-label">${config.brightness || '50'}%</div>
+            `;
+            // Pequeño hack para actualizar el label del rango en tiempo real:
+            setTimeout(() => {
+                document.getElementById('cfg-dimmer-val').oninput = function() {
+                    document.getElementById('cfg-dimmer-label').innerText = this.value + "%";
+                };
+            }, 100);
+        }
         else if (type === 'action_color') {
             titleEl.innerText = "Acción: Modificar Color/Brillo";
             contentEl.innerHTML = `
@@ -320,6 +354,28 @@
                 <input type="color" id="cfg-color" value="${config.color || '#ffffff'}" style="width: 100%; height: 40px; border: none; background: transparent; cursor: pointer;">
                 <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Brillo (0-100%):</label>
                 <input type="number" id="cfg-bright" value="${config.brightness || '100'}" min="0" max="100" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+            `;
+        }
+        else if (type === 'action_buzzer') {
+            titleEl.innerText = "Acción: Sirena / Buzzer";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Dispositivo con Buzzer:</label>
+                <select id="cfg-buzz-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="DEV_ALARM">Alarma Central</option>
+                </select>
+                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Duración (Segundos):</label>
+                <input type="number" id="cfg-buzz-sec" value="${config.seconds || '3'}" min="1" max="60" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+            `;
+        }
+        else if (type === 'action_scene') {
+            titleEl.innerText = "Acción: Activar Escena";
+            contentEl.innerHTML = `
+                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Escena Predefinida:</label>
+                <select id="cfg-scene" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                    <option value="SCENE_NIGHT">Modo Noche (Apagar Todo)</option>
+                    <option value="SCENE_PARTY">Modo Fiesta (Luces de Colores)</option>
+                    <option value="SCENE_AWAY">Modo Vacaciones</option>
+                </select>
             `;
         }
         else if (type === 'action_notify') {
@@ -370,23 +426,38 @@
         } else if (type === 'location') {
             newConfig.location = document.getElementById('cfg-loc').value;
             displayDesc = "Ubicación: Al " + newConfig.location;
-        } else if (type === 'device_state') {
+        } else if (['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'].includes(type)) {
             newConfig.device = document.getElementById('cfg-dev-trigger').value;
             newConfig.operator = document.getElementById('cfg-operator').value;
             newConfig.val = document.getElementById('cfg-val').value;
             displayDesc = "Si " + newConfig.device + " " + newConfig.operator + " " + newConfig.val;
+        } else if (type === 'dev_button') {
+            newConfig.device = document.getElementById('cfg-dev-btn').value;
+            newConfig.action = document.getElementById('cfg-btn-action').value;
+            displayDesc = "Si " + newConfig.device + " == " + newConfig.action;
         } 
         
         // Guardar Acciones
-        else if (type === 'action_device') {
+        else if (['action_device', 'action_light', 'action_plug'].includes(type)) {
             newConfig.device = document.getElementById('cfg-dev').value;
             newConfig.cmd = document.getElementById('cfg-cmd').value;
             displayDesc = "Mandar " + newConfig.cmd + " a " + newConfig.device;
+        } else if (type === 'action_dimmer') {
+            newConfig.device = document.getElementById('cfg-dimmer-dev').value;
+            newConfig.brightness = document.getElementById('cfg-dimmer-val').value;
+            displayDesc = "Fijar " + newConfig.device + " al " + newConfig.brightness + "%";
         } else if (type === 'action_color') {
             newConfig.device = document.getElementById('cfg-color-dev').value;
             newConfig.color = document.getElementById('cfg-color').value;
             newConfig.brightness = document.getElementById('cfg-bright').value;
             displayDesc = "Color " + newConfig.color + " | " + newConfig.brightness + "% brillo";
+        } else if (type === 'action_buzzer') {
+            newConfig.device = document.getElementById('cfg-buzz-dev').value;
+            newConfig.seconds = document.getElementById('cfg-buzz-sec').value;
+            displayDesc = "Sonar " + newConfig.device + " por " + newConfig.seconds + "s";
+        } else if (type === 'action_scene') {
+            newConfig.scene = document.getElementById('cfg-scene').value;
+            displayDesc = "Activar Escena: " + newConfig.scene;
         } else if (type === 'action_notify') {
             newConfig.message = document.getElementById('cfg-msg').value;
             displayDesc = "Notificar: '" + newConfig.message + "'";
