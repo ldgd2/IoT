@@ -24,9 +24,25 @@ def migrate():
         from server.db.database import BaseModel
         
         # El padre aplica la migracion a todas las hijas
-        BaseModel.migrate_all()
+        report = BaseModel.migrate_all()
         
-        progress.update(task, completed=100, description="[green]Migraciones aplicadas a todas las hijas exitosamente![/green]")
+        progress.update(task, completed=100, description="[green]Migraciones finalizadas[/green]")
+
+    # Print report
+    console.print()
+    if report["created"]:
+        console.print("[bold green]Nuevas tablas creadas:[/bold green]")
+        for table in report["created"]:
+            console.print(f"  [green]✔[/green] {table}")
+    
+    if report["exists"]:
+        console.print("[bold cyan]Tablas ya existentes (omitidas):[/bold cyan]")
+        for table in report["exists"]:
+            console.print(f"  [cyan]•[/cyan] {table}")
+            
+    if not report["created"] and not report["exists"]:
+        console.print("[yellow]No se detectaron modelos para migrar.[/yellow]")
+    console.print()
 
 from scripts.database.backups.cli import backups
 db.add_command(backups)

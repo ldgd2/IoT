@@ -38,21 +38,30 @@ class BaseModel:
         return {k: v for k, v in cls.__dict__.items() if isinstance(v, Field)}
 
     @classmethod
-    def migrate_all(cls):
-        """Migra todas las clases hijas al vuelo (crea tablas si no existen)"""
+    def migrate_all(cls) -> dict:
+        """Migra todas las clases hijas al vuelo y retorna un reporte"""
+        report = {"created": [], "exists": []}
         for subclass in cls.__subclasses__():
-            subclass.create_table()
+            status = subclass.create_table()
+            report[status].append(subclass.__table__)
+        return report
 
     @classmethod
-    def create_table(cls):
+    def create_table(cls) -> str:
+        # Check if table exists
+        cursor = Database.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (cls.__table__,))
+        if cursor.fetchone():
+            return "exists"
+            
         fields = []
         for name, field in cls._get_fields().items():
             f_def = f"{name} {field.type_name}"
             if field.primary_key:
                 f_def += " PRIMARY KEY"
             fields.append(f_def)
-        query = f"CREATE TABLE IF NOT EXISTS {cls.__table__} ({', '.join(fields)});"
+        query = f"CREATE TABLE {cls.__table__} ({', '.join(fields)});"
         Database.execute(query)
+        return "created"
 
     def save(self):
         fields = self._get_fields()
