@@ -28,8 +28,21 @@ import platform
 import argparse
 import textwrap
 import subprocess
+import socket
 from pathlib import Path
 from datetime import datetime
+
+# ──────────────────────────────────────────────────────────
+#  RED
+# ──────────────────────────────────────────────────────────
+def get_local_ip() -> str:
+    try:
+        # Conecta a un DNS externo temporalmente para obtener la IP de red local
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
 
 # ──────────────────────────────────────────────────────────
 #  PATHS
@@ -299,7 +312,7 @@ def cmd_start(foreground=False):
 
     if is_running(proc.pid):
         ok(f"Servidor iniciado — PID {proc.pid}")
-        info("Dashboard → http://localhost:5000")
+        info(f"Dashboard → http://{get_local_ip()}:5000")
         info(f"Logs en   → {LOG_FILE}")
     else:
         err("El proceso terminó inesperadamente. Revisa los logs.")
@@ -393,7 +406,7 @@ def cmd_status():
     print(f"    Estado  :  {server_status_str()}")
     pid = get_pid()
     if pid and is_running(pid):
-        print(f"    URL     :  {C.CYAN}http://localhost:5000{C.RESET}")
+        print(f"    URL     :  {C.CYAN}http://{get_local_ip()}:5000{C.RESET}")
         print(f"    Log     :  {C.GRAY}{LOG_FILE}{C.RESET}")
 
     print()
@@ -798,7 +811,7 @@ def cmd_simulate_rf():
 
     body = json.dumps(data).encode()
     req  = urllib.request.Request(
-        "http://127.0.0.1:5000/api/ingest",
+        f"http://{get_local_ip()}:5000/api/ingest",
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST"
@@ -827,7 +840,7 @@ def cmd_devices():
         return
 
     try:
-        with urllib.request.urlopen("http://127.0.0.1:5000/api/devices", timeout=3) as r:
+        with urllib.request.urlopen(f"http://{get_local_ip()}:5000/api/devices", timeout=3) as r:
             devices = json.loads(r.read())
     except Exception as e:
         err(f"No se pudo obtener dispositivos: {e}")

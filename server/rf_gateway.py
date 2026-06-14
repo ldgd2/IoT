@@ -13,12 +13,21 @@ import serial
 import json
 import time
 import requests
+import socket
 import threading
 from datetime import datetime
 
+def get_local_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+
 SERIAL_PORT = "/dev/ttyUSB0"   # Cambiar según puerto
 BAUD_RATE   = 9600
-SERVER_URL  = "http://127.0.0.1:5000/api/ingest"
+SERVER_URL  = f"http://{get_local_ip()}:5000/api/ingest"
 
 
 def parse_rf_line(raw: str) -> dict | None:
