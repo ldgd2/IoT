@@ -8,3 +8,6 @@ pyserial>=3.5            # Comunicación con módulo RF por serial (Arduino, etc
 # RPi.GPIO>=0.7           # GPIO Raspberry Pi
 # spidev>=3.5             # SPI para nRF24/LoRa
 # pyrf24>=1.0             # nRF24L01+
+
+rich>=13.0.0
+click>=8.0

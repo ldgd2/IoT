@@ -17,6 +17,7 @@ build/
 logs/
 *.log
 .server.pid
+server/db/data.sqlite
 
 # Windows / OS
 Thumbs.db
