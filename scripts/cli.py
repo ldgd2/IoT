@@ -12,8 +12,10 @@ from scripts.admin.cli import admin
 from scripts.database.cli import db
 from scripts.network.cli import network
 from scripts.setup.cli import setup
+from scripts.firmware.cli import firmware
 
 cli.add_command(admin)
 cli.add_command(db)
 cli.add_command(network)
 cli.add_command(setup)
+cli.add_command(firmware)

@@ -24,6 +24,7 @@ def show_main_menu():
                 "🗄️ Base de Datos (Migraciones y Backups)",
                 "🌐 Herramientas de Red (Escaner RF)",
                 "⚙️ Asistente de Configuración (.env)",
+                "🔨 Compilar Firmware C++",
                 questionary.Separator(),
                 "❌ Salir"
             ],
@@ -52,6 +53,12 @@ def show_main_menu():
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
         elif choice.startswith("⚙️"):
             subprocess.run([sys.executable, "iot.py", "setup", "env"])
+            console.input("\n[dim]Presiona Enter para continuar...[/dim]")
+        elif choice.startswith("🔨"):
+            # Submenú simple
+            env_choice = questionary.select("Selecciona el entorno destino:", choices=["rp2040", "esp8266"]).ask()
+            if env_choice:
+                subprocess.run([sys.executable, "iot.py", "firmware", "build", "all", "-e", env_choice])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
 
 def show_service_menu():
