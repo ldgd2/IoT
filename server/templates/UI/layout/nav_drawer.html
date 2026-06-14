@@ -1,86 +1,15 @@
-<style>
-    /* 2. Menú de Lista (Navigation Drawer) */
-    .nav-drawer {
-        width: 280px;
-        background-color: var(--md-surface);
-        border-radius: 0 var(--radius-large) var(--radius-large) 0;
-        display: flex;
-        flex-direction: column;
-        padding: 12px;
-        overflow-y: auto;
-        /* Scrollbar personalizado estilo M3 */
-        scrollbar-width: thin;
-        scrollbar-color: var(--md-outline-variant) transparent;
-    }
-
-    .nav-drawer::-webkit-scrollbar { width: 8px; }
-    .nav-drawer::-webkit-scrollbar-track { background: transparent; margin: 12px 0; }
-    .nav-drawer::-webkit-scrollbar-thumb { background-color: var(--md-outline-variant); border-radius: 8px; border: 2px solid var(--md-surface); }
-
-    .drawer-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 16px;
-        margin-bottom: 2px;
-        border-radius: 100px;
-        color: var(--md-text);
-        text-decoration: none;
-        font-size: 0.875rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.15s;
-        user-select: none;
-    }
-
-    .drawer-item:hover { background-color: rgba(230, 224, 233, 0.08); }
-    
-    .drawer-item.active {
-        background-color: var(--md-surface-variant);
-        color: var(--md-on-surface-variant);
-    }
-
-    /* Acordeones Nativos HTML5 */
-    details.drawer-group summary {
-        list-style: none;
-    }
-    details.drawer-group summary::-webkit-details-marker {
-        display: none;
-    }
-    
-    .drawer-group .sub-items {
-        display: flex;
-        flex-direction: column;
-        padding-left: 24px;
-    }
-
-    .chevron {
-        width: 10px; height: 10px;
-        border-right: 2px solid currentColor;
-        border-bottom: 2px solid currentColor;
-        transform: rotate(45deg);
-        transition: transform 0.2s var(--md-easing);
-        margin-right: 8px;
-    }
-
-    details[open] > summary .chevron {
-        transform: rotate(-135deg);
-        margin-top: 4px;
-    }
-</style>
-
 <!-- 2. NAVIGATION DRAWER -->
 <aside class="nav-drawer">
-    <a class="drawer-item active">Dashboard</a>
-    <a class="drawer-item">Gateway Logs</a>
-    <a class="drawer-item">Network Map</a>
+    <a href="/" class="drawer-item active">Dashboard</a>
+    <a href="/log" class="drawer-item">Gateway Logs</a>
+    <a href="/network" class="drawer-item">Network Map</a>
 
     <details class="drawer-group" open>
         <summary class="drawer-item">
             Devices <span class="chevron"></span>
         </summary>
         <div class="sub-items">
-            <a class="drawer-item">All Devices</a>
+            <a href="/devices" class="drawer-item">All Devices</a>
             <a class="drawer-item">Lights</a>
             <a class="drawer-item">Sensors</a>
             <a class="drawer-item">Add New Device</a>
@@ -92,8 +21,8 @@
             Automations <span class="chevron"></span>
         </summary>
         <div class="sub-items">
-            <a class="drawer-item">Active Skills</a>
-            <a class="drawer-item">Skill Builder</a>
+            <a href="/skills" class="drawer-item">Active Skills</a>
+            <a href="/skills/builder" class="drawer-item">Skill Builder</a>
         </div>
     </details>
 

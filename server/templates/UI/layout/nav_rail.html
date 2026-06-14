@@ -1,86 +1,25 @@
 <!-- 1. NAVIGATION RAIL (Izquierda del todo) -->
-<style>
-    /* 1. Barra Lateral de Iconos (Navigation Rail) */
-    .nav-rail {
-        width: 80px;
-        background-color: var(--md-bg);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 12px 0;
-        gap: 16px;
-        z-index: 10;
-        border-right: 1px solid transparent;
-    }
-
-    .rail-fab {
-        background-color: var(--md-surface-variant);
-        width: 56px;
-        height: 56px;
-        border-radius: 16px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 16px;
-        cursor: pointer;
-        color: var(--md-primary);
-    }
-
-    .rail-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-        color: var(--md-text-variant);
-        font-size: 0.75rem;
-        font-weight: 500;
-        width: 100%;
-        text-decoration: none;
-    }
-
-    .rail-icon {
-        width: 56px;
-        height: 32px;
-        border-radius: 16px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        transition: background-color 0.2s;
-    }
-
-    .rail-item:hover .rail-icon { background-color: rgba(230, 224, 233, 0.08); }
-    .rail-item:hover { color: var(--md-text); }
-
-    .rail-item.active { color: var(--md-text); }
-    .rail-item.active .rail-icon {
-        background-color: var(--md-surface-variant);
-        color: var(--md-on-surface-variant);
-    }
-</style>
-
 <nav class="nav-rail">
     <div class="rail-fab ripple-btn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
     </div>
 
-    <!-- TODO: Usar url_for para ruteo dinamico -->
     <a href="#" class="rail-item active">
         <div class="rail-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>
         <span>Hub</span>
     </a>
 
-    <a href="#" class="rail-item">
+    <a href="/devices" class="rail-item">
         <div class="rail-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></div>
         <span>Devices</span>
     </a>
 
-    <a href="#" class="rail-item">
+    <a href="/skills" class="rail-item">
         <div class="rail-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div>
         <span>Skills</span>
     </a>
 
-    <a href="#" class="rail-item">
+    <a href="/settings" class="rail-item">
         <div class="rail-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></div>
         <span>Settings</span>
     </a>

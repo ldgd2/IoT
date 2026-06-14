@@ -1,4 +1,4 @@
-/* Paleta de Colores Material 3 (Warm/Light Theme) */
+/* Paleta de Colores Material 3 (Warm/Light Theme basado en la imagen) */
 :root {
     --md-bg: #F5EBE1;
     --md-surface: #F5EBE1;
@@ -33,22 +33,325 @@ body {
     color: var(--md-text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow: hidden; 
+    overflow: hidden; /* Evita scroll global, el scroll estará por secciones */
     display: flex;
     height: 100vh;
 }
 
-/* Contenido Principal (A la derecha de los drawers) */
+/* --- LAYOUT PRINCIPAL (Flexbox Hardware Accelerated) --- */
+
+/* 1. Barra Lateral de Iconos (Navigation Rail) */
+.nav-rail {
+    width: 80px;
+    background-color: var(--md-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 16px;
+    z-index: 10;
+    border-right: 1px solid transparent;
+}
+
+.rail-fab {
+    background-color: var(--md-surface-variant);
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+    cursor: pointer;
+    color: var(--md-primary);
+}
+
+.rail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--md-text-variant);
+    font-size: 0.75rem;
+    font-weight: 500;
+    width: 100%;
+    text-decoration: none;
+}
+
+.rail-icon {
+    width: 56px;
+    height: 32px;
+    border-radius: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.rail-item:hover .rail-icon { background-color: rgba(230, 224, 233, 0.08); }
+.rail-item:hover { color: var(--md-text); }
+
+.rail-item.active { color: var(--md-text); }
+.rail-item.active .rail-icon {
+    background-color: var(--md-surface-variant);
+    color: var(--md-on-surface-variant);
+}
+
+/* 2. Menú de Lista (Navigation Drawer) */
+.nav-drawer {
+    width: 280px;
+    background-color: var(--md-surface);
+    border-radius: 0 var(--radius-large) var(--radius-large) 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    overflow-y: auto;
+    /* Scrollbar personalizado estilo M3 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-outline-variant) transparent;
+}
+
+.nav-drawer::-webkit-scrollbar { width: 8px; }
+.nav-drawer::-webkit-scrollbar-track { background: transparent; margin: 12px 0; }
+.nav-drawer::-webkit-scrollbar-thumb { background-color: var(--md-outline-variant); border-radius: 8px; border: 2px solid var(--md-surface); }
+
+.drawer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    margin-bottom: 2px;
+    border-radius: 100px;
+    color: var(--md-text);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    user-select: none;
+}
+
+.drawer-item:hover { background-color: rgba(230, 224, 233, 0.08); }
+
+.drawer-item.active {
+    background-color: var(--md-surface-variant);
+    color: var(--md-on-surface-variant);
+}
+
+/* Acordeones Nativos HTML5 */
+details.drawer-group summary {
+    list-style: none; /* Quita la flecha por defecto */
+}
+details.drawer-group summary::-webkit-details-marker {
+    display: none;
+}
+
+.drawer-group .sub-items {
+    display: flex;
+    flex-direction: column;
+    padding-left: 24px;
+}
+
+.chevron {
+    width: 10px; height: 10px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s var(--md-easing);
+    margin-right: 8px;
+}
+
+/* Gira la flecha cuando está abierto usando CSS nativo */
+details[open] > summary .chevron {
+    transform: rotate(-135deg);
+    margin-top: 4px;
+}
+
+/* 3. Contenido Principal (A la derecha) */
 .main-content {
     flex: 1;
     overflow-y: auto;
     padding: 32px 48px;
 }
 
-/* --- EFECTO RIPPLE (Animacion) --- */
-.ripple { 
-    position: absolute; border-radius: 50%; transform: scale(0); 
-    animation: ripple-anim 600ms linear; background-color: rgba(255, 255, 255, 0.3); 
-    pointer-events: none; 
+/* --- ESTILOS DEL CONTENIDO (Hero) --- */
+.hero-section {
+    display: grid; grid-template-columns: 1fr; gap: 16px;
+    max-width: 1200px; margin: 0 auto 40px auto;
 }
+
+@media (min-width: 1100px) { .hero-section { grid-template-columns: 1fr 1.2fr; } }
+
+.hero-card {
+    background-color: var(--md-surface); border-radius: var(--radius-extra-large);
+    padding: 56px 48px; display: flex; flex-direction: column;
+    justify-content: center; align-items: flex-start;
+}
+
+.hero-card h1 { font-size: clamp(3rem, 5vw, 4.5rem); font-weight: 400; line-height: 1.05; letter-spacing: -1.5px; margin-bottom: 24px; color: var(--md-text); }
+.hero-card p { font-size: 1.1rem; color: var(--md-text-variant); max-width: 400px; margin-bottom: 40px; }
+
+.collage-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr);
+    gap: 16px; border-radius: var(--radius-extra-large); overflow: hidden; background: #23202A;
+}
+.mockup-card { border-radius: var(--radius-large); background-color: var(--md-surface-container); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.mockup-1 { grid-column: 1 / 2; grid-row: 1 / 2; background-color: #EADDFF; color: #21005D; }
+.mockup-1 .pill { background: #D0BCFF; height: 32px; border-radius: 16px; width: 80%; }
+.mockup-2 { grid-column: 2 / 3; grid-row: 1 / 3; background-color: #4F378B; border-radius: 40px; color: white; display: flex; flex-direction: column; justify-content: flex-end; padding: 24px; }
+.mockup-2 h3 { font-size: 2.5rem; font-style: italic; font-weight: 400; margin-bottom: 16px; color: #EADDFF;}
+.mockup-3 { grid-column: 1 / 2; grid-row: 2 / 3; background-color: #000; border-radius: 32px; display: flex; flex-direction: column; justify-content: flex-end;}
+.mockup-3 .bubble-left { background: #381E72; height: 24px; width: 70%; border-radius: 16px 16px 16px 4px; margin-bottom: 8px; }
+.mockup-3 .bubble-right { background: #4A4458; height: 24px; width: 60%; border-radius: 16px 16px 4px 16px; align-self: flex-end; }
+.mockup-4 { grid-column: 3 / 4; grid-row: 1 / 3; background-color: #1D1B20; border: 1px solid #49454F; border-radius: 40px; padding: 24px; display: flex; flex-direction: column; gap: 16px;}
+.mockup-4 .time-box { background: #EADDFF; border-radius: 24px; height: 120px; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: #21005D; }
+
+.ripple { position: absolute; border-radius: 50%; transform: scale(0); animation: ripple-anim 600ms linear; background-color: rgba(255, 255, 255, 0.3); pointer-events: none; }
 @keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }
+
+/* ==================================================
+    CATALOGO DE COMPONENTES
+    ================================================== */
+    
+.catalog-container {
+    padding: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100%;
+}
+
+.showcase-board {
+    background-color: #F5EBE1;
+    border-radius: 40px;
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.board-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+
+/* --- BOTONES --- */
+.btn-m3 {
+    font-family: inherit; font-size: 1rem; font-weight: 500;
+    padding: 0 24px; height: 40px; border-radius: 20px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    transition: 0.2s; border: none; outline: none; position: relative; overflow: hidden;
+}
+
+.btn-outlined { background: transparent; border: 1px solid var(--md-outline); color: var(--md-text); }
+.btn-filled { background: var(--md-primary); color: var(--md-on-primary); }
+.btn-tonal { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.btn-elevated { background: var(--md-elevated); color: var(--md-text); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+/* --- FABS --- */
+.fab-large {
+    width: 96px; height: 96px; border-radius: 28px;
+    background: var(--md-secondary); color: var(--md-on-secondary);
+    border: none; cursor: pointer; display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; overflow: hidden;
+    transition: transform 0.1s;
+}
+.fab-large svg { width: 36px; height: 36px; }
+
+.fab-normal {
+    width: 56px; height: 56px; border-radius: 16px;
+    border: none; cursor: pointer; display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1); position: relative; overflow: hidden;
+    transition: transform 0.1s;
+}
+.fab-normal.secondary { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.fab-normal.tertiary { background: var(--md-tertiary); color: var(--md-on-tertiary); }
+
+.fab-large:active, .fab-normal:active, .icon-btn:active { transform: scale(0.95); }
+
+/* --- ICON BUTTONS --- */
+.icon-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    display: flex; justify-content: center; align-items: center;
+    cursor: pointer; position: relative; overflow: hidden; transition: 0.2s;
+}
+.icon-btn.filled { background: var(--md-primary); color: var(--md-on-primary); }
+.icon-btn.tonal { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.icon-btn.outlined { background: transparent; border: 1px solid var(--md-outline); color: var(--md-text); }
+.icon-btn.standard { background: transparent; color: var(--md-text); }
+.icon-btn svg { width: 24px; height: 24px; } /* Constraint para el tamaño del SVG */
+
+/* --- PROGRESS INDICATORS (Animaciones CSS baratas) --- */
+.progress-circ {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 4px solid transparent;
+}
+.progress-circ.indeterminate {
+    border-top-color: var(--md-primary);
+    border-left-color: var(--md-primary);
+    animation: spin 1s linear infinite;
+}
+.progress-circ.determinate {
+    border-color: var(--md-outline-variant);
+    border-top-color: var(--md-primary);
+    border-right-color: var(--md-primary);
+    transform: rotate(45deg);
+}
+
+.progress-lin-container {
+    width: 120px; display: flex; flex-direction: column; gap: 16px;
+}
+.progress-lin {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--md-outline-variant); position: relative; overflow: hidden;
+}
+.progress-lin.determinate::after {
+    content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 60%;
+    background: var(--md-primary);
+}
+.progress-lin.indeterminate::after {
+    content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 40%;
+    background: var(--md-secondary);
+    animation: slide 1.5s infinite ease-in-out;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* --- CONTROLES (Sin JS) --- */
+.m3-control { cursor: pointer; display: flex; align-items: center; position: relative; width: 24px; height: 24px; }
+.m3-control input { display: none; }
+
+.m3-box { width: 20px; height: 20px; border: 2px solid var(--md-text); border-radius: 2px; display: flex; justify-content: center; align-items: center; transition: 0.1s; }
+.m3-control input:checked + .m3-box { background: var(--md-primary); border-color: var(--md-primary); }
+.m3-control input:checked + .m3-box::after { content: ''; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-bottom: 2px; }
+
+.m3-radio { width: 20px; height: 20px; border: 2px solid var(--md-text); border-radius: 50%; display: flex; justify-content: center; align-items: center; transition: 0.1s; }
+.m3-control input:checked + .m3-radio { border-color: var(--md-primary); border-width: 6px; }
+
+.m3-switch-label { display: inline-flex; cursor: pointer; }
+.m3-switch-label input { display: none; }
+.m3-switch {
+    position: relative; width: 52px; height: 32px;
+    background: var(--md-outline-variant); border-radius: 16px;
+    border: 2px solid var(--md-outline); transition: 0.2s;
+}
+.m3-switch::after {
+    content: ''; position: absolute; top: 4px; left: 4px;
+    width: 16px; height: 16px; background: var(--md-outline); border-radius: 50%;
+    transition: transform 0.2s var(--md-easing), width 0.2s, background 0.2s;
+}
+.m3-switch-label input:checked + .m3-switch { background: var(--md-primary); border-color: var(--md-primary); }
+.m3-switch-label input:checked + .m3-switch::after {
+    transform: translateX(20px); width: 24px; height: 24px; top: 2px;
+    background-color: var(--md-elevated);
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236B4C12"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>');
+    background-size: 16px; background-position: center; background-repeat: no-repeat;
+}
+
+/* --- CHIPS --- */
+.m3-chip {
+    padding: 0 16px; height: 32px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 8px; font-size: 0.875rem; font-weight: 500;
+    cursor: pointer; transition: 0.2s; border: 1px solid var(--md-outline); color: var(--md-text);
+}
+.m3-chip.tonal { background: var(--md-surface-variant); border-color: transparent; }
+.m3-chip.input-chip { background: var(--md-elevated); border: 1px solid var(--md-outline-variant); border-radius: 8px; }
+.m3-chip svg { width: 18px; height: 18px; }
