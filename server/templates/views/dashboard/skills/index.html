@@ -1,0 +1,12 @@
+{% extends "UI/layout/base.html" %}
+{% import 'UI/widgets/cards.html' as cards %}
+{% import 'UI/components/buttons.html' as btn %}
+
+{% block title %}Skills - Gerlex IoT{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;">
+    {{ cards.m3_hero_card('Automatizaciones', 'Gestiona las Skills y rutinas inteligentes.', btn.m3_button('Crear Nueva Skill', 'filled')) }}
+    <p>Lista de Skills vendrá aquí...</p>
+</div>
+{% endblock %}

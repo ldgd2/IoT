@@ -1,0 +1,47 @@
+<style>
+/* --- PROGRESS INDICATORS --- */
+.progress-circ {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 4px solid transparent;
+}
+.progress-circ.indeterminate {
+    border-top-color: var(--md-primary);
+    border-left-color: var(--md-primary);
+    animation: spin 1s linear infinite;
+}
+.progress-circ.determinate {
+    border-color: var(--md-outline-variant);
+    border-top-color: var(--md-primary);
+    border-right-color: var(--md-primary);
+    transform: rotate(45deg);
+}
+
+.progress-lin-container {
+    width: 120px; display: flex; flex-direction: column; gap: 16px;
+}
+.progress-lin {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--md-outline-variant); position: relative; overflow: hidden;
+}
+.progress-lin.determinate::after {
+    content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 60%;
+    background: var(--md-primary);
+}
+.progress-lin.indeterminate::after {
+    content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 40%;
+    background: var(--md-secondary);
+    animation: slide 1.5s infinite ease-in-out;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+</style>
+
+{% macro m3_progress_circular(indeterminate=True) %}
+<div class="progress-circ {% if indeterminate %}indeterminate{% else %}determinate{% endif %}"></div>
+{% endmacro %}
+
+{% macro m3_progress_linear(indeterminate=True) %}
+<div class="progress-lin-container">
+    <div class="progress-lin {% if indeterminate %}indeterminate{% else %}determinate{% endif %}"></div>
+</div>
+{% endmacro %}
