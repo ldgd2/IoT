@@ -9,6 +9,10 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent.resolve()))
 
 from scripts.cli import cli
+from scripts.interactive import show_main_menu
 
 if __name__ == '__main__':
-    cli()
+    if len(sys.argv) == 1:
+        show_main_menu()
+    else:
+        cli()
