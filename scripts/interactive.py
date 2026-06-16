@@ -75,7 +75,7 @@ def show_service_menu():
                 "⏹️ Detener servicio",
                 "🔄 Reiniciar servicio",
                 "ℹ️ Ver estado del servicio",
-                "📜 Ver Logs en vivo (server.log)",
+                "📜 Ver Logs en vivo (hub.log)",
                 "📦 Instalar servicio",
                 questionary.Separator(),
                 "⬅️ Volver al menú principal"
@@ -94,7 +94,7 @@ def show_service_menu():
             "⏹️ Detener servicio": ["iot.py", "admin", "service-stop"],
             "🔄 Reiniciar servicio": ["iot.py", "admin", "service-restart"],
             "ℹ️ Ver estado del servicio": ["iot.py", "admin", "service-status"],
-            "📜 Ver Logs en vivo (server.log)": ["iot.py", "admin", "service-logs"],
+            "📜 Ver Logs en vivo (hub.log)": ["iot.py", "admin", "service-logs"],
             "📦 Instalar servicio": ["iot.py", "admin", "service-install"]
         }
         

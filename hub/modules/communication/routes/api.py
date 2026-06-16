@@ -1,0 +1,242 @@
+from flask import Blueprint, jsonify, request
+from datetime import datetime
+import serial.tools.list_ports
+
+from hub.core.config import ENV_FILE
+from hub.modules.devices.models.device import Device
+from hub.modules.communication.models.rflog import RFLog
+from hub.modules.automation.evaluator import evaluator
+from hub.db.database import Database
+from hub.core.device_types import DeviceRegistry
+
+communication_bp = Blueprint('communication_api', __name__)
+
+def process_incoming_packet(data):
+    if not data:
+        return {"error": "bad request"}, 400
+
+    # Soporte para paquetes RAW de RF24Mesh (origin, cmd, data)
+    if "origin" in data and "cmd" in data:
+        node_id = data["origin"]
+        cmd = data["cmd"]
+        raw_data = data.get("data", [])
+        device_id = f"dev_{node_id}"
+        
+        dev = Device.get(device_id)
+        
+        if cmd == 5: # CMD_DISCOVER
+            if len(raw_data) >= 17:
+                name_len = raw_data[0]
+                name_chars = raw_data[1:1+name_len]
+                device_name = "".join([chr(c) for c in name_chars if c != 0])
+                features = raw_data[16]
+                device_type = data.get("type", 0)
+                
+                reg_info = DeviceRegistry.describe(device_type, features)
+                
+                if not dev:
+                    dev = Device(device_id=device_id)
+                
+                dev.name = device_name
+                dev.type_code = reg_info["type_code"]
+                dev.type_name = reg_info["type_name"]
+                dev.type_icon = reg_info["type_icon"]
+                dev.category = reg_info["category"]
+                dev.features = reg_info["features"]
+                dev.feature_keys = reg_info["feature_keys"]
+                
+                current_state = dev.state if isinstance(dev.state, dict) else {}
+                
+                # Inicializacion dinamica de estado basado en feature keys
+                keys = reg_info["feature_keys"]
+                if "relay" in keys: current_state.setdefault("on", False)
+                if "dimmer" in keys: current_state.setdefault("brightness", 0)
+                if "temperature" in keys: current_state.setdefault("temperature", 0.0)
+                if "humidity" in keys: current_state.setdefault("humidity", 0.0)
+                if "motion" in keys: current_state.setdefault("motion", False)
+                if "energy" in keys: current_state.setdefault("power", 0.0)
+                    
+                dev.state = current_state
+                dev.status = "online"
+                dev.save()
+                
+                return {"ok": True, "action": "discovered", "registry": reg_info}, 200
+
+        elif cmd == 4: # CMD_HEARTBEAT
+            payload = {}
+            rssi = 0
+            if dev and isinstance(dev.feature_keys, list):
+                keys = dev.feature_keys
+                # Light/Relay Heartbeat
+                if "relay" in keys or "dimmer" in keys:
+                    if len(raw_data) >= 2:
+                        payload["on"] = (raw_data[0] != 0)
+                        payload["brightness"] = raw_data[1]
+                # Sensor Heartbeat (ejemplo de ProtocolExt.h)
+                elif "temperature" in keys or "humidity" in keys:
+                    if len(raw_data) >= 4:
+                        temp_centi = (raw_data[0] << 8) | raw_data[1]
+                        # Python handles signed 16-bit appropriately
+                        if temp_centi > 32767: temp_centi -= 65536
+                        hum_centi = (raw_data[2] << 8) | raw_data[3]
+                        
+                        payload["temperature"] = temp_centi / 100.0
+                        payload["humidity"] = hum_centi / 100.0
+            else:
+                # Si no está descubierto, no podemos parsearlo de forma segura
+                pass
+        else:
+            payload = {} 
+            rssi = 0
+    else:
+        # Formato App / Bridge
+        if "id" not in data:
+            return {"error": "missing id"}, 400
+        device_id = data["id"]
+        rssi      = data.get("rssi", 0)
+        payload   = data.get("payload", {})
+
+    dev = Device.get(device_id)
+    if not dev:
+        dev = Device(
+            device_id=device_id,
+            name=data.get("name", f"Device {device_id}"),
+            type_name=data.get("type", "generic")
+        )
+    
+    dev.update(payload, rssi if 'rssi' in locals() else 0)
+
+    log = RFLog(
+        ts=datetime.now().isoformat(),
+        device_id=device_id,
+        rssi=rssi if 'rssi' in locals() else 0,
+        payload=payload,
+        direction="RX"
+    )
+    log.save()
+
+    # Disparar Motor de Automatización
+    evaluator.evaluate_event(device_id, payload)
+
+    return {"ok": True}, 200
+
+@communication_bp.route("/ingest", methods=["POST"])
+def api_ingest():
+    data = request.get_json(silent=True)
+    res, status = process_incoming_packet(data)
+    return jsonify(res), status
+
+
+@communication_bp.route("/command", methods=["POST"])
+def api_command():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "bad request"}), 400
+
+    device_id = data.get("id")
+    dev = Device.get(device_id)
+    if not dev:
+        return jsonify({"error": "device not found"}), 404
+
+    cmd    = data.get("cmd", "set")
+    params = data.get("params", {})
+
+    if isinstance(dev.state, dict):
+        dev.state.update(params)
+    dev.save()
+
+    log = RFLog(
+        ts=datetime.now().isoformat(),
+        device_id=device_id,
+        direction="TX",
+        cmd=cmd,
+        payload=params
+    )
+    log.save()
+
+    return jsonify({"ok": True, "state": dev.state})
+
+
+@communication_bp.route("/stats", methods=["GET"])
+def api_stats():
+    devices = Device.all()
+    online = sum(1 for d in devices if d.status == "online")
+    cursor = Database.execute("SELECT COUNT(*) as c FROM rf_logs")
+    log_count = cursor.fetchone()["c"]
+    
+    return jsonify({
+        "total":   len(devices),
+        "online":  online,
+        "offline": len(devices) - online,
+        "log_len": log_count,
+    })
+
+@communication_bp.route("/ports", methods=["GET"])
+def api_ports():
+    port_type = request.args.get("type", "COM")
+    ports_list = []
+    
+    if port_type == "COM":
+        try:
+            ports = serial.tools.list_ports.comports()
+            for p in ports:
+                ports_list.append({
+                    "id": p.device,
+                    "label": f"{p.device} - {p.description}"
+                })
+        except Exception:
+            pass
+    elif port_type == "HID":
+        try:
+            import hid
+            devices = hid.enumerate()
+            for d in devices:
+                # Filtrar dispositivos vacios o estandar
+                prod = d.get('product_string', '')
+                if not prod: continue
+                
+                vid = d.get('vendor_id', 0)
+                pid = d.get('product_id', 0)
+                path = d.get('path', b'').decode('utf-8', errors='ignore')
+                
+                ports_list.append({
+                    "id": f"HID_{vid:04x}:{pid:04x}",
+                    "label": f"[{vid:04x}:{pid:04x}] {prod} - {d.get('manufacturer_string', '')}"
+                })
+                
+            if not ports_list:
+                ports_list.append({
+                    "id": "",
+                    "label": "No se detectaron dispositivos HID USB"
+                })
+        except ImportError:
+            ports_list.append({
+                "id": "",
+                "label": "Libreria 'hid' no instalada. Instala con pip install hidapi"
+            })
+        except Exception as e:
+            ports_list.append({
+                "id": "",
+                "label": f"Error HID: {str(e)}"
+            })
+        
+    return jsonify(ports_list)
+
+@communication_bp.route("/settings", methods=["POST"])
+def api_settings():
+    data = request.get_json(silent=True)
+    if not data or "rf_port" not in data:
+        return jsonify({"error": "bad request"}), 400
+        
+    new_port = data["rf_port"]
+    
+    from dotenv import set_key
+    try:
+        if ENV_FILE.exists():
+            set_key(str(ENV_FILE), "RF_PORT", new_port)
+        else:
+            with open(ENV_FILE, 'w', encoding='utf-8') as f:
+                f.write(f"RF_PORT={new_port}\n")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500

@@ -1,0 +1,184 @@
+{% extends "UI/layout/base.html" %}
+{% import 'UI/widgets/cards.html' as cards %}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/inputs.html' as inp %}
+{% import 'UI/components/chips.html' as chips %}
+
+{% block title %}Configuración - Gerlex IoT{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 800px; margin: 0 auto;">
+    
+    <div style="margin-bottom: 40px;">
+        <h1 style="margin-bottom: 8px;">Configuración del Sistema</h1>
+        <p style="color: var(--md-text-variant);">Ajusta la apariencia y los parámetros de conexión de hardware.</p>
+    </div>
+
+    <!-- SECCION TEMAS -->
+    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 32px; margin-bottom: 24px;">
+        <h2 style="font-size: 1.5rem; font-weight: 500; margin-bottom: 24px;">Apariencia</h2>
+        
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+            <span style="font-weight: 500;">Modo Oscuro</span>
+            <!-- Al cambiar esto, se llama a toggleDarkMode() -->
+            <label class="m3-switch-label">
+                <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode(this.checked)">
+                <div class="m3-switch"></div>
+            </label>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <span style="font-weight: 500;">Paleta de Color</span>
+            <div style="display: flex; gap: 12px;">
+                <div onclick="changeColor('warm')" id="chip-warm">{{ chips.m3_chip('Warm (Cálido)', 'input-chip') }}</div>
+                <div onclick="changeColor('blue')" id="chip-blue">{{ chips.m3_chip('Blue (Frío)', 'input-chip') }}</div>
+                <div onclick="changeColor('green')" id="chip-green">{{ chips.m3_chip('Green (Eco)', 'input-chip') }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCION HARDWARE (RF GATEWAY) -->
+    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 32px;">
+        <h2 style="font-size: 1.5rem; font-weight: 500; margin-bottom: 24px;">Hardware (Gateway)</h2>
+        
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; gap: 24px; align-items: center; margin-bottom: 8px;">
+                <label style="font-weight: 500;">Tipo de Conexión:</label>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <label class="m3-control" style="gap: 8px; width: auto;">
+                        <input type="radio" name="port_type" value="COM" checked onchange="loadPorts('COM')">
+                        <div class="m3-radio"></div>
+                        <span style="font-size: 0.95rem;">Puerto Serial (COM)</span>
+                    </label>
+                    <label class="m3-control" style="gap: 8px; width: auto;">
+                        <input type="radio" name="port_type" value="HID" onchange="loadPorts('HID')">
+                        <div class="m3-radio"></div>
+                        <span style="font-size: 0.95rem;">USB Directo (HID)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 8px;">Seleccionar Dispositivo</label>
+                <select id="rf_port_select" style="width: 100%; max-width: 400px; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem; appearance: auto;">
+                    <option value="{{ rf_port }}">Cargando dispositivos...</option>
+                </select>
+                <p style="font-size: 0.85rem; color: var(--md-text-variant); margin-top: 8px;">Selecciona la antena traductora de la lista de dispositivos conectados actualmente.</p>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <button class="btn-m3 btn-filled ripple-btn" onclick="saveSettings()">Guardar Configuración</button>
+                <button class="btn-m3 btn-tonal ripple-btn" onclick="refreshPorts()" style="margin-left: 8px;">
+                    <div class="icon" style="width: 18px; height: 18px;">
+                        {% include 'UI/icons/svg/palette.svg' ignore missing %}
+                    </div>
+                    Refrescar Lista
+                </button>
+            </div>
+            
+            <div id="save-status" style="margin-top: 8px; font-weight: 500; display: none;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Inicializar estado de los controles de tema
+    document.addEventListener('DOMContentLoaded', () => {
+        const isDark = localStorage.getItem('m3-theme') === 'dark';
+        document.getElementById('dark-mode-toggle').checked = isDark;
+        
+        // Highlight chip activo
+        const color = localStorage.getItem('m3-color') || 'warm';
+        document.querySelectorAll('[id^="chip-"]').forEach(el => el.children[0].style.borderColor = 'transparent');
+        const activeChip = document.getElementById('chip-' + color);
+        if(activeChip) activeChip.children[0].style.borderColor = 'var(--md-primary)';
+        
+        // Cargar puertos por defecto
+        loadPorts('COM');
+    });
+
+    function loadPorts(type) {
+        const selectEl = document.getElementById('rf_port_select');
+        selectEl.innerHTML = '<option value="">Buscando dispositivos...</option>';
+        selectEl.disabled = true;
+
+        fetch('/api/ports?type=' + type)
+        .then(r => r.json())
+        .then(data => {
+            selectEl.innerHTML = '';
+            selectEl.disabled = false;
+            
+            if (data.length === 0) {
+                selectEl.innerHTML = '<option value="">No se encontraron dispositivos</option>';
+                return;
+            }
+            
+            const savedPort = "{{ rf_port }}"; // El puerto actual en .env
+            
+            data.forEach(port => {
+                const opt = document.createElement('option');
+                opt.value = port.id;
+                opt.innerText = port.label;
+                if (port.id === savedPort) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            selectEl.innerHTML = '<option value="">Error al buscar puertos</option>';
+            selectEl.disabled = false;
+        });
+    }
+
+    function refreshPorts() {
+        const type = document.querySelector('input[name="port_type"]:checked').value;
+        loadPorts(type);
+    }
+
+    function toggleDarkMode(isDark) {
+        const color = localStorage.getItem('m3-color') || 'warm';
+        applyTheme(isDark ? 'dark' : 'light', color);
+    }
+
+    function changeColor(color) {
+        const theme = localStorage.getItem('m3-theme') || 'light';
+        applyTheme(theme, color);
+        
+        // Actualizar UI
+        document.querySelectorAll('[id^="chip-"]').forEach(el => el.children[0].style.borderColor = 'transparent');
+        document.getElementById('chip-' + color).children[0].style.borderColor = 'var(--md-primary)';
+    }
+
+    function saveSettings() {
+        const selectEl = document.getElementById('rf_port_select');
+        const port = selectEl.value;
+        
+        if (!port) return alert("Selecciona un puerto válido primero.");
+
+        const statusEl = document.getElementById('save-status');
+        
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--md-text)';
+        statusEl.innerText = 'Guardando...';
+
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ rf_port: port })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.ok) {
+                statusEl.style.color = 'var(--md-primary)';
+                statusEl.innerText = 'Guardado correctamente. El cambio aplicará en el próximo reinicio.';
+            } else {
+                statusEl.style.color = 'red';
+                statusEl.innerText = 'Error al guardar.';
+            }
+        })
+        .catch(err => {
+            statusEl.style.color = 'red';
+            statusEl.innerText = 'Error de conexión.';
+        });
+    }
+</script>
+{% endblock %}

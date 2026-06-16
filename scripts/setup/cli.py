@@ -2,7 +2,7 @@ import rich_click as click
 import questionary
 from rich.console import Console
 from rich.panel import Panel
-from server.core.config import ENV_FILE, VENV_DIR
+from hub.core.config import ENV_FILE, VENV_DIR
 from dotenv import dotenv_values
 import os
 import subprocess

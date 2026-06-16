@@ -1,0 +1,128 @@
+{% extends "UI/layout/base.html" %}
+
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+
+{% block title %}Dashboard - Gerlex IoT OS{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px;">
+    
+    <!-- HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <h1 style="margin: 0 0 8px 0; font-size: 2.5rem; letter-spacing: -1px;">Vista General</h1>
+            <p style="color: var(--md-text-variant); margin: 0; font-size: 1.1rem;">Estado en tiempo real de tu red IoT RF.</p>
+        </div>
+        <div style="display: flex; gap: 16px;">
+            <a href="/devices/new" style="text-decoration: none;">
+                {{ btn.m3_button('Añadir Nodo', 'filled') }}
+            </a>
+            <a href="/skills" style="text-decoration: none;">
+                {{ btn.m3_button('Reglas de Automatización', 'tonal') }}
+            </a>
+        </div>
+    </div>
+
+    <!-- STATS WIDGETS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px;">
+        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px;">
+            <span style="color: var(--md-text-variant); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Dispositivos Totales</span>
+            <span id="stat-total" style="font-size: 3rem; font-weight: 300;">-</span>
+        </div>
+        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px;">
+            <span style="color: var(--md-primary); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Nodos Online</span>
+            <span id="stat-online" style="font-size: 3rem; font-weight: 300; color: var(--md-primary);">-</span>
+        </div>
+        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px;">
+            <span style="color: var(--md-error); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Nodos Offline</span>
+            <span id="stat-offline" style="font-size: 3rem; font-weight: 300; color: var(--md-error);">-</span>
+        </div>
+        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px;">
+            <span style="color: var(--md-tertiary); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Tráfico (Mensajes)</span>
+            <span id="stat-traffic" style="font-size: 3rem; font-weight: 300; color: var(--md-tertiary);">-</span>
+        </div>
+    </div>
+
+    <!-- DEVICES GRID -->
+    <div>
+        <h2 style="margin: 0 0 24px 0; font-weight: 500;">Nodos Recientes</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+            {% for dev in devices %}
+            <div style="background: var(--md-surface); border: 1px solid var(--md-outline-variant); border-radius: 24px; padding: 24px; display: flex; flex-direction: column; gap: 16px; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 24px rgba(0,0,0,0.1)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="width: 48px; height: 48px; border-radius: 16px; background: var(--md-surface-variant); display: flex; justify-content: center; align-items: center; color: var(--md-on-surface-variant);">
+                            <div class="icon" style="width: 24px; height: 24px;">
+                                {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
+                                {% include svg_path ignore missing %}
+                            </div>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 500;">{{ dev.name }}</h3>
+                            <span style="font-family: monospace; font-size: 0.85rem; color: var(--md-text-variant);">{{ dev.device_id }}</span>
+                        </div>
+                    </div>
+                    {% if dev.status == 'online' %}
+                    <span style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--md-primary); background: rgba(var(--md-primary-rgb), 0.1); padding: 4px 10px; border-radius: 12px;">
+                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--md-primary);"></span> Online
+                    </span>
+                    {% else %}
+                    <span style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--md-error); background: rgba(var(--md-error-rgb), 0.1); padding: 4px 10px; border-radius: 12px;">
+                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--md-error);"></span> Offline
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    {{ chip.m3_chip(dev.device_type | title) }}
+                    {{ chip.m3_chip(dev.rssi ~ ' dBm', 'tonal') }}
+                </div>
+                
+                <div style="margin-top: 8px;">
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant); display: flex; justify-content: space-between;">
+                        <span>Visto:</span> <span>{{ dev.last_seen.split('T')[1][:8] if 'T' in dev.last_seen else 'N/A' }}</span>
+                    </p>
+                </div>
+                
+                <div style="margin-top: auto; padding-top: 16px; border-top: 1px dashed var(--md-outline-variant);">
+                    <a href="/device/{{ dev.device_id }}" style="text-decoration: none; width: 100%;">
+                        <button class="btn-m3 btn-text ripple-btn" style="width: 100%; justify-content: center; font-weight: 500;">Administrar Nodo</button>
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <div style="grid-column: 1 / -1; background: var(--md-surface-container); border-radius: 24px; padding: 64px 24px; text-align: center; border: 2px dashed var(--md-outline-variant);">
+                <div class="icon" style="width: 48px; height: 48px; margin-bottom: 16px; color: var(--md-outline);">
+                    {% include 'UI/icons/svg/router-wireless.svg' ignore missing %}
+                </div>
+                <h2 style="margin: 0 0 8px 0; font-weight: 500;">La red está vacía</h2>
+                <p style="color: var(--md-text-variant); margin: 0 0 24px 0; max-width: 400px; margin-inline: auto;">Todavía no hemos recibido ningún paquete de descubrimiento. Enciende tus nodos Arduino/ESP para comenzar.</p>
+                <a href="/devices/new" style="text-decoration: none;">
+                    {{ btn.m3_button('Configuración Manual', 'tonal') }}
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fetch stats in real time
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            document.getElementById('stat-total').innerText = data.total;
+            document.getElementById('stat-online').innerText = data.online;
+            document.getElementById('stat-offline').innerText = data.offline;
+            document.getElementById('stat-traffic').innerText = data.log_len;
+        } catch(e) {
+            console.error('Failed to load stats:', e);
+        }
+    }
+    loadStats();
+    setInterval(loadStats, 5000);
+</script>
+{% endblock %}

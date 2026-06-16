@@ -1,3 +1,9 @@
-bblanchon/ArduinoJson @ ^6.21.3
-nRF24/RF24Network @ ^1.0.17
+EEPROM
+adafruit/Adafruit SSD1306 @ ^2.5.9
+LittleFS
 nRF24/RF24 @ ^1.4.7
+nRF24/RF24Network @ ^1.0.17
+SPI
+adafruit/Adafruit GFX Library @ ^1.11.9
+bblanchon/ArduinoJson @ ^6.21.3
+nRF24/RF24Mesh @ ^1.1.8

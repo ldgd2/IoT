@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 console = Console()
-from server.core.config import SERVER_DIR, VENV_DIR
+from hub.core.config import HUB_DIR, VENV_DIR
 
 SERVICE_NAME = "iot-rf-gateway.service"
 
@@ -27,7 +27,7 @@ def start():
     if sys.platform == "win32":
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
     try:
-        subprocess.run([py_exec, str(SERVER_DIR / "main.py")])
+        subprocess.run([py_exec, str(HUB_DIR / "main.py")])
     except KeyboardInterrupt:
         console.print("[yellow]Servidor detenido por el usuario.[/yellow]")
 
@@ -42,8 +42,8 @@ def service_install():
     
     # Generate service string
     python_path = str(VENV_DIR / "bin" / "python")
-    main_path = str(SERVER_DIR / "main.py")
-    log_path = str(SERVER_DIR.parent / "logs" / "server.log")
+    main_path = str(HUB_DIR / "main.py")
+    log_path = str(HUB_DIR.parent / "logs" / "hub.log")
     
     svc = f"""[Unit]
 Description=IoT RF Gateway — Servidor Flask
@@ -52,7 +52,7 @@ After=network.target
 [Service]
 Type=simple
 User={os.getenv('USER', 'root')}
-WorkingDirectory={SERVER_DIR.parent}
+WorkingDirectory={HUB_DIR.parent}
 ExecStart={python_path} {main_path}
 Restart=on-failure
 RestartSec=5

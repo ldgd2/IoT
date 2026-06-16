@@ -1,0 +1,78 @@
+{% extends "UI/layout/base.html" %}
+{% import 'UI/widgets/cards.html' as cards %}
+{% import 'UI/components/buttons.html' as btn %}
+
+{% block title %}Dispositivos - Gerlex IoT{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+        <div>
+            <h1 style="margin-bottom: 8px;">Dispositivos Conectados</h1>
+            <p style="color: var(--md-text-variant);">Administra tus nodos de hardware RF y WiFi.</p>
+        </div>
+        <a href="/devices/new" style="text-decoration: none;">
+            <button class="btn-m3 btn-filled ripple-btn" style="display: flex; align-items: center; gap: 8px;">
+                <div class="icon" style="width: 18px; height: 18px;">
+                    {% include 'UI/icons/svg/plus.svg' ignore missing %}
+                </div>
+                Vincular Nuevo Dispositivo
+            </button>
+        </a>
+    </div>
+
+    <!-- TABLA DE DISPOSITIVOS -->
+    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--md-outline-variant);">
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">ID Nodo</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Nombre</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Tipo</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Señal (RSSI)</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Estado</th>
+                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dev in devices %}
+                <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
+                    <td style="padding: 16px 24px; font-family: monospace;">{{ dev.device_id }}</td>
+                    <td style="padding: 16px 24px; font-weight: 500;">{{ dev.name }}</td>
+                    <td style="padding: 16px 24px;">{{ dev.device_type | title }}</td>
+                    <td style="padding: 16px 24px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="icon" style="width: 16px; height: 16px; color: var(--md-primary);">
+                                {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
+                                {% include svg_path ignore missing %}
+                            </div>
+                            {{ dev.rssi }} dBm
+                        </div>
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        {% if dev.status == 'online' %}
+                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-tertiary); color: var(--md-on-tertiary);">Online</span>
+                        {% else %}
+                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-error-container); color: var(--md-on-error-container);">Offline</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px 24px;">
+                        <a href="/device/{{ dev.device_id }}">
+                            <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px;">Ver</button>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="padding: 48px; text-align: center; color: var(--md-text-variant);">
+                        No hay dispositivos vinculados. Espera a que un nodo se conecte o emita un paquete de descubrimiento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

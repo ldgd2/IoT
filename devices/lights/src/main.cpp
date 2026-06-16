@@ -1,117 +1,156 @@
+/**
+ * @file main.cpp — lights
+ * @brief Orquestador del nodo de iluminación. Solo conecta módulos de shared/.
+ *
+ * Este archivo NO contiene lógica. Solo:
+ *   1. Selecciona las implementaciones concretas según la plataforma
+ *   2. Instancia los módulos que este dispositivo necesita
+ *   3. Llama a sus métodos en setup() y loop()
+ *
+ * ─── Módulos usados (todos de shared/) ──────────────────────────────────────
+ *   RelayBank       → N relays (definidos en PinConfig.h)
+ *   MeshConnection  → red RF24Mesh como nodo leaf
+ *   ColmenaNode     → lógica de hive: announce + heartbeat + applySync
+ *   ParamStore      → persistencia por plataforma
+ *
+ * ─── Módulos que este dispositivo NO usa ────────────────────────────────────
+ *   Display (IDisplay, Renderer, UILayout)  → sin pantalla
+ *   Transport (Serial, HID)                 → solo el translator
+ *   MasterMeshConnection                    → solo el gateway
+ *   ColmenaMaster                           → solo el gateway
+ */
+
 #include <Arduino.h>
 #include <SPI.h>
-#include <RF24.h>
-#include <RF24Network.h>
-#include <RF24Mesh.h>
-#include "../config/Protocol.h"
-#include "../config/RadioConfig.h"
 
-// Inicialización de la red Mesh
-RF24 radio(CE_PIN, CSN_PIN);
-RF24Network network(radio);
-RF24Mesh mesh(radio, network);
+// ── Config de hardware (específico de este dispositivo) ─────────────────────
+#include "PinConfig.h"
+#include "RadioConfig.h"
 
-// Este es el Node ID de esta luz específica (1 a 255)
-// Para propósitos de este ejemplo es 1, pero cada placa debe tener uno único.
-#define NODE_ID 1
+// ── Protocolo compartido ────────────────────────────────────────────────────
+#include "protocol/Protocol.h"
+#include "protocol/ProtocolExt.h"
 
-const int RELAY_PIN = 5; 
-unsigned long lastHeartbeat = 0;
-bool relayState = false;
+// ── Persistencia — selección compile-time según plataforma ──────────────────
+#include "params/PreferencesStore.h"
+#include "params/FlashStore.h"
+#include "params/EEPROMStore.h"
 
+#if defined(IS_ESP32)
+    using ParamStore = PreferencesStore;
+#elif defined(IS_RP2040)
+    using ParamStore = FlashStore;
+#else
+    using ParamStore = EEPROMStore;   // Arduino, ESP8266
+#endif
+
+// ── Red RF Mesh (nodo leaf) ─────────────────────────────────────────────────
+#include "mesh/MeshConnection.h"
+
+// ── Lógica de colmena (leaf: announce + heartbeat + applySync) ───────────────
+#include "colmena/ColmenaNode.h"
+
+// ── Actuadores ───────────────────────────────────────────────────────────────
+#include "actuators/relay/RelayBank.h"
+
+// ─── Instancias de módulos ───────────────────────────────────────────────────
+ParamStore      params;
+MeshConnection  connection(NODE_ID);       // NODE_ID definido en PinConfig.h
+ColmenaNode     colmena(connection, params);
+RelayBank       relays;
+
+// ─── Estado local ─────────────────────────────────────────────────────────────
+static bool      reconectando = false;
+
+// ─────────────────────────────────────────────────────────────────────────────
 void setup() {
-    Serial.begin(115200);
-    pinMode(RELAY_PIN, OUTPUT);
-    digitalWrite(RELAY_PIN, LOW);
-    
-    // Configurar Node ID y empezar Mesh
-    mesh.setNodeID(NODE_ID);
-    
-    Serial.println("Conectando a la red Mesh...");
-    if (!mesh.begin()) {
-        Serial.println("Error iniciando radio SPI.");
-        while(1){}
+    // 1. Inicializar almacenamiento y cargar parámetros
+    params.begin("colmena");
+
+    // 2. Configurar identidad del nodo
+    colmena.setNodeId(NODE_ID);
+    colmena.setDeviceType(NODE_DEVICE_TYPE);  // Ej: DEV_LIGHT=0x02, DEV_PLUG=0x01
+    colmena.setFeatures(NODE_FEATURES);       // Ej: FEAT_RELAY|FEAT_DIMMER
+    colmena.load();
+
+    // 3. Inicializar relays — solo los pines que este dispositivo tiene
+    //    RELAY_PINS y RELAY_COUNT definidos en PinConfig.h
+    relays.init(RELAY_COUNT, RELAY_PINS, RELAY_ACTIVE_LOW);
+
+    // 4. Conectar a la red Mesh
+    if (!connection.begin()) {
+        // Sin conexión → quedar en standby local
+        // Los relays siguen operando con el último estado guardado
+        return;
     }
-    
-    radio.setPALevel(RF24_PA_MAX);
-    radio.setDataRate(RF_DATARATE);
-    
-    Serial.println("Conectado! Node ID: " + String(NODE_ID));
-    
-    // Enviar paquete de auto-descubrimiento
-    RFPacket discover_pkt;
-    discover_pkt.originId = NODE_ID;
-    discover_pkt.destId = 0; // Master
-    discover_pkt.deviceType = DEV_TYPE_LIGHT;
-    discover_pkt.command = CMD_DISCOVER;
-    
-    String nodeName = "Luz Node " + String(NODE_ID);
-    discover_pkt.data[0] = nodeName.length();
-    for (int i = 0; i < nodeName.length() && i < 15; i++) {
-        discover_pkt.data[i+1] = nodeName[i];
-    }
-    // Set Feature Flags (Bitmask: Relay + Brightness)
-    discover_pkt.data[16] = FEATURE_RELAY | FEATURE_BRIGHTNESS;
-    
-    Serial.print("Tx Discovery... ");
-    if (!mesh.write(&discover_pkt, 'C', sizeof(discover_pkt), 0)) {
-        Serial.println("FAIL");
-    } else {
-        Serial.println("OK");
-    }
+
+    // 5. Anunciar presencia al master
+    colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    // 1. Mantener conexión con la red Mesh (Renovar DHCP si perdemos conexión)
-    mesh.update();
-    
-    if (!mesh.checkConnection()) {
-        Serial.println("Conexion perdida, renovando direccion...");
-        mesh.renewAddress();
-    }
-    
-    // 2. Leer comandos entrantes
-    if (network.available()) {
-        RF24NetworkHeader header;
-        RFPacket packet;
-        network.read(header, &packet, sizeof(packet));
-        
-        Serial.print("Rx Cmd: ");
-        Serial.print(packet.command);
-        Serial.print(" from: ");
-        Serial.println(mesh.getNodeID(header.from_node));
-        
-        // Ejecutar comando
-        if (packet.command == CMD_ON) {
-            relayState = true;
-            digitalWrite(RELAY_PIN, HIGH);
-        } else if (packet.command == CMD_OFF) {
-            relayState = false;
-            digitalWrite(RELAY_PIN, LOW);
-        } else if (packet.command == CMD_TOGGLE) {
-            relayState = !relayState;
-            digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+    // 1. Mantener red Mesh (update + checkConnection automático)
+    connection.update();
+
+    // 2. Reconexión automática si se perdió la red
+    if (!connection.isConnected()) {
+        if (!reconectando) {
+            reconectando = true;
         }
+        bool ok = connection.reconnect();
+        if (ok) {
+            reconectando = false;
+            colmena.announce(NODE_NAME);  // Re-anunciar tras reconectar
+        }
+        return;
     }
-    
-    // 3. Heartbeat cada 60s hacia el Master (Node ID 0)
-    if (millis() - lastHeartbeat > 60000) {
-        lastHeartbeat = millis();
-        RFPacket hb;
-        hb.originId = NODE_ID;
-        hb.destId = 0; // Master
-        hb.deviceType = DEV_TYPE_LIGHT;
-        hb.command = CMD_HEARTBEAT;
-        hb.data[0] = relayState ? 1 : 0; // Enviar estado actual en el heartbeat
-        
-        Serial.print("Tx Heartbeat... ");
-        if (!mesh.write(&hb, 'C', sizeof(hb), 0)) {
-            Serial.println("Fallo al enviar heartbeat. Verificando conexion...");
-            if (!mesh.checkConnection()) {
-                mesh.renewAddress();
+    reconectando = false;
+
+    // 3. Procesar paquetes RF entrantes
+    if (connection.available()) {
+        RFPacket pkt;
+        if (connection.receive(&pkt, sizeof(pkt))) {
+
+            if (!Protocol_verify(&pkt)) return;  // Checksum inválido
+
+            switch (pkt.command) {
+
+                case CMD_ON:
+                    relays.setState(pkt.data[0], true);
+                    break;
+
+                case CMD_OFF:
+                    relays.setState(pkt.data[0], false);
+                    break;
+
+                case CMD_TOGGLE:
+                    relays.toggle(pkt.data[0]);
+                    break;
+
+                case CMD_ON_ALL:
+                    relays.setAll(true);
+                    break;
+
+                case CMD_OFF_ALL:
+                    relays.setAll(false);
+                    break;
+
+                case CMD_SET_MASK:
+                    // data[0..1] = bitmask de 16 relays
+                    relays.setMask((uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8));
+                    break;
+
+                case CMD_CONFIG_SYNC:
+                    colmena.applySync(pkt);
+                    break;
+
+                default:
+                    break;
             }
-        } else {
-            Serial.println("OK");
         }
     }
+
+    // 4. Heartbeat automático (envía cada heartbeatInterval segundos)
+    colmena.tickHeartbeat(relays.getMask());
 }

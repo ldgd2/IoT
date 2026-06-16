@@ -18,10 +18,10 @@ def migrate():
         time.sleep(1) # Simular carga para la animacion
         
         # Import models so they register
-        from server.modules.devices.models.device import Device
-        from server.modules.communication.models.rflog import RFLog
-        from server.modules.automation.models.skill import Skill
-        from server.db.database import BaseModel
+        from hub.modules.devices.models.device import Device
+        from hub.modules.communication.models.rflog import RFLog
+        from hub.modules.automation.models.skill import Skill
+        from hub.db.database import BaseModel
         
         # El padre aplica la migracion a todas las hijas
         report = BaseModel.migrate_all()

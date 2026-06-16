@@ -1,0 +1,31 @@
+{% extends "UI/layout/base.html" %}
+
+{% block title %}Detalle del Dispositivo{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 800px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+        <div>
+            <h1 style="margin-bottom: 8px;">{{ device.name }}</h1>
+            <p style="color: var(--md-text-variant); font-family: monospace;">ID: {{ device.device_id }}</p>
+        </div>
+        <a href="/devices" style="text-decoration: none;">
+            <button class="btn-m3 btn-outlined ripple-btn">Volver</button>
+        </a>
+    </div>
+
+    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 24px;">
+        <h3 style="margin-top: 0;">Estado Actual</h3>
+        <ul style="list-style: none; padding: 0; margin: 16px 0;">
+            <li style="margin-bottom: 8px;"><strong>Tipo:</strong> {{ device.device_type | title }}</li>
+            <li style="margin-bottom: 8px;"><strong>Status:</strong> {{ device.status }}</li>
+            <li style="margin-bottom: 8px;"><strong>Señal:</strong> {{ device.rssi }} dBm</li>
+            <li style="margin-bottom: 8px;"><strong>Última vez visto:</strong> {{ device.last_seen }}</li>
+            <li style="margin-bottom: 8px;"><strong>Mensajes TX/RX:</strong> {{ device.msg_count }}</li>
+        </ul>
+        
+        <h4>Variables / Sensores (Raw JSON)</h4>
+        <pre style="background: var(--md-surface); padding: 16px; border-radius: 8px; overflow-x: auto;"><code>{{ device.state | tojson(indent=2) }}</code></pre>
+    </div>
+</div>
+{% endblock %}

@@ -1,200 +1,152 @@
+/**
+ * @file main.cpp — translator / gateway
+ * @brief Orquestador del gateway. Solo conecta módulos de shared/.
+ *
+ * ─── Módulos usados (todos de shared/) ──────────────────────────────────────
+ *   MasterMeshConnection → red RF24Mesh como nodo master (Node 0 + DHCP)
+ *   ColmenaMaster        → registro de nodos, broadcastSync
+ *   ParamStore           → persistencia por plataforma
+ *   SSD1306Driver        → OLED hardware (IDisplay)
+ *   Renderer             → primitivas de dibujo sobre IDisplay
+ *   UILayout             → pantallas completas sobre Renderer
+ *   ITransport           → puente con HUB
+ *     ├─ SerialTransport (ESP8266, ESP32, Arduino)
+ *     └─ HIDTransport    (RP2040 con TinyUSB)
+ *
+ * ─── Módulos que este dispositivo NO usa ────────────────────────────────────
+ *   RelayBank           → sin actuadores físicos (es un gateway)
+ *   MeshConnection      → usa MasterMeshConnection (no el leaf)
+ *   ColmenaNode         → usa ColmenaMaster (no el leaf)
+ */
+
 #include <Arduino.h>
 #include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <RF24.h>
-#include <RF24Network.h>
-#include <RF24Mesh.h>
-#include <ArduinoJson.h>
-#include "../config/Protocol.h"
-#include "../config/RadioConfig.h"
 
-// Inicialización de la pantalla OLED
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// ── Config de hardware ──────────────────────────────────────────────────────
+#include "PinConfig.h"
+#include "RadioConfig.h"
 
-// Inicialización de Radio y Mesh
-RF24 radio(CE_PIN, CSN_PIN);
-RF24Network network(radio);
-RF24Mesh mesh(radio, network);
+// ── Protocolo compartido ────────────────────────────────────────────────────
+#include "protocol/Protocol.h"
+#include "protocol/ProtocolExt.h"
 
-// El Gateway siempre es el Nodo 0 (Maestro)
-#define MESH_MASTER_NODE_ID 0
+// ── Persistencia ─────────────────────────────────────────────────────────────
+#include "params/PreferencesStore.h"
+#include "params/FlashStore.h"
+#include "params/EEPROMStore.h"
 
-unsigned long lastHeartbeat = 0;
-String currentStatus = "Iniciando...";
-String lastActivity = "Ninguna";
-
-// Función auxiliar para refrescar la pantalla
-void updateDisplay() {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("Colmena IoT Gateway");
-    display.println("-------------------");
-    display.print("Est: ");
-    display.println(currentStatus);
-    display.println("Nodos Conectados:");
-    display.println(mesh.addrListTop); // Número de nodos enrutados
-    display.println("-------------------");
-    display.println("Actividad:");
-    display.println(lastActivity);
-    display.display();
-}
-
-#ifdef IS_RP2040
-  #include "Adafruit_TinyUSB.h"
-
-  uint8_t const desc_hid_report[] = {
-    TUD_HID_REPORT_DESC_GENERIC_INOUT(64)
-  };
-
-  Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_NONE, 2, false);
-
-  void set_report_callback(uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {
-    if (bufsize >= sizeof(RFPacket)) {
-        RFPacket packet;
-        memcpy(&packet, buffer, sizeof(RFPacket));
-        
-        // Enviar por la red Mesh (usamos el destId como NodeID de RF24Mesh)
-        // El caracter 'C' (Command) sirve como tipo de cabecera arbitraria
-        bool ok = mesh.write(&packet, 'C', sizeof(packet), packet.destId);
-        
-        uint8_t ack_buf[64] = {0};
-        ack_buf[0] = ok ? 1 : 0; 
-        usb_hid.sendReport(0, ack_buf, sizeof(ack_buf));
-        
-        lastActivity = "Tx -> Nodo " + String(packet.destId) + (ok ? " [OK]" : " [FAIL]");
-        updateDisplay();
-    }
-  }
-#endif
-
-void setup() {
-    // Inicializar Pantalla I2C (SDA, SCL por defecto)
-    Wire.begin();
-    if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-        display.clearDisplay();
-        display.display();
-    }
-
-#ifdef IS_RP2040
-    TinyUSBDevice.setManufacturerDescriptor("Gerlex");
-    TinyUSBDevice.setProductDescriptor("IoT RF Gateway");
-    TinyUSBDevice.setID(0x1234, 0x5678); 
-    
-    usb_hid.setReportCallback(NULL, set_report_callback);
-    usb_hid.begin();
-    
-    while (!TinyUSBDevice.mounted()) delay(1);
-    currentStatus = "USB HID Listo";
+#if defined(IS_ESP32)
+    using ParamStore = PreferencesStore;
+#elif defined(IS_RP2040)
+    using ParamStore = FlashStore;
 #else
-    Serial.begin(115200);
-    while (!Serial) {} 
-    currentStatus = "Serial COM Listo";
+    using ParamStore = EEPROMStore;
 #endif
-    
-    updateDisplay();
-    
-    // Configurar RF24Mesh
-    mesh.setNodeID(MESH_MASTER_NODE_ID);
-    currentStatus = "Iniciando Mesh...";
-    updateDisplay();
-    
-    if (!mesh.begin()) {
-        currentStatus = "ERROR RADIO (SPI)";
-        updateDisplay();
-#ifndef IS_RP2040
-        Serial.println("{\"error\": \"radio_hardware_not_responding\"}");
+
+// ── Red RF Mesh (master) ────────────────────────────────────────────────────
+#include "mesh/MasterMeshConnection.h"
+
+// ── Lógica de colmena (master) ───────────────────────────────────────────────
+#include "colmena/ColmenaMaster.h"
+
+// ── Display ──────────────────────────────────────────────────────────────────
+#include "display/core/SSD1306Driver.h"
+#include "display/render/Renderer.h"
+#include "display/ui/UILayout.h"
+
+// ── Transport — selección compile-time ───────────────────────────────────────
+#include "transport/ITransport.h"
+#if defined(IS_RP2040) && defined(USE_TINYUSB)
+    #include "transport/hid/HIDTransport.h"
+    using TransportImpl = HIDTransport;
+#else
+    #include "transport/serial/SerialTransport.h"
+    using TransportImpl = SerialTransport;
 #endif
+
+// ─── Instancias ──────────────────────────────────────────────────────────────
+ParamStore            params;
+MasterMeshConnection  connection;
+ColmenaMaster         colmena(connection, params);
+
+SSD1306Driver         displayDriver;
+Renderer              renderer(displayDriver);
+UILayout              ui(renderer);
+
+TransportImpl         transport;
+ITransport*           pTransport = &transport;
+
+// ─── Temporizadores ──────────────────────────────────────────────────────────
+static unsigned long lastDisplayRefresh = 0;
+static const unsigned long DISPLAY_REFRESH_MS   = 5000;
+static const unsigned long HEARTBEAT_TIMEOUT_MS = 90000;
+
+// ─────────────────────────────────────────────────────────────────────────────
+void setup() {
+    params.begin("colmena");
+    colmena.load();
+
+    // Display boot
+    if (displayDriver.init()) {
+        ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Iniciando...");
+    }
+
+    // Transport
+    if (!pTransport->begin()) {
+        ui.drawErrorScreen("E_TRANSPORT", "Init failed");
         while (1) {}
     }
-    
-    radio.setPALevel(RF24_PA_MAX);
-    radio.setDataRate(RF_DATARATE);
-    
-    currentStatus = "MESH MASTER ACTIVO";
-    updateDisplay();
-    
-#ifndef IS_RP2040
-    Serial.println("{\"status\": \"translator_ready\"}");
-#endif
+
+    // Mesh master
+    ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Init Mesh...");
+    if (!connection.begin()) {
+        ui.drawErrorScreen("E_RADIO", "Radio sin respuesta");
+        pTransport->sendStatus("{\"error\":\"radio_not_responding\"}");
+        while (1) {}
+    }
+
+    // Distribuir config a todos los nodos
+    colmena.broadcastSync();
+
+    ui.drawStatusScreen("ACTIVO", 0, colmena.getParams().colmenaName, "Sistema listo");
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    // 1. Mantener la red Mesh viva (Asignar IPs/Direcciones DHCP a los nodos)
-    mesh.update();
-    mesh.DHCP();
-    
-    // 2. Leer paquetes entrantes de cualquier nodo de la red
-    if (network.available()) {
-        RF24NetworkHeader header;
-        RFPacket packet;
-        network.read(header, &packet, sizeof(packet));
-        
-        int fromNode = mesh.getNodeID(header.from_node);
-        lastActivity = "Rx <- Nodo " + String(fromNode);
-        updateDisplay();
-        
-#ifdef IS_RP2040
-        if (usb_hid.ready()) {
-            uint8_t report_buf[64] = {0};
-            memcpy(report_buf, &packet, sizeof(packet));
-            usb_hid.sendReport(0, report_buf, sizeof(report_buf));
-        }
-#else
-        StaticJsonDocument<512> doc;
-        doc["origin"] = packet.originId;
-        doc["dest"] = packet.destId;
-        doc["type"] = packet.deviceType;
-        doc["cmd"] = packet.command;
-        
-        JsonArray dataArray = doc.createNestedArray("data");
-        // Forward all 26 bytes of the payload so the Python server can decode strings/features
-        for(int i=0; i<26; i++) {
-            dataArray.add(packet.data[i]);
-        }
-        
-        serializeJson(doc, Serial);
-        Serial.println();
-#endif
-    }
-    
-    // 3. Leer comandos desde el PC hacia el hardware (ESP8266/Serial)
-#ifndef IS_RP2040
-    if (Serial.available()) {
-        String input = Serial.readStringUntil('\n');
-        StaticJsonDocument<256> doc;
-        DeserializationError err = deserializeJson(doc, input);
-        
-        if (!err) {
-            RFPacket packet;
-            packet.originId = MESH_MASTER_NODE_ID;
-            packet.destId = doc["dest"] | 0xFF;
-            packet.deviceType = DEV_TYPE_GATEWAY;
-            packet.command = doc["cmd"] | CMD_ON;
-            
-            bool ok = mesh.write(&packet, 'C', sizeof(packet), packet.destId);
-            
-            StaticJsonDocument<128> ack;
-            ack["ack"] = ok;
-            serializeJson(ack, Serial);
-            Serial.println();
-            
-            lastActivity = "Tx -> Nodo " + String(packet.destId) + (ok ? " [OK]" : " [FAIL]");
-            updateDisplay();
+    // 1. Mantener red (update + DHCP)
+    connection.update();
+
+    // 2. RF → HUB
+    if (connection.available()) {
+        RFPacket pkt;
+        if (connection.receive(&pkt, sizeof(pkt))) {
+            if (!Protocol_verify(&pkt)) {
+                pTransport->sendStatus("{\"warn\":\"bad_checksum\"}");
+            } else {
+                colmena.onPacketReceived(pkt);
+                pTransport->sendPacket(pkt);
+            }
         }
     }
-#endif
-    
-    // 4. Heartbeat autonomo y refresco de pantalla
-    if (millis() - lastHeartbeat > 30000) {
-        lastHeartbeat = millis();
-        // El heartbeat no se envia por radio en el master, el master solo recibe
-        updateDisplay();
+
+    // 3. HUB → RF
+    if (pTransport->available()) {
+        RFPacket pkt;
+        if (pTransport->readPacket(pkt)) {
+            bool ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+            pTransport->sendAck(ok, pkt.destId);
+        }
+    }
+
+    // 4. Timeouts de heartbeat
+    colmena.checkHeartbeatTimeouts(HEARTBEAT_TIMEOUT_MS);
+
+    // 5. Refrescar display
+    if (millis() - lastDisplayRefresh > DISPLAY_REFRESH_MS) {
+        lastDisplayRefresh = millis();
+        ui.drawStatusScreen("ACTIVO",
+                             colmena.getOnlineCount(),
+                             colmena.getParams().colmenaName,
+                             "En operacion");
     }
 }
