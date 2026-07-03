@@ -70,14 +70,12 @@ class CloudBridgeWorker:
                         )
                         print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
 
-            except requests.exceptions.Timeout:
-                pass
-            except requests.exceptions.ConnectionError:
-                # Si el servidor cloud no está disponible o aún no arranca, reintentar suavemente
-                time.sleep(4)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException):
+                # Si el servidor cloud (o VPS) no está accesible o el dominio aún no se configura, esperar en silencio
+                time.sleep(5)
             except Exception as e:
-                print(f"⚠️ [CLOUD BRIDGE] Error en ciclo de enlace: {e}")
-                time.sleep(2)
+                # Solo mostrar error si es algo excepcional de lógica de programación
+                time.sleep(5)
 
     def _sync_devices(self):
         """Envía la lista actual de dispositivos al Bridge Server para caché"""

@@ -45,17 +45,21 @@ def service_install():
     main_path = str(HUB_DIR / "main.py")
     log_path = str(HUB_DIR.parent / "logs" / "hub.log")
     
+    # Configurar permisos al USB de forma proactiva si existe
+    subprocess.run(["sudo", "sh", "-c", "chmod 666 /dev/ttyACM* /dev/ttyUSB* /dev/hidraw* 2>/dev/null || true"])
+
     svc = f"""[Unit]
 Description=IoT RF Gateway — Servidor Flask
 After=network.target
 
 [Service]
 Type=simple
-User={os.getenv('USER', 'root')}
+User=root
+Group=root
 WorkingDirectory={HUB_DIR.parent}
 ExecStart={python_path} {main_path}
-Restart=on-failure
-RestartSec=5
+Restart=always
+RestartSec=3
 StandardOutput=append:{log_path}
 StandardError=append:{log_path}
 Environment=PYTHONUNBUFFERED=1
