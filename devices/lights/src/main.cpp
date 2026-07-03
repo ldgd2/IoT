@@ -91,6 +91,9 @@ void setup() {
 #ifdef PAIR_BUTTON_PIN
     colmena.initPairButton(PAIR_BUTTON_PIN);  // activeLow=true por defecto
 #endif
+
+    // 7. Puerto Serial para emparejamiento por USB (sin botón físico)
+    Serial.begin(115200);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,4 +171,19 @@ void loop() {
 #ifdef PAIR_BUTTON_PIN
     colmena.tickPairButton(NODE_NAME);
 #endif
+
+    // 6. Emparejamiento por comando Serial USB (sin botón físico)
+    if (Serial.available() > 0) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+        cmd.toUpperCase();
+        if (cmd == "PAIR" || cmd == "DISCOVER" || cmd == "ANNOUNCE") {
+            Serial.println("📡 [SERIAL COMMAND] Recibido comando PAIR via USB. Enviando anuncio al Gateway...");
+            colmena.announce(NODE_NAME);
+            Serial.println("✔️ [SERIAL COMMAND] Anuncio enviado exitosamente a la red Mesh.");
+        } else if (cmd == "STATUS") {
+            Serial.print("ℹ️ [STATUS] Nodo: "); Serial.print(NODE_NAME);
+            Serial.print(" | ID: "); Serial.println(NODE_ID);
+        }
+    }
 }
