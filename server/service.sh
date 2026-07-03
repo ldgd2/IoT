@@ -90,6 +90,26 @@ install_deps() {
     print_msg "${GREEN}✔️ Dependencias (incluyendo Gunicorn y Flask) instaladas en ${VENV_DIR}.${NC}"
 }
 
+free_port() {
+    PORT_NUM=${1:-8000}
+    PIDS=""
+    if command -v lsof >/dev/null 2>&1; then
+        PIDS=$(lsof -t -i :${PORT_NUM} 2>/dev/null)
+    elif command -v fuser >/dev/null 2>&1; then
+        PIDS=$(fuser ${PORT_NUM}/tcp 2>/dev/null)
+    elif command -v ss >/dev/null 2>&1; then
+        PIDS=$(ss -lptn "sport = :${PORT_NUM}" | grep -o 'pid=[0-9]*' | cut -d= -f2)
+    fi
+
+    if [ -n "$PIDS" ]; then
+        print_msg "${YELLOW}⚠️  Puerto ${PORT_NUM} en uso por proceso(s): $PIDS. Liberando puerto para systemd...${NC}"
+        for p in $PIDS; do
+            kill -9 "$p" 2>/dev/null || true
+        done
+        sleep 1
+    fi
+}
+
 install_service() {
     check_root
     print_msg "${BLUE}⚙️  Configurando servicio ${SERVICE_NAME}.service para producción...${NC}"
@@ -106,6 +126,10 @@ install_service() {
     fi
 
     print_msg "🔍 Binario Gunicorn verificado en: ${CYAN}${GUNICORN_BIN}${NC}"
+
+    # Detener servicio previo y liberar puerto 8000 si había un python/gunicorn manual corriendo
+    systemctl stop ${SERVICE_NAME}.service 2>/dev/null || true
+    free_port 8000
 
     cat <<EOF | tee ${SERVICE_FILE} > /dev/null
 [Unit]
@@ -154,6 +178,7 @@ stop_service() {
 start_service() {
     check_root
     print_msg "${GREEN}▶️  Iniciando ${SERVICE_NAME}.service...${NC}"
+    free_port 8000
     systemctl start ${SERVICE_NAME}.service
     print_msg "${GREEN}✔️ Servicio en ejecución.${NC}"
 }
@@ -161,6 +186,7 @@ start_service() {
 restart_service() {
     check_root
     print_msg "${YELLOW}🔄 Reiniciando ${SERVICE_NAME}.service...${NC}"
+    free_port 8000
     systemctl restart ${SERVICE_NAME}.service
     print_msg "${GREEN}✔️ Reinicio completado.${NC}"
 }
