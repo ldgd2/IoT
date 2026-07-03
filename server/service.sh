@@ -118,14 +118,14 @@ Group=${USER_NAME}
 WorkingDirectory=${APP_DIR}
 Environment="PATH=${VENV_DIR}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
 Environment="VIRTUAL_ENV=${VENV_DIR}"
+Environment="PYTHONPATH=${APP_DIR}"
 Environment="SERVER_MODE=auto"
 Environment="SERVER_PORT=8000"
 ExecStart=${GUNICORN_BIN} --workers 4 --threads 2 --bind 0.0.0.0:8000 --timeout 60 --access-logfile - --error-logfile - main:app
 Restart=always
 RestartSec=3
 KillSignal=SIGQUIT
-Type=notify
-NotifyAccess=all
+Type=simple
 
 [Install]
 WantedBy=multi-user.target
@@ -134,8 +134,13 @@ EOF
     print_msg "${GREEN}✔️ Archivo systemd creado en ${SERVICE_FILE}${NC}"
     systemctl daemon-reload
     systemctl enable ${SERVICE_NAME}.service
-    systemctl start ${SERVICE_NAME}.service
-    print_msg "${GREEN}🚀 Servicio iniciado corriendo 100% aislado en su entorno virtual.${NC}\n"
+    
+    if systemctl start ${SERVICE_NAME}.service; then
+        print_msg "${GREEN}🚀 Servicio iniciado corriendo 100% aislado en su entorno virtual.${NC}\n"
+    else
+        print_msg "${RED}❌ Error al arrancar el servicio. Mostrando logs exactos del fallo:${NC}\n"
+        journalctl -u ${SERVICE_NAME}.service -n 30 --no-pager
+    fi
     systemctl status ${SERVICE_NAME}.service --no-pager -n 12
 }
 
