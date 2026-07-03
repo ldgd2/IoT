@@ -19,5 +19,9 @@ def log_view():
 
 @communication_view_bp.route("/settings")
 def settings_view():
-    rf_port = os.getenv("RF_PORT", "/dev/ttyUSB0")
-    return render_template("views/dashboard/settings/index.html", rf_port=rf_port)
+    rf_port = os.getenv("RF_PORT", "").strip("'\"")
+    # Derivar el tipo a partir del valor guardado para pre-seleccionar el radio en la UI
+    port_type = "HID" if rf_port.startswith("HID:") else "COM"
+    return render_template("views/dashboard/settings/index.html",
+                           rf_port=rf_port,
+                           port_type=port_type)

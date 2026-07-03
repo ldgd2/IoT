@@ -86,6 +86,11 @@ void setup() {
 
     // 5. Anunciar presencia al master
     colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
+
+    // 6. Botón de vinculación (opcional) — activo solo si PAIR_BUTTON_PIN está definido
+#ifdef PAIR_BUTTON_PIN
+    colmena.initPairButton(PAIR_BUTTON_PIN);  // activeLow=true por defecto
+#endif
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +120,11 @@ void loop() {
             if (!Protocol_verify(&pkt)) return;  // Checksum inválido
 
             switch (pkt.command) {
+
+                case CMD_REPORT:
+                    // El master arrancó después que nosotros — re-anunciarse
+                    colmena.announce(NODE_NAME);
+                    break;
 
                 case CMD_ON:
                     relays.setState(pkt.data[0], true);
@@ -153,4 +163,9 @@ void loop() {
 
     // 4. Heartbeat automático (envía cada heartbeatInterval segundos)
     colmena.tickHeartbeat(relays.getMask());
+
+    // 5. Botón de vinculación — re-anuncia al master si se presiona
+#ifdef PAIR_BUTTON_PIN
+    colmena.tickPairButton(NODE_NAME);
+#endif
 }

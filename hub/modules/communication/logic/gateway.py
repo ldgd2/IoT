@@ -52,7 +52,14 @@ class IoTGateway:
         if not self.port_string:
             console.print("[red]No se ha configurado RF_PORT en el .env[/red]")
             return False
-            
+
+        # Limpiar comillas que python-dotenv puede dejar si el .env tiene RF_PORT='valor'
+        self.port_string = self.port_string.strip("'\"")
+
+        # Normalizar formato legado: HID_VVVV:PPPP → HID:VVVV:PPPP
+        if self.port_string.startswith("HID_"):
+            self.port_string = "HID:" + self.port_string[4:]
+
         if self.port_string.startswith("HID:"):
             return self._connect_hid()
         else:

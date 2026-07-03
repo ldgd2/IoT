@@ -14,19 +14,26 @@ HIDTransport::HIDTransport()
 
 // ── begin() ───────────────────────────────────────────────────────────────────
 bool HIDTransport::begin() {
-    // Descriptores USB: fabricante, producto, VID/PID
-    TinyUSBDevice.setManufacturerDescriptor("Gerlex");
-    TinyUSBDevice.setProductDescriptor("IoT RF Gateway");
-    TinyUSBDevice.setID(0x1234, 0x5678);
+    // IMPORTANTE: los descriptores deben configurarse ANTES de _hid.begin()
+    // De lo contrario TinyUSB ya enumeró como CDC y el host ve un COM port.
+    // VID/PID vienen de los build flags definidos en platformio.ini
+    TinyUSBDevice.setManufacturerDescriptor(USBD_MANUFACTURER_STRING);
+    TinyUSBDevice.setProductDescriptor(USBD_PRODUCT_STRING);
+    TinyUSBDevice.setID(HID_VID, HID_PID);
 
-    // Registrar callback de recepción de reports del host
+    // Registrar callback de recepción ANTES de begin()
     _hid.setReportCallback(NULL, _onSetReport);
+
+    // Iniciar stack HID — esto gatilla la enumeración USB con los descriptores ya configurados
     _hid.begin();
 
-    // Esperar a que el host monte el dispositivo USB (max 5s)
+    // Bombear el stack USB mientras esperamos que el host monte el dispositivo (max 5s)
     unsigned long t = millis();
     while (!TinyUSBDevice.mounted() && (millis() - t < 5000)) {
-        delay(10);
+#ifdef ARDUINO_ARCH_RP2040
+        tud_task(); // Procesar eventos USB del stack TinyUSB
+#endif
+        delay(1);
     }
 
     return TinyUSBDevice.mounted();

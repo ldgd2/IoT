@@ -105,8 +105,11 @@ void setup() {
         while (1) {}
     }
 
-    // Distribuir config a todos los nodos
+    // Distribuir config a todos los nodos conocidos
     colmena.broadcastSync();
+    // Pedir re-anuncio a nodos que ya estaban corriendo antes que el translator
+    delay(100);
+    colmena.broadcastPing();
 
     ui.drawStatusScreen("ACTIVO", 0, colmena.getParams().colmenaName, "Sistema listo");
 }

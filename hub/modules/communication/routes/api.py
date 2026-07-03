@@ -227,16 +227,54 @@ def api_settings():
     data = request.get_json(silent=True)
     if not data or "rf_port" not in data:
         return jsonify({"error": "bad request"}), 400
-        
-    new_port = data["rf_port"]
-    
+
+    raw_port  = data["rf_port"]          # ej. "HID_1234:5678" o "COM3"
+    port_type = data.get("port_type", "COM")
+
+    # Normalizar formato: la UI envía HID_VVVV:PPPP, el gateway espera HID:VVVV:PPPP
+    if port_type == "HID" and raw_port.startswith("HID_"):
+        new_port = "HID:" + raw_port[4:]   # HID_1234:5678  →  HID:1234:5678
+    else:
+        new_port = raw_port
+
     from dotenv import set_key
+    from hub.modules.communication.logic.gateway import gateway
     try:
+        # 1. Persistir en .env
         if ENV_FILE.exists():
             set_key(str(ENV_FILE), "RF_PORT", new_port)
         else:
             with open(ENV_FILE, 'w', encoding='utf-8') as f:
                 f.write(f"RF_PORT={new_port}\n")
-        return jsonify({"ok": True})
+
+        # 2. Actualizar os.environ para que getenv() lo refleje de inmediato
+        import os
+        os.environ["RF_PORT"] = new_port
+
+        # 3. Reconectar el gateway en caliente sin reiniciar el servidor
+        gateway.stop_listening()
+        if gateway.hid_device:
+            try: gateway.hid_device.close()
+            except Exception: pass
+            gateway.hid_device = None
+        if gateway.serial_device:
+            try: gateway.serial_device.close()
+            except Exception: pass
+            gateway.serial_device = None
+
+        gateway.port_string  = new_port
+        gateway.is_connected = False
+        gateway.mode         = "NONE"
+
+        if gateway.connect():
+            from hub.modules.communication.routes.api import process_incoming_packet
+            gateway.on_packet_received = process_incoming_packet
+            gateway.start_listening()
+            return jsonify({"ok": True, "connected": True, "port": new_port})
+        else:
+            return jsonify({"ok": True, "connected": False,
+                            "warn": "Puerto guardado pero no se pudo conectar ahora.",
+                            "port": new_port})
+
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500

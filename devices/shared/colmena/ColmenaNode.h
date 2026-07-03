@@ -6,11 +6,11 @@
  * @brief Lógica de colmena para nodos LEAF (lights, sensors, actuators).
  *
  * Extiende ColmenaBase con las operaciones específicas de los nodos que
- * se conectan al master: anuncio de presencia, heartbeat periódico y
- * aplicación de configuración recibida del master.
+ * se conectan al master: anuncio de presencia, heartbeat periódico,
+ * aplicación de configuración recibida del master, y botón de vinculación.
  *
  * Uso en main.cpp de cualquier nodo leaf:
- * ─────────────────────────────────────────────────────────────────────────
+ * ─────────────────────────────────────────────────────────────────────
  * MeshConnection  conn(NODE_ID);
  * EEPROMStore     store;
  * ColmenaNode     colmena(conn, store);
@@ -23,6 +23,9 @@
  *     colmena.load();
  *     conn.begin();
  *     colmena.announce("Luz-01");
+ *
+ *     // Botón de vinculación (opcional) — definir PAIR_BUTTON_PIN en PinConfig.h
+ *     colmena.initPairButton(PAIR_BUTTON_PIN);  // activeLow=true por defecto
  * }
  *
  * void loop() {
@@ -31,16 +34,27 @@
  *         RFPacket pkt;
  *         conn.receive(&pkt, sizeof(pkt));
  *         if (pkt.command == CMD_CONFIG_SYNC) colmena.applySync(pkt);
+ *         if (pkt.command == CMD_REPORT)      colmena.announce(NODE_NAME);
  *     }
  *     colmena.tickHeartbeat(relays.getState(0));
+ *     colmena.tickPairButton();  // Revisar botón — re-anuncia al master si se presiona
  * }
- * ─────────────────────────────────────────────────────────────────────────
+ * ─────────────────────────────────────────────────────────────────────
  *
  * Compatibilidad: ESP32 · ESP8266 · RP2040 · Raspberry Pi Pico · Arduino
  */
 
 #include "colmena/ColmenaBase.h"
 #include "protocol/ProtocolExt.h"
+#include <Arduino.h>
+
+// Tiempo mínimo entre activaciones del botón (anti-rebote + anti-spam)
+#ifndef PAIR_BUTTON_DEBOUNCE_MS
+  #define PAIR_BUTTON_DEBOUNCE_MS  50
+#endif
+#ifndef PAIR_BUTTON_COOLDOWN_MS
+  #define PAIR_BUTTON_COOLDOWN_MS  3000
+#endif
 
 class ColmenaNode : public ColmenaBase {
 public:
@@ -77,8 +91,38 @@ public:
      */
     void applySync(const RFPacket& pkt);
 
+    // ── Botón de vinculación ────────────────────────────────────────────
+
+    /**
+     * @brief Configura el pin del botón de vinculación.
+     * Llama a pinMode internamente. Llamar en setup().
+     *
+     * @param pin       GPIO del botón. Definir PAIR_BUTTON_PIN en PinConfig.h.
+     * @param activeLow true (default) = botón conectado a GND (pull-up interno).
+     *                  false          = botón conectado a VCC (pull-down).
+     */
+    void initPairButton(uint8_t pin, bool activeLow = true);
+
+    /**
+     * @brief Revisa el estado del botón de vinculación. Llamar en cada loop().
+     *
+     * Si el botón se presiona, llama a announce() con el nombre del nodo
+     * configurado. Incluye debounce (PAIR_BUTTON_DEBOUNCE_MS) y cooldown
+     * (PAIR_BUTTON_COOLDOWN_MS) para evitar ráfagas de anuncios.
+     *
+     * @param nodeName  Nombre a usar en el announce (ej. NODE_NAME de PinConfig.h)
+     */
+    void tickPairButton(const char* nodeName);
+
 private:
     unsigned long _lastHeartbeatMs;
+
+    // Botón de vinculación
+    uint8_t       _pairPin;           // 255 = no configurado
+    bool          _pairActiveLow;
+    bool          _pairLastState;     // Estado anterior (para detección de flanco)
+    unsigned long _pairDebounceMs;    // Timestamp del último cambio detectado
+    unsigned long _pairLastAnnounce;  // Timestamp del último announce por botón
 };
 
 #endif // COLMENA_NODE_H

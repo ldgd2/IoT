@@ -96,6 +96,25 @@
     #define RELAY_ACTIVE_LOW false
 #endif
 
+// ─── Botón de Vinculación (pair) ───────────────────────────────────────────
+// Botom que al presionarlo re-anuncia el nodo al master (CMD_DISCOVER).
+// Usar con colmena.initPairButton(PAIR_BUTTON_PIN) en setup()
+// y colmena.tickPairButton(NODE_NAME) en loop().
+// Comentar #define PAIR_BUTTON_PIN si el dispositivo no tiene botón físico.
+
+#if defined(IS_RP2040)
+    #define PAIR_BUTTON_PIN  3        // GPIO3 — cambiar según hardware
+
+#elif defined(IS_ESP8266)
+    #define PAIR_BUTTON_PIN  0        // D3 = GPIO0 (botón FLASH de NodeMCU, pull-up interno)
+
+#elif defined(IS_ESP32)
+    #define PAIR_BUTTON_PIN  0        // GPIO0 (botón BOOT de ESP32, pull-up interno)
+
+#else
+    #define PAIR_BUTTON_PIN  3        // Arduino: pin 3 (INT1)
+#endif
+
 // ─── Array de pines para RelayBank::init() ───────────────────────────────────
 // Se construye automáticamente desde los RELAY_PIN_x definidos arriba.
 // PinConfig.h es el ÚNICO lugar donde se edita la lista de pines de relay.

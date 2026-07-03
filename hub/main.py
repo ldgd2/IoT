@@ -33,6 +33,7 @@ from hub.modules.communication.routes.api import communication_bp, process_incom
 from hub.modules.communication.routes.views import communication_view_bp
 from hub.modules.communication.logic.watchdog import start_watchdog
 from hub.modules.communication.logic.gateway import gateway
+from hub.modules.communication.logic.cloud_bridge import cloud_bridge
 
 app = Flask(__name__)
 app.register_blueprint(devices_bp, url_prefix="/api")
@@ -44,6 +45,7 @@ app.register_blueprint(communication_view_bp)
 
 start_watchdog()
 evaluator.start()
+cloud_bridge.start()
 
 # Iniciar Gateway Real (RF)
 if gateway.connect():

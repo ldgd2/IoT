@@ -76,6 +76,14 @@ public:
     void broadcastSync();
 
     /**
+     * @brief Envía CMD_REPORT broadcast para que todos los nodos ya encendidos
+     * re-ejecuten su announce(). Útil cuando el translator arranca mientras
+     * los nodos ya están corriendo y el announce inicial se perdíde.
+     * Llamar en setup() después de broadcastSync().
+     */
+    void broadcastPing();
+
+    /**
      * @brief Envía CMD_CONFIG_SYNC a un nodo específico.
      * @param destId  Node ID del nodo destino
      */

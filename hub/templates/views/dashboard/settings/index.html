@@ -46,12 +46,16 @@
                 <label style="font-weight: 500;">Tipo de Conexión:</label>
                 <div style="display: flex; gap: 16px; align-items: center;">
                     <label class="m3-control" style="gap: 8px; width: auto;">
-                        <input type="radio" name="port_type" value="COM" checked onchange="loadPorts('COM')">
+                        <input type="radio" name="port_type" value="COM"
+                               {% if port_type != 'HID' %}checked{% endif %}
+                               onchange="loadPorts('COM')">
                         <div class="m3-radio"></div>
                         <span style="font-size: 0.95rem;">Puerto Serial (COM)</span>
                     </label>
                     <label class="m3-control" style="gap: 8px; width: auto;">
-                        <input type="radio" name="port_type" value="HID" onchange="loadPorts('HID')">
+                        <input type="radio" name="port_type" value="HID"
+                               {% if port_type == 'HID' %}checked{% endif %}
+                               onchange="loadPorts('HID')">
                         <div class="m3-radio"></div>
                         <span style="font-size: 0.95rem;">USB Directo (HID)</span>
                     </label>
@@ -93,8 +97,9 @@
         const activeChip = document.getElementById('chip-' + color);
         if(activeChip) activeChip.children[0].style.borderColor = 'var(--md-primary)';
         
-        // Cargar puertos por defecto
-        loadPorts('COM');
+        // Cargar puertos usando el tipo que vino del servidor (COM o HID)
+        const savedType = "{{ port_type }}";
+        loadPorts(savedType);
     });
 
     function loadPorts(type) {
@@ -113,13 +118,17 @@
                 return;
             }
             
-            const savedPort = "{{ rf_port }}"; // El puerto actual en .env
+            // Puerto guardado en .env — viene renderizado por Jinja
+            const savedPort = "{{ rf_port }}";
             
             data.forEach(port => {
                 const opt = document.createElement('option');
                 opt.value = port.id;
                 opt.innerText = port.label;
-                if (port.id === savedPort) opt.selected = true;
+                // Seleccionar el guardado: comparar el ID del puerto con el valor guardado
+                // savedPort puede ser HID:2e8a:0101 e id puede ser HID_2e8a:0101 — normalizar
+                const normalizedSaved = savedPort.replace('HID:', 'HID_');
+                if (port.id === savedPort || port.id === normalizedSaved) opt.selected = true;
                 selectEl.appendChild(opt);
             });
         })
@@ -151,6 +160,7 @@
     function saveSettings() {
         const selectEl = document.getElementById('rf_port_select');
         const port = selectEl.value;
+        const portType = document.querySelector('input[name="port_type"]:checked').value;
         
         if (!port) return alert("Selecciona un puerto válido primero.");
 
@@ -158,21 +168,24 @@
         
         statusEl.style.display = 'block';
         statusEl.style.color = 'var(--md-text)';
-        statusEl.innerText = 'Guardando...';
+        statusEl.innerText = 'Guardando y conectando...';
 
         fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ rf_port: port })
+            body: JSON.stringify({ rf_port: port, port_type: portType })
         })
         .then(r => r.json())
         .then(data => {
-            if(data.ok) {
+            if (data.ok && data.connected) {
                 statusEl.style.color = 'var(--md-primary)';
-                statusEl.innerText = 'Guardado correctamente. El cambio aplicará en el próximo reinicio.';
+                statusEl.innerText = `✅ Guardado y conectado a ${data.port}`;
+            } else if (data.ok && !data.connected) {
+                statusEl.style.color = 'orange';
+                statusEl.innerText = `⚠️ Puerto guardado pero no se pudo conectar ahora: ${data.warn || ''}`;
             } else {
                 statusEl.style.color = 'red';
-                statusEl.innerText = 'Error al guardar.';
+                statusEl.innerText = 'Error al guardar: ' + (data.error || 'desconocido');
             }
         })
         .catch(err => {

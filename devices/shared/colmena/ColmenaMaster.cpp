@@ -50,6 +50,17 @@ void ColmenaMaster::broadcastSync() {
     _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
 }
 
+void ColmenaMaster::broadcastPing() {
+    // Envía CMD_REPORT broadcast: los nodos que ya estaban corriendo
+    // lo reciben en su loop() y responden con un CMD_DISCOVER (announce).
+    // Soluciona el caso: translator arranca DESPUÉS que los nodos leaf.
+    RFPacket pkt;
+    Protocol_initPacket(&pkt, ADDR_MASTER, ADDR_BROADCAST, DEV_TYPE_GATEWAY, CMD_REPORT);
+    Protocol_seal(&pkt);
+    _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
+}
+
+
 void ColmenaMaster::sendSync(uint8_t destId) {
     RFPacket pkt;
     _buildSyncPacket(pkt, destId);
