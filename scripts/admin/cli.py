@@ -129,13 +129,13 @@ def service_start():
         try:
             pid = int(PID_FILE.read_text().strip())
             if is_process_running(pid):
-                console.print(f"[yellow]⚠️ El servidor ya está ejecutándose en segundo plano (PID: {pid}).[/yellow]")
+                console.print(f"[yellow] El servidor ya está ejecutándose en segundo plano (PID: {pid}).[/yellow]")
                 _show_status()
                 return
         except Exception:
             pass
 
-    console.print("[green]🚀 Arrancando Servidor IoT en segundo plano...[/green]")
+    console.print("[green] Arrancando Servidor IoT en segundo plano...[/green]")
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
     if sys.platform == "win32":
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
@@ -146,10 +146,11 @@ def service_start():
 
     try:
         if sys.platform == "win32":
-            # CREATE_NO_WINDOW = 0x08000000, CREATE_NEW_PROCESS_GROUP = 0x00000200
+            # DETACHED_PROCESS = 0x00000008, CREATE_NEW_PROCESS_GROUP = 0x00000200
+            flags = 0x00000008 | 0x00000200
             proc = subprocess.Popen(
                 [py_exec, str(HUB_DIR / "main.py")],
-                creationflags=0x08000000 | 0x00000200,
+                creationflags=flags,
                 env=env_vars,
                 cwd=str(HUB_DIR.parent)
             )
