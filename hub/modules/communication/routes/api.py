@@ -171,6 +171,24 @@ def api_stats():
         "log_len": log_count,
     })
 
+@communication_bp.route("/pairing", methods=["POST"])
+def api_pairing():
+    data = request.get_json(silent=True) or {}
+    action = data.get("action", "").lower()
+    
+    from hub.modules.communication.logic.gateway import gateway
+    if not gateway.is_connected:
+        return jsonify({"ok": False, "error": "Gateway no conectado"}), 400
+        
+    if action == "start":
+        res = gateway.send_command(0x00, 0x0D)
+        return jsonify({"ok": res, "mode": "pairing_started"})
+    elif action == "stop":
+        res = gateway.send_command(0x00, 0x0E)
+        return jsonify({"ok": res, "mode": "pairing_stopped"})
+    else:
+        return jsonify({"ok": False, "error": "Accion invalida"}), 400
+
 @communication_bp.route("/ports", methods=["GET"])
 def api_ports():
     port_type = request.args.get("type", "COM")

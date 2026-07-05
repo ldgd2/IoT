@@ -76,12 +76,27 @@
 </div>
 
 <script>
-    // Removemos toda simulación. Hacemos auto-detección real.
+    // Auto-detección real y control de modo vinculación del Gateway RF
     document.getElementById('scan-result').style.display = 'none';
 
     let initialDeviceCount = null;
+    let isPairingActive = false;
+
+    async function setGatewayPairingMode(action) {
+        try {
+            await fetch('/api/pairing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action })
+            });
+            isPairingActive = (action === 'start');
+        } catch (e) {
+            console.error('Error enviando comando de vinculación al gateway:', e);
+        }
+    }
 
     async function pollForNewDevices() {
+        if (!isPairingActive && initialDeviceCount !== null) return;
         try {
             const res = await fetch('/api/stats');
             const data = await res.json();
@@ -95,6 +110,9 @@
                 document.getElementById('found-id').innerText = 'Nuevo Nodo Registrado';
                 document.getElementById('found-type').innerText = 'Detectado vía RF';
                 
+                // Detener modo vinculación en el Gateway
+                setGatewayPairingMode('stop');
+
                 // Avanzar al paso 2 automáticamente después de 2 segundos
                 setTimeout(() => nextStep(2), 2000);
                 return; // Dejar de buscar
@@ -104,7 +122,9 @@
         }
         
         // Seguir buscando
-        setTimeout(pollForNewDevices, 2000);
+        if (isPairingActive || initialDeviceCount === null) {
+            setTimeout(pollForNewDevices, 2000);
+        }
     }
 
     function nextStep(step) {
@@ -113,6 +133,14 @@
         // Mostrar el correcto
         document.getElementById('step-' + step).style.display = 'block';
         
+        // Si el usuario regresa al paso 1, reanudamos modo vinculación
+        if (step === 1) {
+            setGatewayPairingMode('start');
+            pollForNewDevices();
+        } else {
+            setGatewayPairingMode('stop');
+        }
+
         // Actualizar indicadores
         for(let i=1; i<=2; i++) {
             const ind = document.getElementById('ind-' + i);
@@ -122,11 +150,21 @@
     }
 
     function finishWizard() {
-        // En una app real, aquí haríamos un POST para actualizar el nombre.
+        setGatewayPairingMode('stop');
         window.location.href = "/devices";
     }
 
-    // Iniciar auto-descubrimiento
-    pollForNewDevices();
+    // Asegurar que si el usuario cierra la pestaña o navega hacia atrás, se cancele la vinculación en el Gateway
+    window.addEventListener('beforeunload', () => {
+        if (isPairingActive) {
+            const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
+            navigator.sendBeacon('/api/pairing', blob);
+        }
+    });
+
+    // Iniciar modo vinculación en el Gateway y auto-descubrimiento en la web
+    setGatewayPairingMode('start').then(() => {
+        pollForNewDevices();
+    });
 </script>
 {% endblock %}

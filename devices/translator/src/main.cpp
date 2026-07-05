@@ -83,6 +83,9 @@ static const unsigned long DISPLAY_REFRESH_MS   = 80; // ~12.5 FPS a tiempo real
 static const unsigned long HEARTBEAT_TIMEOUT_MS = 90000;
 static char lastActivityStr[64] = "Esperando paquetes...";
 static uint8_t animFrame = 0;
+static bool isPairingMode = false;
+static unsigned long pairingStartTime = 0;
+static const unsigned long PAIRING_TIMEOUT_MS = 60000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
@@ -143,19 +146,13 @@ void setup() {
         }
     }
 
-    // 2. Animación de modo vinculación / escaneo inicial a tiempo real
-    for (int step = 0; step < 4; step++) {
-        ui.drawPairingAnimation(colmena.getParams().colmenaName, step);
-        delay(130);
-    }
-
     // Distribuir config a todos los nodos conocidos
     colmena.broadcastSync();
     delay(80);
     colmena.broadcastPing();
 
-    snprintf(lastActivityStr, sizeof(lastActivityStr), "Red lista. Escaneando...");
-    ui.drawLiveStatusScreen("ACTIVO", 0, colmena.getParams().colmenaName, lastActivityStr, 0);
+    snprintf(lastActivityStr, sizeof(lastActivityStr), "Red lista. Esperando...");
+    ui.drawLiveStatusScreen("ACTIVO", colmena.getOnlineCount(), colmena.getParams().colmenaName, lastActivityStr, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +177,10 @@ void loop() {
                     const NodeInfo* n = colmena.findNode(pkt.originId);
                     if (n) {
                         ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                        if (isPairingMode) {
+                            isPairingMode = false;
+                            snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
+                        }
                     }
                 }
 
@@ -199,6 +200,15 @@ void loop() {
                 ColmenaError::acknowledge(errCodeAck);
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Error #%u aceptado", errCodeAck);
                 pTransport->sendAck(true, pkt.destId);
+            } else if (pkt.command == CMD_PAIR_START) {
+                isPairingMode = true;
+                pairingStartTime = millis();
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Modo vinculacion ACTIVO");
+                pTransport->sendAck(true, pkt.destId);
+            } else if (pkt.command == CMD_PAIR_STOP) {
+                isPairingMode = false;
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");
+                pTransport->sendAck(true, pkt.destId);
             } else {
                 bool ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
                 pTransport->sendAck(ok, pkt.destId);
@@ -217,6 +227,13 @@ void loop() {
         // Si hay un error activo, mostramos su animación fluida en tiempo real
         if (ColmenaError::hasActiveError()) {
             ColmenaError::renderActiveError(animFrame);
+        } else if (isPairingMode) {
+            if (millis() - pairingStartTime > PAIRING_TIMEOUT_MS) {
+                isPairingMode = false;
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Tiempo vinculacion agotado");
+            } else {
+                ui.drawPairingAnimation(colmena.getParams().colmenaName, (animFrame / 3) % 4);
+            }
         } else {
             ui.drawLiveStatusScreen("ACTIVO",
                                     colmena.getOnlineCount(),
