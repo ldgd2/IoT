@@ -1,4 +1,5 @@
 #include "mesh/MeshConnection.h"
+#include <SPI.h>
 
 volatile bool MeshConnection::rfDataReady = false;
 
@@ -9,14 +10,37 @@ void ISR_PREFIX MeshConnection::rfInterruptHandler() {
 MeshConnection::MeshConnection(uint8_t nodeId, int8_t irqPin)
     : _irqPin(irqPin),
       _nodeId(nodeId),
-      _radio(CE_PIN, CSN_PIN),
+      // Usar 2 MHz (2000000) en lugar de los 10 MHz por defecto.
+      // En protoboards con cables Dupont, 10 MHz causa ruido, capacitancia parasita y rebote de señal,
+      // haciendo que el chip no responda aunque la continuidad sea fluida. 2 MHz es estable y seguro.
+      _radio(CE_PIN, CSN_PIN, 2000000),
       _network(_radio),
       _mesh(_radio, _network)
 {}
 
 bool MeshConnection::begin() {
     _mesh.setNodeID(_nodeId);
-    if (!_mesh.begin(RF_CHANNEL, RF_DATARATE)) return false;
+
+    // Pre-configurar pines CE y CSN en un estado conocido antes de tocar el bus SPI
+    pinMode(CE_PIN, OUTPUT);
+    pinMode(CSN_PIN, OUTPUT);
+    digitalWrite(CSN_PIN, HIGH); // CSN alto = bus SPI libre/deseleccionado
+    digitalWrite(CE_PIN, LOW);   // CE bajo  = radio en modo espera/configuración
+
+#if defined(IS_RP2040)
+    // Enrutar explícitamente los pines del bus SPI0 por hardware en RP2040
+    SPI.setSCK(18);
+    SPI.setTX(19);  // MOSI
+    SPI.setRX(16);  // MISO
+    SPI.begin();
+#endif
+
+    // Retardo de estabilización de voltaje y reloj para el módulo nRF24L01+
+    delay(200);
+
+    if (!_mesh.begin(RF_CHANNEL, RF_DATARATE)) {
+        return false;
+    }
     _radio.setPALevel(RF24_PA_MAX);
 
     if (_irqPin != -1) {

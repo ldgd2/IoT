@@ -55,33 +55,65 @@ void ColmenaNode::initPairButton(uint8_t pin, bool activeLow) {
     _pairActiveLow  = activeLow;
     _pairLastAnnounce = 0;
     _pairDebounceMs   = 0;
-    // Configurar pull-up interno si es active-low, pull-down si es active-high
+    // Configurar pull-up interno si es active-low (botón a GND).
+    // Si es active-high (botón táctil TTP223 a VCC), usar INPUT_PULLDOWN donde exista o INPUT.
+#if defined(IS_RP2040) || defined(ARDUINO_ARCH_RP2040)
     pinMode(pin, activeLow ? INPUT_PULLUP : INPUT_PULLDOWN);
+    pinMode(24, INPUT_PULLUP); // Botón físico integrado KEY/USR en YD-RP2040 (GP24)
+#elif defined(IS_ESP32) || defined(ARDUINO_ARCH_ESP32)
+    pinMode(pin, activeLow ? INPUT_PULLUP : INPUT_PULLDOWN);
+#else
+    pinMode(pin, activeLow ? INPUT_PULLUP : INPUT);
+#endif
     // Leer estado inicial para no disparar en el arranque
-    _pairLastState = (digitalRead(pin) == LOW) == activeLow;
+    _pairLastState = false;
 }
 
-void ColmenaNode::tickPairButton(const char* nodeName) {
-    if (_pairPin == 255) return;  // Botón no configurado
-
+bool ColmenaNode::tickPairButton(const char* nodeName) {
     unsigned long now       = millis();
-    bool rawPressed         = (digitalRead(_pairPin) == LOW) == _pairActiveLow;
+    bool rawPressed         = false;
 
-    // Detección de flanco con debounce
-    if (rawPressed != _pairLastState) {
-        _pairLastState  = rawPressed;
-        _pairDebounceMs = now;
-        return;  // Esperar a que se estabilice
+    if (_pairPin != 255) {
+        rawPressed = (digitalRead(_pairPin) == LOW) == _pairActiveLow;
     }
 
-    // Confirmar que el estado lleva al menos PAIR_BUTTON_DEBOUNCE_MS estable
-    if (!rawPressed) return;  // No está presionado
-    if ((now - _pairDebounceMs) < PAIR_BUTTON_DEBOUNCE_MS) return;  // Aún en debounce
+#if defined(IS_RP2040) || defined(ARDUINO_ARCH_RP2040)
+    // En YD-RP2040, el botón físico integrado (KEY/USR) está conectado a tierra en GP24
+    if (digitalRead(24) == LOW) {
+        rawPressed = true;
+    }
+#endif
 
-    // Cooldown: evitar announce repetido si mantiene el botón apretado
-    if ((now - _pairLastAnnounce) < PAIR_BUTTON_COOLDOWN_MS) return;
+    if (!rawPressed) {
+        _pairLastState  = false;
+        _pairDebounceMs = 0;
+        return false;
+    }
 
-    // ✔ Botón válidamente presionado — re-anunciar al master
+    // Si acaba de presionar el botón, registrar el instante inicial
+    if (!_pairLastState) {
+        _pairLastState  = true;
+        _pairDebounceMs = now;
+        Serial.println("\n[BOTÓN] ¡Contacto detectado! Mantén presionado por 5 segundos para entrar en modo vinculación...");
+        return false;
+    }
+
+    // Calcular cuánto tiempo continuo lleva presionado el botón
+    unsigned long heldMs = now - _pairDebounceMs;
+
+    // Requisito: mantener presionado mínimo 5 segundos (5000 ms) para evitar activaciones accidentales
+    if (heldMs < 5000UL) {
+        return false;
+    }
+
+    // Cooldown de 30 segundos mientras el modo vinculación está en curso
+    if ((now - _pairLastAnnounce) < 30000UL) {
+        return false;
+    }
+
+    // ✔ ¡Botón mantenido por 5 segundos continuos! Disparar modo vinculación
     _pairLastAnnounce = now;
+    Serial.println("\n[BOTÓN] ¡5 segundos alcanzados! Disparando anuncio de vinculación (CMD_DISCOVER)...");
     announce(nodeName);
+    return true;
 }

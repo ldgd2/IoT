@@ -53,6 +53,7 @@
 #include "display/core/SSD1306Driver.h"
 #include "display/render/Renderer.h"
 #include "display/ui/UILayout.h"
+#include "error/ColmenaError.h"
 
 // ── Transport — selección compile-time ───────────────────────────────────────
 #include "transport/ITransport.h"
@@ -76,42 +77,85 @@ UILayout              ui(renderer);
 TransportImpl         transport;
 ITransport*           pTransport = &transport;
 
-// ─── Temporizadores ──────────────────────────────────────────────────────────
+// ─── Temporizadores y Estado UI ──────────────────────────────────────────────
 static unsigned long lastDisplayRefresh = 0;
-static const unsigned long DISPLAY_REFRESH_MS   = 5000;
+static const unsigned long DISPLAY_REFRESH_MS   = 80; // ~12.5 FPS a tiempo real
 static const unsigned long HEARTBEAT_TIMEOUT_MS = 90000;
+static char lastActivityStr[64] = "Esperando paquetes...";
+static uint8_t animFrame = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
     params.begin("colmena");
     colmena.load();
 
-    // Display boot
+    // Display boot con retraso de estabilización integrado en driver
     if (displayDriver.init()) {
-        ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Iniciando...");
+        // Registramos la interfaz gráfica y el transporte en el sistema central de errores
+        ColmenaError::registerUI(&ui);
+        ColmenaError::registerTransport(pTransport);
+        // 1. Animación fluida de entrada a tiempo real
+        ui.drawIntroAnimation();
     }
 
     // Transport
     if (!pTransport->begin()) {
-        ui.drawErrorScreen("E_TRANSPORT", "Init failed");
-        while (1) {}
+        ColmenaError::raise(ERR_HUB_DISCONNECTED);
+        while (1) {
+            delay(500);
+        }
     }
 
     // Mesh master
-    ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Init Mesh...");
+    ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Iniciando Radio...");
     if (!connection.begin()) {
-        ui.drawErrorScreen("E_RADIO", "Radio sin respuesta");
+        ColmenaError::raise(ERR_RADIO_INIT_FAIL);
         pTransport->sendStatus("{\"error\":\"radio_not_responding\"}");
-        while (1) {}
+        
+        // Bucle de control en tiempo real: NO simulaciones ni rotaciones falsas.
+        // Mantiene el error real activo, permite al frontend aceptarlo (CMD_ACK_ERROR)
+        // y realiza reintentos en vivo por si el usuario ajusta el hardware en tiempo real.
+        unsigned long lastRetry = millis();
+        while (1) {
+            delay(80); // ~12.5 FPS tiempo real
+            animFrame++;
+            ColmenaError::renderActiveError(animFrame);
+
+            // 1. Verificar si el frontend envía comando de aceptación (CMD_ACK_ERROR)
+            if (pTransport->available()) {
+                RFPacket pkt;
+                if (pTransport->readPacket(pkt) && pkt.command == CMD_ACK_ERROR) {
+                    uint16_t errCodeAck = (uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8);
+                    ColmenaError::acknowledge(errCodeAck);
+                }
+            }
+
+            // 2. Reintento automático de hardware en vivo cada 3 segundos
+            if (millis() - lastRetry > 3000) {
+                lastRetry = millis();
+                if (connection.begin()) {
+                    // ¡El radio respondió! Limpiamos el error y continuamos el arranque
+                    ColmenaError::clear();
+                    pTransport->sendStatus("{\"status\":\"radio_recovered\"}");
+                    break;
+                }
+            }
+        }
+    }
+
+    // 2. Animación de modo vinculación / escaneo inicial a tiempo real
+    for (int step = 0; step < 4; step++) {
+        ui.drawPairingAnimation(colmena.getParams().colmenaName, step);
+        delay(130);
     }
 
     // Distribuir config a todos los nodos conocidos
     colmena.broadcastSync();
-    // Pedir re-anuncio a nodos que ya estaban corriendo antes que el translator
-    delay(100);
+    delay(80);
     colmena.broadcastPing();
 
-    ui.drawStatusScreen("ACTIVO", 0, colmena.getParams().colmenaName, "Sistema listo");
+    snprintf(lastActivityStr, sizeof(lastActivityStr), "Red lista. Escaneando...");
+    ui.drawLiveStatusScreen("ACTIVO", 0, colmena.getParams().colmenaName, lastActivityStr, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,31 +169,60 @@ void loop() {
         if (connection.receive(&pkt, sizeof(pkt))) {
             if (!Protocol_verify(&pkt)) {
                 pTransport->sendStatus("{\"warn\":\"bad_checksum\"}");
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Checksum invalido");
+                ColmenaError::raise(ERR_PACKET_CORRUPT);
             } else {
+                bool isNewOrDiscover = (pkt.command == CMD_DISCOVER) || (colmena.findNode(pkt.originId) == nullptr);
                 colmena.onPacketReceived(pkt);
+                
+                // Si es un dispositivo nuevo o que se está vinculando, ¡mostrar animación en tiempo real!
+                if (isNewOrDiscover) {
+                    const NodeInfo* n = colmena.findNode(pkt.originId);
+                    if (n) {
+                        ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                    }
+                }
+
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "RX Nodo %d (CMD 0x%02X)", pkt.originId, pkt.command);
                 pTransport->sendPacket(pkt);
             }
         }
     }
 
-    // 3. HUB → RF
+    // 3. HUB → RF o comandos de control desde el frontend
     if (pTransport->available()) {
         RFPacket pkt;
         if (pTransport->readPacket(pkt)) {
-            bool ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
-            pTransport->sendAck(ok, pkt.destId);
+            // Si el frontend envía CMD_ACK_ERROR, ¡aceptamos/limpiamos el error para que deje de salir en display!
+            if (pkt.command == CMD_ACK_ERROR) {
+                uint16_t errCodeAck = (uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8);
+                ColmenaError::acknowledge(errCodeAck);
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Error #%u aceptado", errCodeAck);
+                pTransport->sendAck(true, pkt.destId);
+            } else {
+                bool ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                pTransport->sendAck(ok, pkt.destId);
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "TX -> Nodo %d (%s)", pkt.destId, ok ? "OK" : "Fallo");
+            }
         }
     }
 
     // 4. Timeouts de heartbeat
     colmena.checkHeartbeatTimeouts(HEARTBEAT_TIMEOUT_MS);
 
-    // 5. Refrescar display
+    // 5. Refrescar display a tiempo real (~12.5 FPS)
     if (millis() - lastDisplayRefresh > DISPLAY_REFRESH_MS) {
         lastDisplayRefresh = millis();
-        ui.drawStatusScreen("ACTIVO",
-                             colmena.getOnlineCount(),
-                             colmena.getParams().colmenaName,
-                             "En operacion");
+        animFrame++;
+        // Si hay un error activo, mostramos su animación fluida en tiempo real
+        if (ColmenaError::hasActiveError()) {
+            ColmenaError::renderActiveError(animFrame);
+        } else {
+            ui.drawLiveStatusScreen("ACTIVO",
+                                    colmena.getOnlineCount(),
+                                    colmena.getParams().colmenaName,
+                                    lastActivityStr,
+                                    animFrame);
+        }
     }
 }

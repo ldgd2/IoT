@@ -106,13 +106,14 @@ public:
     /**
      * @brief Revisa el estado del botón de vinculación. Llamar en cada loop().
      *
-     * Si el botón se presiona, llama a announce() con el nombre del nodo
-     * configurado. Incluye debounce (PAIR_BUTTON_DEBOUNCE_MS) y cooldown
-     * (PAIR_BUTTON_COOLDOWN_MS) para evitar ráfagas de anuncios.
+     * Si el botón se presiona (o se toca si es botón táctil), llama a announce()
+     * con el nombre del nodo configurado. Incluye debounce (PAIR_BUTTON_DEBOUNCE_MS)
+     * y cooldown (PAIR_BUTTON_COOLDOWN_MS) para evitar ráfagas de anuncios.
      *
      * @param nodeName  Nombre a usar en el announce (ej. NODE_NAME de PinConfig.h)
+     * @return true si se acaba de activar el botón y se envió el paquete de vinculación.
      */
-    void tickPairButton(const char* nodeName);
+    bool tickPairButton(const char* nodeName);
 
 private:
     unsigned long _lastHeartbeatMs;

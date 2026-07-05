@@ -75,6 +75,39 @@ void Renderer::fillRect(int16_t x, int16_t y, int16_t w, int16_t h) {
     _display.fillRect(x, y, w, h, COLOR_ON);
 }
 
+void Renderer::circle(int16_t x0, int16_t y0, int16_t r) {
+    int16_t f = 1 - r;
+    int16_t ddF_x = 1;
+    int16_t ddF_y = -2 * r;
+    int16_t x = 0;
+    int16_t y = r;
+
+    _display.drawPixel(x0, y0 + r, COLOR_ON);
+    _display.drawPixel(x0, y0 - r, COLOR_ON);
+    _display.drawPixel(x0 + r, y0, COLOR_ON);
+    _display.drawPixel(x0 - r, y0, COLOR_ON);
+
+    while (x < y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
+
+        _display.drawPixel(x0 + x, y0 + y, COLOR_ON);
+        _display.drawPixel(x0 - x, y0 + y, COLOR_ON);
+        _display.drawPixel(x0 + x, y0 - y, COLOR_ON);
+        _display.drawPixel(x0 - x, y0 - y, COLOR_ON);
+        _display.drawPixel(x0 + y, y0 + x, COLOR_ON);
+        _display.drawPixel(x0 - y, y0 + x, COLOR_ON);
+        _display.drawPixel(x0 + y, y0 - x, COLOR_ON);
+        _display.drawPixel(x0 - y, y0 - x, COLOR_ON);
+    }
+}
+
 void Renderer::icon8x8(int16_t x, int16_t y, const uint8_t bmp[8]) {
     for (int16_t row = 0; row < 8; row++) {
         uint8_t line = bmp[row];

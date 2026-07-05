@@ -20,6 +20,7 @@
  */
 
 #include "../render/Renderer.h"
+#include "../../error/ColmenaError.h"
 #include <stdint.h>
 
 class UILayout {
@@ -69,6 +70,40 @@ public:
      * @param msg   Mensaje corto (max ~21 chars a size=1)
      */
     void drawStatusBar(const char* msg);
+
+    // ── Animaciones a tiempo real ─────────────────────────────────────────────
+
+    /** @brief Animación fluida de entrada (intro) al arrancar el gateway. */
+    void drawIntroAnimation();
+
+    /** @brief Animación de radar/búsqueda durante modo vinculación y sincronización. */
+    void drawPairingAnimation(const char* colmenaName, uint8_t step);
+
+    /** @brief Alerta animada en tiempo real cuando se detecta o conecta un dispositivo. */
+    void drawDeviceDetectedAnimation(const char* nodeName, uint8_t nodeId, uint8_t devType);
+
+    /** @brief Pantalla principal dinámica en tiempo real con indicador animado y contadores vivos. */
+    void drawLiveStatusScreen(const char* status, uint8_t nodeCount,
+                              const char* colmenaName, const char* lastActivity,
+                              uint8_t animFrame);
+
+    // ── Sistema de Errores Formateados y Easter Eggs ──────────────────────────
+
+    /**
+     * @brief Muestra en pantalla un error del catálogo formateado por código.
+     * @param errorCode Código numérico (ej: 1, 101, 404, 666...)
+     */
+    void drawSystemError(uint16_t errorCode);
+
+    /**
+     * @brief Muestra un error del catálogo pero permitiendo sobreescribir el detalle.
+     */
+    void drawSystemErrorCustom(uint16_t errorCode, const char* customDetail);
+
+    /**
+     * @brief Dibuja la animación en tiempo real de un error activo (parpadeo, abejas, radares).
+     */
+    void drawAnimatedError(const ErrorInfo* info, uint8_t frame);
 
 private:
     Renderer& _r;

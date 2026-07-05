@@ -14,7 +14,7 @@
  * implementaciones concretas. La selección se hace en main.cpp según #ifdef.
  */
 
-#include "protocol/Protocol.h"
+#include "../protocol/Protocol.h"
 
 class ITransport {
 public:

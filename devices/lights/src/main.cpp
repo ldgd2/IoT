@@ -52,18 +52,27 @@
 
 // ── Actuadores ───────────────────────────────────────────────────────────────
 #include "actuators/relay/RelayBank.h"
+#include "RGBIndicator.h"
+
+// ── Módulo de Diagnóstico y Emparejamiento por USB (fácil de eliminar en producción) ──
+#include "../shared/debug/TestSerial.h"
 
 // ─── Instancias de módulos ───────────────────────────────────────────────────
 ParamStore      params;
 MeshConnection  connection(NODE_ID);       // NODE_ID definido en PinConfig.h
 ColmenaNode     colmena(connection, params);
 RelayBank       relays;
+RGBIndicator    rgbLed;
+TestSerial      testSerial;
 
 // ─── Estado local ─────────────────────────────────────────────────────────────
 static bool      reconectando = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
+    // 0. Diagnóstico e inspección Serial (fácil de eliminar en producción)
+    testSerial.init(115200);
+
     // 1. Inicializar almacenamiento y cargar parámetros
     params.begin("colmena");
 
@@ -73,9 +82,9 @@ void setup() {
     colmena.setFeatures(NODE_FEATURES);       // Ej: FEAT_RELAY|FEAT_DIMMER
     colmena.load();
 
-    // 3. Inicializar relays — solo los pines que este dispositivo tiene
-    //    RELAY_PINS y RELAY_COUNT definidos en PinConfig.h
+    // 3. Inicializar relays y LED RGB integrado — solo los pines que este dispositivo tiene
     relays.init(RELAY_COUNT, RELAY_PINS, RELAY_ACTIVE_LOW);
+    rgbLed.init();
 
     // 4. Conectar a la red Mesh
     if (!connection.begin()) {
@@ -87,19 +96,22 @@ void setup() {
     // 5. Anunciar presencia al master
     colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
 
-    // 6. Botón de vinculación (opcional) — activo solo si PAIR_BUTTON_PIN está definido
+    // 6. Botón de vinculación táctil (opcional) — activo solo si PAIR_BUTTON_PIN está definido
 #ifdef PAIR_BUTTON_PIN
-    colmena.initPairButton(PAIR_BUTTON_PIN);  // activeLow=true por defecto
+    colmena.initPairButton(PAIR_BUTTON_PIN, PAIR_BUTTON_ACTIVE_LOW);
 #endif
-
-    // 7. Puerto Serial para emparejamiento por USB (sin botón físico)
-    Serial.begin(115200);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
+    // 0. Diagnóstico e interacción Serial por USB (siempre activo para responder órdenes aunque esté sin RF)
+    testSerial.update(colmena, relays, NODE_NAME, NODE_ID);
+
     // 1. Mantener red Mesh (update + checkConnection automático)
     connection.update();
+
+    // Actualizar animación del LED RGB en tiempo real (efecto ola / verde / rojo) sin bloquear
+    rgbLed.update(colmena, NODE_NAME);
 
     // 2. Reconexión automática si se perdió la red
     if (!connection.isConnected()) {
@@ -121,6 +133,9 @@ void loop() {
         if (connection.receive(&pkt, sizeof(pkt))) {
 
             if (!Protocol_verify(&pkt)) return;  // Checksum inválido
+
+            testSerial.logPacketRX(pkt);
+            rgbLed.onPacketReceived(); // ¡Cualquier paquete recibido confirma vinculación exitosa!
 
             switch (pkt.command) {
 
@@ -167,23 +182,24 @@ void loop() {
     // 4. Heartbeat automático (envía cada heartbeatInterval segundos)
     colmena.tickHeartbeat(relays.getMask());
 
-    // 5. Botón de vinculación — re-anuncia al master si se presiona
+    // 5. Botón de vinculación táctil — re-anuncia al master y da feedback visual en relay y LED RGB
 #ifdef PAIR_BUTTON_PIN
-    colmena.tickPairButton(NODE_NAME);
+    if (colmena.tickPairButton(NODE_NAME)) {
+        // Iniciar animación "Ola de Colores" en el LED RGB NeoPixel del YD-RP2040 por 30 segundos
+        rgbLed.startPairing();
+
+        // Confirmación física en tiempo real al tocar el botón táctil:
+        // Hacemos una rápida secuencia de destellos (doble parpadeo) en el relay 0
+        relays.toggle(0);
+        delay(80);
+        relays.toggle(0);
+        delay(80);
+        relays.toggle(0);
+        delay(80);
+        relays.toggle(0);
+    }
 #endif
 
-    // 6. Emparejamiento por comando Serial USB (sin botón físico)
-    if (Serial.available() > 0) {
-        String cmd = Serial.readStringUntil('\n');
-        cmd.trim();
-        cmd.toUpperCase();
-        if (cmd == "PAIR" || cmd == "DISCOVER" || cmd == "ANNOUNCE") {
-            Serial.println("📡 [SERIAL COMMAND] Recibido comando PAIR via USB. Enviando anuncio al Gateway...");
-            colmena.announce(NODE_NAME);
-            Serial.println("✔️ [SERIAL COMMAND] Anuncio enviado exitosamente a la red Mesh.");
-        } else if (cmd == "STATUS") {
-            Serial.print("ℹ️ [STATUS] Nodo: "); Serial.print(NODE_NAME);
-            Serial.print(" | ID: "); Serial.println(NODE_ID);
-        }
-    }
+    // 6. Diagnóstico e interacción Serial por USB (fácil de eliminar en producción)
+    testSerial.update(colmena, relays, NODE_NAME, NODE_ID);
 }

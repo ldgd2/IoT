@@ -72,8 +72,10 @@
 
 #if defined(IS_RP2040)
     #define RELAY_PIN_0      5
-    // #define RELAY_PIN_1    6    // Descomentar para más relays
-    #define RELAY_COUNT      1
+    #define RELAY_PIN_1      6
+    #define RELAY_PIN_2      7
+    #define RELAY_PIN_3      8
+    #define RELAY_COUNT      4
     #define RELAY_ACTIVE_LOW false
 
 #elif defined(IS_ESP8266)
@@ -96,20 +98,25 @@
     #define RELAY_ACTIVE_LOW false
 #endif
 
-// ─── Botón de Vinculación (pair) ───────────────────────────────────────────
-// Botom que al presionarlo re-anuncia el nodo al master (CMD_DISCOVER).
-// Usar con colmena.initPairButton(PAIR_BUTTON_PIN) en setup()
+// ─── Botón de Vinculación (pair / táctil) ──────────────────────────────────
+// Botón que al tocarlo re-anuncia el nodo al master (CMD_DISCOVER).
+// Usar con colmena.initPairButton(PAIR_BUTTON_PIN, PAIR_BUTTON_ACTIVE_LOW) en setup()
 // y colmena.tickPairButton(NODE_NAME) en loop().
 // Comentar #define PAIR_BUTTON_PIN si el dispositivo no tiene botón físico.
 
+// Lógica de activación:
+// true  = Pulsador mecánico tradicional a GND o botón integrado del YD-RP2040 (activo en LOW con pull-up)
+// false = Botón Táctil (TTP223 / capacitivo) o sensor activo en HIGH (3.3V al tocar)
+#define PAIR_BUTTON_ACTIVE_LOW false
+
 #if defined(IS_RP2040)
-    #define PAIR_BUTTON_PIN  3        // GPIO3 — cambiar según hardware
+    #define PAIR_BUTTON_PIN  3        // GPIO3 — conectar OUT/SIG del botón táctil aquí
 
 #elif defined(IS_ESP8266)
-    #define PAIR_BUTTON_PIN  0        // D3 = GPIO0 (botón FLASH de NodeMCU, pull-up interno)
+    #define PAIR_BUTTON_PIN  0        // D3 = GPIO0 (botón FLASH o táctil)
 
 #elif defined(IS_ESP32)
-    #define PAIR_BUTTON_PIN  0        // GPIO0 (botón BOOT de ESP32, pull-up interno)
+    #define PAIR_BUTTON_PIN  0        // GPIO0 (botón BOOT o táctil)
 
 #else
     #define PAIR_BUTTON_PIN  3        // Arduino: pin 3 (INT1)

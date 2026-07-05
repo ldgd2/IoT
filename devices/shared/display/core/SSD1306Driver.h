@@ -30,6 +30,10 @@ public:
         : _display(width, height, &Wire, -1), _w(width), _h(height) {}
 
     bool init() override {
+        // Retardo vital en el arranque para estabilizar la alimentación y el charge-pump
+        // del display OLED en placas como YD-RP2040 / Raspberry Pi Pico
+        delay(300);
+
         // Inicializar bus I2C con pines de PinConfig si están definidos
 #if defined(OLED_SDA) && defined(OLED_SCL)
     #if defined(IS_RP2040)
@@ -42,8 +46,13 @@ public:
 #else
         Wire.begin();
 #endif
+        Wire.setClock(400000); // I2C a 400kHz para animaciones fluidas a tiempo real
+
+        // Intentar dirección por defecto (0x3C) y respaldo (0x3D)
         if (!_display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
-            return false;
+            if (!_display.begin(SSD1306_SWITCHCAPVCC, 0x3D)) {
+                return false;
+            }
         }
         _display.clearDisplay();
         _display.display();

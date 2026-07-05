@@ -87,7 +87,8 @@ def trigger_pairing(port, baudrate=115200):
 
             # 1. Solicitar estado
             print_msg("📤 Consultando estado del nodo...", "dim")
-            ser.write(b"STATUS\n")
+            ser.write(b"STATUS\r\n")
+            ser.flush()
             time.sleep(0.3)
             while ser.in_waiting:
                 line = ser.readline().decode("utf-8", errors="replace").strip()
@@ -96,7 +97,8 @@ def trigger_pairing(port, baudrate=115200):
 
             # 2. Enviar señal de emparejamiento (PAIR)
             print_msg("⚡ Enviando comando de vinculación vía USB Serial ('PAIR')...", "bold yellow")
-            ser.write(b"PAIR\n")
+            ser.write(b"PAIR\r\n")
+            ser.flush()
             
             # 3. Escuchar respuesta y confirmación de transmisión por RF
             start_time = time.time()
@@ -124,7 +126,17 @@ def main():
     parser.add_argument("-p", "--port", help="Puerto COM o /dev/ttyACM0 del dispositivo a emparejar")
     parser.add_argument("-b", "--baud", type=int, default=115200, help="Velocidad en baudios (default: 115200)")
     parser.add_argument("--list", action="store_true", help="Listar puertos disponibles y salir")
+    parser.add_argument("--cli", action="store_true", help="Ejecutar en modo terminal de texto en lugar de GUI Qt6")
     args = parser.parse_args()
+
+    # Si no se pide explícitamente CLI, abrir la interfaz gráfica Qt6 modular
+    if not args.cli and not args.list and not args.port:
+        try:
+            from test_serial import TestSerial
+            TestSerial.run()
+            return
+        except ImportError as e:
+            print(f"⚠️ No se pudo iniciar GUI Qt6 ({e}). Pasando a modo terminal...\n")
 
     if RICH_AVAILABLE:
         console.print(Panel.fit("[bold magenta]✨ Colmena Pair Tool — Emparejamiento por USB Serial[/bold magenta]", border_style="magenta"))

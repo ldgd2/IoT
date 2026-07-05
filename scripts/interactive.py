@@ -65,18 +65,19 @@ def show_main_menu():
 def show_service_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold yellow]🔧 Gestión de Servicios Systemd[/bold yellow]", border_style="yellow"))
+        console.print(Panel.fit("[bold yellow]🔧 Gestión del Servidor y Servicios IoT[/bold yellow]", border_style="yellow"))
         console.print()
         
         choice = questionary.select(
             "Selecciona una opción:",
             choices=[
-                "▶️ Iniciar servicio",
-                "⏹️ Detener servicio",
-                "🔄 Reiniciar servicio",
-                "ℹ️ Ver estado del servicio",
+                "ℹ️ Ver Estado, IP y Puerto del Servicio",
+                "▶️ Iniciar Servicio / Servidor (Background)",
+                "⏹️ Detener Servicio / Servidor",
+                "🔄 Reiniciar Servicio",
                 "📜 Ver Logs en vivo (hub.log)",
-                "📦 Instalar servicio",
+                "📦 Instalar Servicio en Sistema (Linux/Systemd)",
+                "🗑️ Eliminar y Limpiar Servicio Actual",
                 questionary.Separator(),
                 "⬅️ Volver al menú principal"
             ],
@@ -90,12 +91,13 @@ def show_service_menu():
             break
             
         cmds = {
-            "▶️ Iniciar servicio": ["iot.py", "admin", "service-start"],
-            "⏹️ Detener servicio": ["iot.py", "admin", "service-stop"],
-            "🔄 Reiniciar servicio": ["iot.py", "admin", "service-restart"],
-            "ℹ️ Ver estado del servicio": ["iot.py", "admin", "service-status"],
+            "ℹ️ Ver Estado, IP y Puerto del Servicio": ["iot.py", "admin", "service-status"],
+            "▶️ Iniciar Servicio / Servidor (Background)": ["iot.py", "admin", "service-start"],
+            "⏹️ Detener Servicio / Servidor": ["iot.py", "admin", "service-stop"],
+            "🔄 Reiniciar Servicio": ["iot.py", "admin", "service-restart"],
             "📜 Ver Logs en vivo (hub.log)": ["iot.py", "admin", "service-logs"],
-            "📦 Instalar servicio": ["iot.py", "admin", "service-install"]
+            "📦 Instalar Servicio en Sistema (Linux/Systemd)": ["iot.py", "admin", "service-install"],
+            "🗑️ Eliminar y Limpiar Servicio Actual": ["iot.py", "admin", "service-uninstall"]
         }
         
         if choice in cmds:

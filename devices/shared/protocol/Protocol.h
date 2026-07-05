@@ -27,6 +27,7 @@
 #define CMD_ON_ALL      0x09   // Encender todos los canales/relays
 #define CMD_OFF_ALL     0x0A   // Apagar todos los canales/relays
 #define CMD_SET_MASK    0x0B   // Configurar mascara de bits directa
+#define CMD_ACK_ERROR   0x0C   // Confirmacion/aceptacion de error desde el frontend
 
 // ─── Tipos de dispositivo y Feature Flags ────────────────────────────────────
 // Movidos a DeviceTypes.h para mejor organización y extensibilidad.
