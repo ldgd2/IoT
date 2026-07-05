@@ -91,8 +91,8 @@ public:
                 break;
 
             case STATE_SUCCESS:
-                // Mantener verde por 3 segundos y luego apagar
-                if (now - _statusStartMs >= 3000UL) {
+                // Mantener verde por 5 segundos y luego apagar
+                if (now - _statusStartMs >= 5000UL) {
                     _strip.clear();
                     _strip.show();
                     _state = STATE_IDLE;

@@ -35,10 +35,24 @@ bool MeshConnection::begin() {
     SPI.begin();
 #endif
 
-    // Retardo de estabilización de voltaje y reloj para el módulo nRF24L01+
-    delay(200);
+    // Retardo largo para permitir estabilización completa de voltaje y condensadores en protoboard/YD-RP2040
+    delay(500);
 
-    if (!_mesh.begin(RF_CHANNEL, RF_DATARATE)) {
+    bool initOk = false;
+    for (int attempt = 0; attempt < 8; attempt++) {
+        // Asegurar que CSN esté en HIGH y CE en LOW antes de cada intento para limpiar el bus SPI
+        digitalWrite(CSN_PIN, HIGH);
+        digitalWrite(CE_PIN, LOW);
+        delay(50);
+
+        if (_mesh.begin(RF_CHANNEL, RF_DATARATE)) {
+            initOk = true;
+            break;
+        }
+        delay(250);
+    }
+
+    if (!initOk) {
         return false;
     }
     _radio.setPALevel(RF24_PA_MAX);

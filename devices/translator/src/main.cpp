@@ -86,6 +86,7 @@ static uint8_t animFrame = 0;
 static bool isPairingMode = false;
 static unsigned long pairingStartTime = 0;
 static const unsigned long PAIRING_TIMEOUT_MS = 60000;
+static bool isRadioOk = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
@@ -114,83 +115,73 @@ void setup() {
     if (!connection.begin()) {
         ColmenaError::raise(ERR_RADIO_INIT_FAIL);
         pTransport->sendStatus("{\"error\":\"radio_not_responding\"}");
-        
-        // Bucle de control en tiempo real: NO simulaciones ni rotaciones falsas.
-        // Mantiene el error real activo, permite al frontend aceptarlo (CMD_ACK_ERROR)
-        // y realiza reintentos en vivo por si el usuario ajusta el hardware en tiempo real.
-        unsigned long lastRetry = millis();
-        while (1) {
-            delay(80); // ~12.5 FPS tiempo real
-            animFrame++;
-            ColmenaError::renderActiveError(animFrame);
-
-            // 1. Verificar si el frontend envía comando de aceptación (CMD_ACK_ERROR)
-            if (pTransport->available()) {
-                RFPacket pkt;
-                if (pTransport->readPacket(pkt) && pkt.command == CMD_ACK_ERROR) {
-                    uint16_t errCodeAck = (uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8);
-                    ColmenaError::acknowledge(errCodeAck);
-                }
-            }
-
-            // 2. Reintento automático de hardware en vivo cada 3 segundos
-            if (millis() - lastRetry > 3000) {
-                lastRetry = millis();
-                if (connection.begin()) {
-                    // ¡El radio respondió! Limpiamos el error y continuamos el arranque
-                    ColmenaError::clear();
-                    pTransport->sendStatus("{\"status\":\"radio_recovered\"}");
-                    break;
-                }
-            }
-        }
+        isRadioOk = false;
+        snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Radio RF no detectado");
+    } else {
+        isRadioOk = true;
+        // Distribuir config a todos los nodos conocidos
+        colmena.broadcastSync();
+        delay(80);
+        colmena.broadcastPing();
+        snprintf(lastActivityStr, sizeof(lastActivityStr), "Red lista. Esperando...");
     }
 
-    // Distribuir config a todos los nodos conocidos
-    colmena.broadcastSync();
-    delay(80);
-    colmena.broadcastPing();
-
-    snprintf(lastActivityStr, sizeof(lastActivityStr), "Red lista. Esperando...");
     ui.drawLiveStatusScreen("ACTIVO", colmena.getOnlineCount(), colmena.getParams().colmenaName, lastActivityStr, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    // 1. Mantener red (update + DHCP)
-    connection.update();
+    // 0. Si el radio falló al iniciar, reintentar cada 3 segundos en segundo plano sin bloquear el USB/HID
+    if (!isRadioOk) {
+        static unsigned long lastRadioRetry = 0;
+        if (millis() - lastRadioRetry > 3000) {
+            lastRadioRetry = millis();
+            if (connection.begin()) {
+                isRadioOk = true;
+                ColmenaError::clear();
+                pTransport->sendStatus("{\"status\":\"radio_recovered\"}");
+                colmena.broadcastSync();
+                delay(80);
+                colmena.broadcastPing();
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Radio RF recuperado");
+            }
+        }
+    } else {
+        // 1. Mantener red (update + DHCP) solo si el radio funciona
+        connection.update();
 
-    // 2. RF → HUB
-    if (connection.available()) {
-        RFPacket pkt;
-        if (connection.receive(&pkt, sizeof(pkt))) {
-            if (!Protocol_verify(&pkt)) {
-                pTransport->sendStatus("{\"warn\":\"bad_checksum\"}");
-                snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Checksum invalido");
-                ColmenaError::raise(ERR_PACKET_CORRUPT);
-            } else {
-                bool isNewOrDiscover = (pkt.command == CMD_DISCOVER) || (colmena.findNode(pkt.originId) == nullptr);
-                colmena.onPacketReceived(pkt);
-                
-                // Si es un dispositivo nuevo o que se está vinculando, ¡mostrar animación en tiempo real!
-                if (isNewOrDiscover) {
-                    const NodeInfo* n = colmena.findNode(pkt.originId);
-                    if (n) {
-                        ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
-                        if (isPairingMode) {
-                            isPairingMode = false;
-                            snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
+        // 2. RF → HUB
+        if (connection.available()) {
+            RFPacket pkt;
+            if (connection.receive(&pkt, sizeof(pkt))) {
+                if (!Protocol_verify(&pkt)) {
+                    pTransport->sendStatus("{\"warn\":\"bad_checksum\"}");
+                    snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Checksum invalido");
+                    ColmenaError::raise(ERR_PACKET_CORRUPT);
+                } else {
+                    bool isNewOrDiscover = (pkt.command == CMD_DISCOVER) || (colmena.findNode(pkt.originId) == nullptr);
+                    colmena.onPacketReceived(pkt);
+                    
+                    // Si es un dispositivo nuevo o que se está vinculando, ¡mostrar animación en tiempo real!
+                    if (isNewOrDiscover) {
+                        const NodeInfo* n = colmena.findNode(pkt.originId);
+                        if (n) {
+                            ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                            if (isPairingMode) {
+                                isPairingMode = false;
+                                snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
+                            }
                         }
                     }
-                }
 
-                snprintf(lastActivityStr, sizeof(lastActivityStr), "RX Nodo %d (CMD 0x%02X)", pkt.originId, pkt.command);
-                pTransport->sendPacket(pkt);
+                    snprintf(lastActivityStr, sizeof(lastActivityStr), "RX Nodo %d (CMD 0x%02X)", pkt.originId, pkt.command);
+                    pTransport->sendPacket(pkt);
+                }
             }
         }
     }
 
-    // 3. HUB → RF o comandos de control desde el frontend
+    // 3. HUB → RF o comandos de control desde el frontend (Se ejecuta SIEMPRE para no desconectar al Hub)
     if (pTransport->available()) {
         RFPacket pkt;
         if (pTransport->readPacket(pkt)) {
@@ -210,9 +201,12 @@ void loop() {
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");
                 pTransport->sendAck(true, pkt.destId);
             } else {
-                bool ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                bool ok = false;
+                if (isRadioOk) {
+                    ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                }
                 pTransport->sendAck(ok, pkt.destId);
-                snprintf(lastActivityStr, sizeof(lastActivityStr), "TX -> Nodo %d (%s)", pkt.destId, ok ? "OK" : "Fallo");
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "TX -> Nodo %d (%s)", pkt.destId, ok ? "OK" : "Fallo RF");
             }
         }
     }

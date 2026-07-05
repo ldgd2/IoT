@@ -8,6 +8,7 @@
 
 import sys
 import time
+import threading
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QComboBox, QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox,
@@ -24,22 +25,25 @@ except ImportError:
 
 
 class SerialReaderThread(QThread):
-    """Hilo en segundo plano para leer datos del puerto serial sin congelar la UI"""
+    """Hilo en segundo plano para leer datos del puerto serial sin congelar la UI ni chocar con escrituras en Windows"""
     data_received = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, serial_conn):
+    def __init__(self, serial_conn, lock):
         super().__init__()
         self.serial_conn = serial_conn
+        self.lock = lock
         self.running = True
 
     def run(self):
         while self.running and self.serial_conn and self.serial_conn.is_open:
             try:
-                if self.serial_conn.in_waiting > 0:
-                    line = self.serial_conn.readline().decode("utf-8", errors="replace").strip()
-                    if line:
-                        self.data_received.emit(line)
+                line = None
+                with self.lock:
+                    if self.serial_conn.is_open and self.serial_conn.in_waiting > 0:
+                        line = self.serial_conn.readline().decode("utf-8", errors="replace").strip()
+                if line:
+                    self.data_received.emit(line)
                 else:
                     self.msleep(30)
             except Exception as e:
@@ -64,6 +68,7 @@ class TestSerial(QMainWindow):
         self.resize(850, 600)
         self.serial_conn = None
         self.reader_thread = None
+        self.serial_lock = threading.Lock()
 
         self._apply_dark_style()
         self._init_ui()
@@ -296,9 +301,9 @@ class TestSerial(QMainWindow):
             self._log_system(f"✅ Conectado a {port_data} ({baud} bps). Escuchando en vivo...")
 
             # Iniciar hilo de lectura
-            self.reader_thread = SerialReaderThread(self.serial_conn)
+            self.reader_thread = SerialReaderThread(self.serial_conn, self.serial_lock)
             self.reader_thread.data_received.connect(self._log_rx)
-            self.reader_thread.error_occurred.connect(lambda err: self._log_system(f"⚠️ Error serial: {err}"))
+            self.reader_thread.error_occurred.connect(self._handle_serial_error)
             self.reader_thread.start()
 
             # Actualizar controles UI
@@ -323,13 +328,20 @@ class TestSerial(QMainWindow):
             self._log_system(f"❌ No se pudo abrir el puerto {port_data}: {e}")
             QMessageBox.critical(self, "Error de Conexión", f"No se pudo conectar a {port_data}:\n{e}")
 
+    def _handle_serial_error(self, err):
+        self._log_system(f"⚠️ Error serial detectado ({err}). Desconectando automáticamente para liberar el puerto en Windows...")
+        self._disconnect_serial()
+
     def _disconnect_serial(self):
         if self.reader_thread:
             self.reader_thread.stop()
             self.reader_thread = None
 
         if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()
+            try:
+                self.serial_conn.close()
+            except Exception:
+                pass
 
         self.serial_conn = None
         self._log_system("🔌 Puerto serial desconectado.")
@@ -353,11 +365,13 @@ class TestSerial(QMainWindow):
             return
         try:
             self._log_tx(cmd_text)
-            # Usar \r\n (CRLF) para garantizar compatibilidad con búferes seriales de Windows y USB CDC
-            self.serial_conn.write(f"{cmd_text}\r\n".encode("utf-8"))
-            self.serial_conn.flush()
+            with self.serial_lock:
+                # Usar \r\n (CRLF) para garantizar compatibilidad con búferes seriales de Windows y USB CDC
+                self.serial_conn.write(f"{cmd_text}\r\n".encode("utf-8"))
+                self.serial_conn.flush()
         except Exception as e:
             self._log_system(f"❌ Error al enviar comando '{cmd_text}': {e}")
+            self._handle_serial_error(str(e))
 
     def _send_custom_cmd(self):
         text = self.input_cmd.text().strip()

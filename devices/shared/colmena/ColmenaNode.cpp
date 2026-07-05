@@ -94,15 +94,15 @@ bool ColmenaNode::tickPairButton(const char* nodeName) {
     if (!_pairLastState) {
         _pairLastState  = true;
         _pairDebounceMs = now;
-        Serial.println("\n[BOTÓN] ¡Contacto detectado! Mantén presionado por 5 segundos para entrar en modo vinculación...");
+        Serial.println("\n[BOTÓN] ¡Contacto detectado! Mantén presionado ~1 segundo para entrar en modo vinculación...");
         return false;
     }
 
     // Calcular cuánto tiempo continuo lleva presionado el botón
     unsigned long heldMs = now - _pairDebounceMs;
 
-    // Requisito: mantener presionado mínimo 5 segundos (5000 ms) para evitar activaciones accidentales
-    if (heldMs < 5000UL) {
+    // Requisito: mantener presionado mínimo 1.2 segundos (1200 ms) para evitar rebotes o toques accidentales
+    if (heldMs < 1200UL) {
         return false;
     }
 
@@ -111,9 +111,9 @@ bool ColmenaNode::tickPairButton(const char* nodeName) {
         return false;
     }
 
-    // ✔ ¡Botón mantenido por 5 segundos continuos! Disparar modo vinculación
+    // ✔ ¡Botón mantenido por 1.2 segundos! Disparar modo vinculación
     _pairLastAnnounce = now;
-    Serial.println("\n[BOTÓN] ¡5 segundos alcanzados! Disparando anuncio de vinculación (CMD_DISCOVER)...");
+    Serial.println("\n[BOTÓN] ¡Modo vinculación activado! Disparando anuncio por RF (CMD_DISCOVER)...");
     announce(nodeName);
     return true;
 }

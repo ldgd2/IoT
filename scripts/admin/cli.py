@@ -163,6 +163,23 @@ def service_start():
             )
         PID_FILE.write_text(str(proc.pid))
         console.print(f"[bold green]✔ Servidor iniciado en segundo plano (PID: {proc.pid}). Logs en {log_path}[/bold green]")
+        
+        import time
+        console.print("[dim]⏳ Esperando 2.5 segundos para verificar que el servicio arranque y abra el puerto HTTP...[/dim]")
+        time.sleep(2.5)
+        if is_port_open(API_PORT):
+            console.print(f"[bold green]✔ ¡Éxito! Servidor respondiendo en http://127.0.0.1:{API_PORT}[/bold green]")
+        else:
+            if not is_process_running(proc.pid):
+                console.print("[bold red]⚠️ Alerta: El proceso se cerró inmediatamente al iniciar. Revisa si el puerto COM o el puerto HTTP 5000 ya están ocupados o si hay un error en logs/hub.log[/bold red]")
+                if log_path.exists():
+                    console.print("[yellow]--- Últimas 5 líneas de logs/hub.log ---[/yellow]")
+                    lines = log_path.read_text(errors="replace").splitlines()[-5:]
+                    for l in lines:
+                        console.print(f"  [dim]{l}[/dim]")
+            else:
+                console.print("[yellow]⏳ El proceso sigue ejecutándose pero el puerto HTTP aún no responde. Puede tardar unos segundos más en cargar.[/yellow]")
+                
         _show_status()
     except Exception as e:
         console.print(f"[red]❌ Error al arrancar servidor: {e}[/red]")

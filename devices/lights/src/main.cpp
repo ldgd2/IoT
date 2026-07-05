@@ -86,15 +86,12 @@ void setup() {
     relays.init(RELAY_COUNT, RELAY_PINS, RELAY_ACTIVE_LOW);
     rgbLed.init();
 
-    // 4. Conectar a la red Mesh
-    if (!connection.begin()) {
-        // Sin conexión → quedar en standby local
-        // Los relays siguen operando con el último estado guardado
-        return;
-    }
+    // 4. Conectar a la red Mesh (intentar arranque sin bloquear si falla)
+    connection.begin();
 
-    // 5. Anunciar presencia al master
+    // 5. Anunciar presencia al master e iniciar efecto ola de colores (30s) en YD-RP2040
     colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
+    rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
 
     // 6. Botón de vinculación táctil (opcional) — activo solo si PAIR_BUTTON_PIN está definido
 #ifdef PAIR_BUTTON_PIN
