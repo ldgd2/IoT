@@ -63,7 +63,7 @@ if not (BASE_DIR / "pubspec.yaml").is_file():
     if (BASE_DIR / "app" / "pubspec.yaml").is_file():
         BASE_DIR = BASE_DIR / "app"
 
-DEFAULT_SERVER_IP = "157.173.102.129:5000"
+DEFAULT_SERVER_IP = "157.173.102.129:8000"
 CURRENT_SERVER_IP = DEFAULT_SERVER_IP
 
 def ensure_java_home():
