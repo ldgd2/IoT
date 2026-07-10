@@ -58,9 +58,9 @@ public:
     }
 
     void onPacketReceived() {
-        // Si recibimos cualquier paquete válido del master mientras estamos en modo vinculación,
+        // Si recibimos un paquete del master mientras estamos en modo vinculación o en reposo,
         // significa que el master nos detectó y nos respondió. ¡Vinculación Exitosa!
-        if (_state == STATE_PAIRING) {
+        if (_state == STATE_PAIRING || _state == STATE_IDLE) {
             _state = STATE_SUCCESS;
             _statusStartMs = millis();
             _lastWaveMs = millis();
@@ -163,7 +163,7 @@ public:
     void startPairing() {}
     void onPacketReceived() {}
     void showRfError() {}
-    void update(ColmenaNode& colmena, const char* nodeName) {}
+    void update() {}
 };
 #endif
 

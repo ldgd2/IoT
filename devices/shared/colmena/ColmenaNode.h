@@ -90,6 +90,7 @@ public:
      * @param pkt  Paquete CMD_CONFIG_SYNC recibido
      */
     void applySync(const RFPacket& pkt);
+    void unpair();
 
     // ── Botón de vinculación ────────────────────────────────────────────
 

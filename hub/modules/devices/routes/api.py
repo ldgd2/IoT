@@ -95,6 +95,14 @@ def api_delete_device(device_id):
     dev.delete()
 
     try:
+        from hub.modules.communication.logic.gateway import gateway
+        node_num = int(str(device_id).replace("dev_", ""))
+        gateway.send_command(dest_id=node_num, command=0x0F, device_type=0, data=[0]*8)
+        print(f"🗑️ [HUB API] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
+    except Exception as e:
+        print(f"⚠️ [HUB API] No se pudo notificar desvinculación al Gateway: {e}")
+
+    try:
         from hub.modules.communication.logic.cloud_bridge import cloud_bridge
         cloud_bridge._sync_devices()
     except Exception:

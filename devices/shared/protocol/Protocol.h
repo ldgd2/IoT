@@ -30,6 +30,8 @@
 #define CMD_ACK_ERROR   0x0C   // Confirmacion/aceptacion de error desde el frontend
 #define CMD_PAIR_START  0x0D   // Iniciar modo vinculacion / busqueda en el Gateway
 #define CMD_PAIR_STOP   0x0E   // Detener / cancelar modo vinculacion en el Gateway
+#define CMD_UNPAIR      0x0F   // Desvincular / eliminar nodo del Gateway y del dispositivo
+#define CMD_CONTROL     0x10   // Control multicanal directo ch1..ch4
 
 // ─── Tipos de dispositivo y Feature Flags ────────────────────────────────────
 // Movidos a DeviceTypes.h para mejor organización y extensibilidad.

@@ -83,6 +83,11 @@ def firmware_wizard():
         for t in targets:
             console.print(f"\n[bold yellow]🛠️  Compilando {t} para {placa}...[/bold yellow]")
             proj_dir = ROOT_DIR / "devices" / t
+            shared_build = proj_dir / ".pio" / "build" / "shared"
+            if shared_build.exists():
+                shutil.rmtree(shared_build, ignore_errors=True)
+            # Limpiar build completo para garantizar que cambios en headers compartidos (Protocol.h) sean recompilados
+            subprocess.run(["pio", "run", "-e", pio_env, "--target", "clean"], cwd=proj_dir, capture_output=True)
             res = subprocess.run(["pio", "run", "-e", pio_env], cwd=proj_dir)
             if res.returncode == 0:
                 uf2_source = proj_dir / ".pio" / "build" / pio_env / "firmware.uf2"
@@ -120,6 +125,9 @@ def firmware_wizard():
             
             console.print(f"[bold yellow]🛠️  Compilando y subiendo {t} a {com_port}...[/bold yellow]")
             proj_dir = ROOT_DIR / "devices" / t
+            shared_build = proj_dir / ".pio" / "build" / "shared"
+            if shared_build.exists():
+                shutil.rmtree(shared_build, ignore_errors=True)
             
             res = subprocess.run(["pio", "run", "-t", "upload", "--upload-port", com_port, "-e", pio_env], cwd=proj_dir)
             

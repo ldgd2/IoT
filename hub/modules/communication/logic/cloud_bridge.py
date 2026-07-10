@@ -71,7 +71,7 @@ class CloudBridgeWorker:
                         payload = data.get("payload", {})
                         cmd_name = payload.get("cmd", "")
                         if cmd_name != "pairing_status":
-                            print(f"\n⚡ [CLOUD BRIDGE] Orden recibida desde el exterior (ID: {cmd_id} | CMD: {cmd_name})")
+                            print(f"\n [CLOUD BRIDGE] Orden recibida desde el exterior (ID: {cmd_id} | CMD: {cmd_name})")
                         
                         # Procesar comando con la lógica nativa del Hub
                         result = self._execute_local_command(payload)
@@ -173,6 +173,13 @@ class CloudBridgeWorker:
             if dev:
                 dev.delete()
                 print(f"🗑️ [CLOUD BRIDGE] Dispositivo eliminado: '{del_id}'")
+            try:
+                from hub.modules.communication.logic.gateway import gateway
+                node_num = int(str(del_id).replace("dev_", ""))
+                gateway.send_command(dest_id=node_num, command=0x0F, device_type=0, data=[0]*8)
+                print(f"📡 [CLOUD BRIDGE] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
+            except Exception as e:
+                print(f"⚠️ [CLOUD BRIDGE] No se pudo enviar CMD_UNPAIR al Gateway: {e}")
             self._sync_devices()
             return {"ok": True, "deleted": del_id}
 
@@ -217,8 +224,8 @@ class CloudBridgeWorker:
                     ch3 = 1 if params.get("ch3", state_dict.get("ch3", False)) else 0
                     ch4 = 1 if params.get("ch4", state_dict.get("ch4", False)) else 0
                     
-                    # Comando 0x06 (CONTROL) con estados de canales
-                    gateway.send_command(dest_id=dest_id, command=0x06, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+                    # Comando 0x10 (CMD_CONTROL) con estados de canales
+                    gateway.send_command(dest_id=dest_id, command=0x10, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
                     
                     # Si es comando específico de encendido/apagado general o 1 canal
                     if "on" in params and not any(k in params for k in ("ch1", "ch2", "ch3", "ch4")):

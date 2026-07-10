@@ -163,21 +163,26 @@ void loop() {
                     ColmenaError::raise(ERR_PACKET_CORRUPT);
                 } else {
                     snprintf(lastRxPktStr, sizeof(lastRxPktStr), "RX: ID %u CMD 0x%02X", pkt.originId, pkt.command);
-                    bool isNewOrDiscover = (pkt.command == CMD_DISCOVER) || (colmena.findNode(pkt.originId) == nullptr);
-                    colmena.onPacketReceived(pkt);
-                    
-                    // Si es un dispositivo nuevo o que se está vinculando, ¡mostrar animación en tiempo real!
-                    if (isNewOrDiscover) {
-                        const NodeInfo* n = colmena.findNode(pkt.originId);
-                        if (n) {
-                            snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
-                            ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
-                            if (isPairingMode) {
-                                isPairingMode = false;
-                                char pairBuf[128];
-                                snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\"}", n->nodeId, n->name);
-                                pTransport->sendStatus(pairBuf);
-                                snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
+                    bool isUnknown = (colmena.findNode(pkt.originId) == nullptr);
+                    bool isDiscover = (pkt.command == CMD_DISCOVER);
+
+                    if (!isPairingMode && (isDiscover || isUnknown)) {
+                        snprintf(lastActivityStr, sizeof(lastActivityStr), "Ignorado ID %u (Sin PAIR)", pkt.originId);
+                        pTransport->sendAck(false, pkt.originId);
+                    } else {
+                        colmena.onPacketReceived(pkt);
+                        if (isDiscover || isUnknown) {
+                            const NodeInfo* n = colmena.findNode(pkt.originId);
+                            if (n) {
+                                snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
+                                ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                                if (isPairingMode) {
+                                    isPairingMode = false;
+                                    char pairBuf[128];
+                                    snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\"}", n->nodeId, n->name);
+                                    pTransport->sendStatus(pairBuf);
+                                    snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
+                                }
                             }
                         }
                     }
@@ -206,13 +211,16 @@ void loop() {
                 snprintf(lastRxPktStr, sizeof(lastRxPktStr), "RX: Ninguno");
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Modo vinculacion ACTIVO");
                 pTransport->sendAck(true, pkt.destId);
-                if (isRadioOk) {
-                    colmena.broadcastPing();
-                    colmena.broadcastSync();
-                }
             } else if (pkt.command == CMD_PAIR_STOP) {
                 isPairingMode = false;
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");
+                pTransport->sendAck(true, pkt.destId);
+            } else if (pkt.command == CMD_UNPAIR) {
+                colmena.removeNode(pkt.destId);
+                if (isRadioOk) {
+                    connection.send(&pkt, sizeof(pkt), pkt.destId);
+                }
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Desvinculado Nodo %u", pkt.destId);
                 pTransport->sendAck(true, pkt.destId);
             } else {
                 bool ok = false;
@@ -243,6 +251,7 @@ void loop() {
             if (millis() - pairingStartTime > PAIRING_TIMEOUT_MS) {
                 isPairingMode = false;
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Tiempo vinculacion agotado");
+                pTransport->sendStatus("{\"event\":\"pairing_timeout\"}");
             } else {
                 ui.drawPairingAnimation(colmena.getParams().colmenaName, (animFrame / 3) % 4, lastRxPktStr, lastTxPktStr);
             }

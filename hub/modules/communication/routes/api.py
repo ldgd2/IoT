@@ -127,40 +127,16 @@ def process_incoming_packet(data):
     dev = Device.get(device_id)
     from hub.modules.communication.logic.gateway import gateway
     if not dev:
-        if "origin" in data and gateway.pairing_status not in ("active", "success"):
-            # Paquete RF (heartbeat/reporte) de un nodo desconocido cuando el Hub no está emparejando.
-            # No crear automáticamente el dispositivo, solo registrar el paquete para depuración.
-            log = RFLog(
-                ts=datetime.now().isoformat(),
-                device_id=device_id,
-                rssi=rssi if 'rssi' in locals() else 0,
-                payload=payload,
-                direction="RX"
-            )
-            log.save()
-            return {"ok": True, "action": "ignored_unpaired"}, 200
-        else:
-            dev = Device(
-                device_id=device_id,
-                name=data.get("name", f"Device {device_id}"),
-                type_name=data.get("type", "generic")
-            )
-            if gateway.pairing_status in ("active", "success"):
-                was_active = (gateway.pairing_status == "active")
-                gateway.pairing_status = "success"
-                if not gateway.last_paired_device:
-                    gateway.last_paired_device = {
-                        "id": device_id,
-                        "name": dev.name,
-                        "type_name": dev.type_name,
-                        "category": dev.category
-                    }
-                    if was_active:
-                        try:
-                            from hub.modules.communication.logic.notifier import PushNotifier
-                            PushNotifier.notify_device_connected(dev)
-                        except Exception:
-                            pass
+        # Si llega un paquete (que no es CMD_DISCOVER, ya que ese se procesó antes) de un nodo desconocido, no crear dispositivo.
+        log = RFLog(
+            ts=datetime.now().isoformat(),
+            device_id=device_id,
+            rssi=rssi if 'rssi' in locals() else 0,
+            payload=payload,
+            direction="RX"
+        )
+        log.save()
+        return {"ok": True, "action": "ignored_unpaired"}, 200
     
     dev.update(payload, rssi if 'rssi' in locals() else 0)
 
@@ -231,7 +207,7 @@ def api_command():
                 ch2 = 1 if params.get("ch2", state_dict.get("ch2", False)) else 0
                 ch3 = 1 if params.get("ch3", state_dict.get("ch3", False)) else 0
                 ch4 = 1 if params.get("ch4", state_dict.get("ch4", False)) else 0
-                gateway.send_command(dest_id=dest_id, command=0x06, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+                gateway.send_command(dest_id=dest_id, command=0x10, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
                 if "on" in params and not any(k in params for k in ("ch1", "ch2", "ch3", "ch4")):
                     cmd_byte = 0x01 if params["on"] else 0x02
                     gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])

@@ -115,6 +115,14 @@ void ColmenaNode::applySync(const RFPacket& pkt) {
     Serial.println("✔️ [RX RF] Configuración de red sincronizada y guardada.");
 }
 
+void ColmenaNode::unpair() {
+    _isPairingMode = true;
+    _pairingStartMs = millis();
+    _p.rfChannel = 76;
+    save();
+    Serial.println("🔄 [ColmenaNode] Desvinculado por orden remota del Gateway. Volviendo a modo emparejamiento...");
+}
+
 // ── Botón de vinculación ──────────────────────────────────────────────────
 
 void ColmenaNode::initPairButton(uint8_t pin, bool activeLow) {

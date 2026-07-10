@@ -52,17 +52,22 @@ void ColmenaMaster::broadcastSync() {
     _buildSyncPacket(pkt, ADDR_BROADCAST);
     Serial.println("📤 [TX RF] Enviando CONFIG_SYNC Broadcast...");
     _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
+    for (uint8_t id = 1; id <= 5; id++) {
+        _conn.send(&pkt, sizeof(pkt), id);
+    }
 }
 
 void ColmenaMaster::broadcastPing() {
     // Envía CMD_REPORT broadcast: los nodos que ya estaban corriendo
     // lo reciben en su loop() y responden con un CMD_DISCOVER (announce).
-    // Soluciona el caso: translator arranca DESPUÉS que los nodos leaf.
     RFPacket pkt;
     Protocol_initPacket(&pkt, ADDR_MASTER, ADDR_BROADCAST, DEV_TYPE_GATEWAY, CMD_REPORT);
     Protocol_seal(&pkt);
     Serial.println("📤 [TX RF] Enviando CMD_REPORT (Ping) Broadcast...");
     _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
+    for (uint8_t id = 1; id <= 5; id++) {
+        _conn.send(&pkt, sizeof(pkt), id);
+    }
 }
 
 
@@ -105,6 +110,19 @@ const NodeInfo* ColmenaMaster::findNode(uint8_t nodeId) const {
         if (_nodes[i].nodeId == nodeId) return &_nodes[i];
     }
     return nullptr;
+}
+
+void ColmenaMaster::removeNode(uint8_t nodeId) {
+    for (uint8_t i = 0; i < _nodeCount; i++) {
+        if (_nodes[i].nodeId == nodeId) {
+            for (uint8_t j = i; j < _nodeCount - 1; j++) {
+                _nodes[j] = _nodes[j + 1];
+            }
+            _nodeCount--;
+            Serial.printf("🗑️ [ColmenaMaster] Nodo %u eliminado y desvinculado de tabla interna.\r\n", nodeId);
+            return;
+        }
+    }
 }
 
 NodeInfo* ColmenaMaster::_findOrCreate(uint8_t nodeId) {

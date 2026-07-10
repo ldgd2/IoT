@@ -66,7 +66,6 @@ RGBIndicator    rgbLed;
 TestSerial      testSerial;
 
 // ─── Estado local ─────────────────────────────────────────────────────────────
-static bool      reconectando = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
@@ -148,11 +147,21 @@ void loop() {
 
             switch (pkt.command) {
 
-                case CMD_PING:
                 case CMD_REPORT:
                 case CMD_DISCOVER:
                     // El master o un nodo pide anuncio — responder y anunciarse
                     colmena.announce(NODE_NAME);
+                    break;
+
+                case CMD_UNPAIR:
+                    colmena.unpair();
+                    rgbLed.startPairing();
+                    break;
+
+                case CMD_CONTROL:
+                    for (uint8_t i = 0; i < RELAY_COUNT && i < 4; i++) {
+                        relays.setState(i, pkt.data[i] != 0);
+                    }
                     break;
 
                 case CMD_ON:

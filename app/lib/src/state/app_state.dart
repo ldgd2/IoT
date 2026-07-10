@@ -332,7 +332,7 @@ class AppState extends ChangeNotifier {
         uri,
         headers: headers,
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 8));
 
       if (r.statusCode == 200) {
         final j = jsonDecode(r.body);
@@ -363,7 +363,7 @@ class AppState extends ChangeNotifier {
       if (d.isRf) {
         final target = d.hubIp ?? _hubHost;
         final uri = Uri.parse('http://$target/api/device/${d.rfNodeId ?? d.id}');
-        final r = await http.get(uri).timeout(const Duration(seconds: 4));
+        final r = await http.get(uri).timeout(const Duration(seconds: 8));
         if (r.statusCode == 200) {
           final item = jsonDecode(r.body) as Map<String, dynamic>;
           final stateMap = item['state'] is Map ? Map<String, dynamic>.from(item['state'] as Map) : <String, dynamic>{};
@@ -590,7 +590,7 @@ class AppState extends ChangeNotifier {
         uri,
         headers: headers,
         body: jsonEncode({'action': 'start'}),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (e) {
       _lastError = '$e';
@@ -606,7 +606,7 @@ class AppState extends ChangeNotifier {
         uri,
         headers: headers,
         body: jsonEncode({'action': 'stop'}),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 8));
       return r.statusCode == 200;
     } catch (e) {
       _lastError = '$e';
@@ -618,7 +618,7 @@ class AppState extends ChangeNotifier {
     try {
       final uri = Uri.parse('http://$_hubHost/api/pairing/status');
       final headers = await _getAuthHeaders();
-      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 3));
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 8));
       if (r.statusCode == 200) {
         return jsonDecode(r.body) as Map<String, dynamic>;
       }

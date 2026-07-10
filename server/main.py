@@ -387,6 +387,68 @@ def relay_api_delete_device(device_id):
     return jsonify(res), status
 
 
+# =============================================================
+# NOTIFICACIONES PUSH → El Hub solicita al servidor que envíe FCM
+# =============================================================
+@app.route("/api/hubs/<hub_id>/notify", methods=["POST"])
+@require_hub_auth
+def hub_notify(hub_id: str):
+    """
+    El Hub llama a este endpoint para pedir al servidor que envíe un push FCM
+    a todos los usuarios dueños de ese hub.
+    Body: { "title": "...", "body": "...", "event_type": "...", "device_id": "...", "data": {} }
+    """
+    data = request.get_json(silent=True) or {}
+    title      = data.get("title", "Colmena")
+    body       = data.get("body", "")
+    event_type = data.get("event_type", "info")
+    device_id  = data.get("device_id", "")
+    extra_data = data.get("data", {})
+
+    # Buscar los usuarios dueños de este hub y sus tokens FCM
+    from server.db import database as db
+    from datetime import datetime
+
+    rows = db.execute(
+        "SELECT u.user_id, u.fcm_token, u.username FROM users u "
+        "JOIN hubs h ON u.user_id = h.user_id "
+        "WHERE h.hub_id = ?",
+        (hub_id,)
+    ).fetchall()
+
+    sent = 0
+    for row in rows:
+        user = dict(row)
+        fcm_token = user.get("fcm_token", "")
+
+        # Guardar en historial de notificaciones
+        try:
+            db.execute(
+                "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (user["user_id"], hub_id, device_id, title, body, event_type, datetime.now().isoformat())
+            )
+        except Exception:
+            pass
+
+        if fcm_token:
+            from server.modules.notifications.fcm import send_push_notification
+            import threading
+            push_data = {"hub_id": hub_id, "device_id": device_id, "event": event_type}
+            push_data.update({k: str(v) for k, v in extra_data.items()})
+            threading.Thread(
+                target=send_push_notification,
+                args=(fcm_token, title, body),
+                kwargs={"data": push_data},
+                daemon=True
+            ).start()
+            sent += 1
+        else:
+            print(f"[NOTIFY] Usuario '{user.get('username')}' sin token FCM.")
+
+    return jsonify({"ok": True, "pushed": sent, "total_users": len(rows)}), 200
+
+
 if __name__ == "__main__":
     print("\n" + "*"*65)
     print("🚀 IoT Bridge Server (Multi-Hub Architecture)")

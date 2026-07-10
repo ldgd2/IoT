@@ -115,6 +115,7 @@ public:
      * @return nullptr si no se encuentra
      */
     const NodeInfo* findNode(uint8_t nodeId) const;
+    void            removeNode(uint8_t nodeId);
 
 private:
     NodeInfo _nodes[COLMENA_MAX_NODES];

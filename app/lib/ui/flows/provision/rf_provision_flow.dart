@@ -35,6 +35,8 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   
   Timer? _pairingTimer;
   Map<String, dynamic>? pairingApiDevice;
+  bool isPairingTimeout = false;
+  double pairingElapsedSeconds = 0.0;
 
   final List<Map<String, dynamic>> categories = [
     {'name': 'Luz', 'icon': Icons.lightbulb_outline, 'desc': 'Bombillas, luces LED'},
@@ -106,29 +108,72 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   Future<void> _startScanOnHub() async {
     setState(() {
       step = _RfStep.scanOrInput;
+      isPairingTimeout = false;
+      pairingElapsedSeconds = 0.0;
       progressMsg = 'Buscando dispositivos y activando modo de vinculación automática...';
     });
 
     final app = context.read<AppState>();
     await app.startRfPairing();
     final list = await app.syncRfDevicesFromHub();
-    setState(() {
-      discoveredFromHub = list;
-    });
+    if (mounted) {
+      setState(() {
+        discoveredFromHub = list;
+      });
+    }
 
     _pairingTimer?.cancel();
-    _pairingTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+    _pairingTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) async {
       if (step != _RfStep.scanOrInput) {
         timer.cancel();
         return;
       }
+      if (mounted) {
+        setState(() {
+          pairingElapsedSeconds += 1.0;
+          if (pairingElapsedSeconds >= 50.0) {
+            isPairingTimeout = true;
+            pairingElapsedSeconds = 50.0;
+          }
+        });
+      }
+      if (isPairingTimeout) {
+        timer.cancel();
+        await app.stopRfPairing();
+        return;
+      }
+
       final status = await app.checkRfPairingStatus();
-      if (status != null && status['status'] == 'success' && status['last_device'] != null) {
-        if (mounted) {
-          setState(() {
-            pairingApiDevice = Map<String, dynamic>.from(status['last_device'] as Map);
-            progressMsg = '¡Nuevo dispositivo detectado automáticamente!';
-          });
+      if (status != null) {
+        if (status['status'] == 'timeout' || (status['elapsed'] != null && (status['elapsed'] as num) >= 50)) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              isPairingTimeout = true;
+              pairingElapsedSeconds = 50.0;
+            });
+          }
+          await app.stopRfPairing();
+          return;
+        } else if (status['elapsed'] != null) {
+          final sElapsed = (status['elapsed'] as num).toDouble();
+          if (sElapsed > pairingElapsedSeconds && sElapsed <= 50.0) {
+            if (mounted) {
+              setState(() {
+                pairingElapsedSeconds = sElapsed;
+              });
+            }
+          }
+        }
+
+        if (status['status'] == 'success' && status['last_device'] != null) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              pairingApiDevice = Map<String, dynamic>.from(status['last_device'] as Map);
+              progressMsg = '¡Nuevo dispositivo detectado automáticamente!';
+            });
+          }
         }
       }
     });
@@ -383,6 +428,66 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
                 ),
               ),
               Gap.l,
+            ] else if (isPairingTimeout) ...[
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.error.withValues(alpha: 0.8), width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.timer_off_rounded, color: cs.error, size: 32),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Tiempo de espera agotado (50s)',
+                            style: tt.titleMedium?.copyWith(color: cs.onErrorContainer, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: 1.0,
+                        minHeight: 8,
+                        color: cs.error,
+                        backgroundColor: cs.error.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'No se detectaron dispositivos en modo emparejamiento. Verifica que el foco o sensor esté encendido y dentro del rango de cobertura del traductor.',
+                      style: tt.bodyMedium?.copyWith(color: cs.onErrorContainer, fontWeight: FontWeight.w600, height: 1.4),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _startScanOnHub,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cs.error,
+                          foregroundColor: cs.onError,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text(
+                          'Volver a intentar vinculación',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Gap.l,
             ] else ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -391,18 +496,57 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: cs.primary.withValues(alpha: 0.5)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(strokeWidth: 3, color: cs.primary),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: (pairingElapsedSeconds / 50.0).clamp(0.0, 1.0),
+                                strokeWidth: 3.5,
+                                color: cs.primary,
+                                backgroundColor: cs.primary.withValues(alpha: 0.2),
+                              ),
+                              Text(
+                                '${(50.0 - pairingElapsedSeconds).clamp(0, 50).toInt()}',
+                                style: tt.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Modo de vinculación activo (${(50.0 - pairingElapsedSeconds).clamp(0, 50).toInt()}s restantes)',
+                                style: tt.titleSmall?.copyWith(color: cs.onPrimaryContainer, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Buscando dispositivos en tu hogar (${context.read<AppState>().hubHost})...',
+                                style: tt.bodySmall?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        'Modo de vinculación activo. Buscando nuevos dispositivos en tu hogar (${context.read<AppState>().hubHost})...',
-                        style: tt.bodySmall?.copyWith(color: cs.onPrimaryContainer, fontWeight: FontWeight.w600),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (pairingElapsedSeconds / 50.0).clamp(0.0, 1.0),
+                        minHeight: 8,
+                        color: cs.primary,
+                        backgroundColor: cs.primary.withValues(alpha: 0.2),
                       ),
                     ),
                   ],
