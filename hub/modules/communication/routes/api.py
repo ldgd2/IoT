@@ -405,3 +405,77 @@ def api_test_notification():
     from hub.modules.communication.logic.notifier import PushNotifier
     PushNotifier.send_notification(title=title, body=body, event_type="info")
     return jsonify({"ok": True, "message": "Notificación de prueba enviada"})
+
+@communication_bp.route("/hub/pair", methods=["POST"])
+def api_hub_pair():
+    """
+    Ruta llamada por la App Móvil para vincular este Hub a la cuenta del usuario en la Nube.
+    Recibe el server_url y el user_token (JWT).
+    El Hub hace la petición al servidor para registrarse y guarda las credenciales generadas.
+    """
+    data = request.get_json(silent=True) or {}
+    server_url = data.get("server_url")
+    user_token = data.get("user_token")
+    name = data.get("name", "Mi Hogar Colmena")
+    
+    if not server_url or not user_token:
+        return jsonify({"error": "server_url y user_token son requeridos"}), 400
+
+    server_url = server_url.rstrip('/')
+    
+    # Intentar obtener la IP local del hub para enviarla al servidor
+    local_ip = "127.0.0.1:5000"
+    try:
+        local_ip = request.host
+    except:
+        pass
+
+    import requests
+    try:
+        # Registrar el hub en el servidor usando el token del usuario
+        headers = {"Authorization": f"Bearer {user_token}", "Content-Type": "application/json"}
+        payload = {"name": name, "local_url": f"http://{local_ip}"}
+        
+        r = requests.post(f"{server_url}/api/hubs", json=payload, headers=headers, timeout=10)
+        
+        if r.status_code == 201:
+            res_data = r.json()
+            hub_id = res_data.get("hub_id")
+            relay_secret = res_data.get("relay_secret")
+            
+            if not hub_id or not relay_secret:
+                return jsonify({"error": "Respuesta del servidor malformada"}), 502
+            
+            # Guardar en .env
+            from dotenv import set_key
+            import os
+            
+            if not ENV_FILE.exists():
+                with open(ENV_FILE, 'w', encoding='utf-8') as f:
+                    pass
+            
+            set_key(str(ENV_FILE), "CLOUD_SERVER_URL", server_url)
+            set_key(str(ENV_FILE), "HUB_ID", hub_id)
+            set_key(str(ENV_FILE), "HUB_RELAY_SECRET", relay_secret)
+            
+            # Actualizar memoria (para el bridge saliente)
+            os.environ["CLOUD_SERVER_URL"] = server_url
+            os.environ["HUB_ID"] = hub_id
+            os.environ["HUB_RELAY_SECRET"] = relay_secret
+            
+            # Reiniciar cloud bridge (si estaba corriendo)
+            from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+            cloud_bridge.stop()
+            cloud_bridge.start()
+            
+            return jsonify({"ok": True, "hub_id": hub_id, "message": "Hub vinculado exitosamente"}), 200
+        else:
+            try:
+                err_msg = r.json().get("error", "Error del servidor")
+            except:
+                err_msg = r.text
+            return jsonify({"error": f"El servidor rechazó el registro: {err_msg}"}), r.status_code
+            
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error al conectar con el servidor en la nube: {str(e)}"}), 502
+

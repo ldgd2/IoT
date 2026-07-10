@@ -39,11 +39,23 @@ class CloudBridgeWorker:
     def stop(self):
         self.running = False
 
+    def _get_headers(self):
+        return {
+            "Content-Type": "application/json",
+            "X-Hub-Id": os.environ.get("HUB_ID", ""),
+            "X-Hub-Secret": os.environ.get("HUB_RELAY_SECRET", "")
+        }
+
     def _loop(self):
         # Pequeño retraso inicial para permitir que el Hub levante la DB
         time.sleep(2)
         while self.running:
             try:
+                if not os.environ.get("HUB_ID"):
+                    # Si el hub no está vinculado, no hace polling
+                    time.sleep(5)
+                    continue
+
                 # 1. Sincronizar catálogo de dispositivos cada 15 segundos hacia el servidor exterior
                 now = time.time()
                 if now - self.last_sync > 15.0:
@@ -51,7 +63,7 @@ class CloudBridgeWorker:
                     self.last_sync = now
 
                 # 2. Consultar salientemente por peticiones pendientes (Long-Polling)
-                r = requests.get(f"{self.bridge_url}/api/hub/poll", timeout=5)
+                r = requests.get(f"{self.bridge_url}/api/hub/poll", headers=self._get_headers(), timeout=5)
                 if r.status_code == 200:
                     data = r.json()
                     if data.get("status") == "job":
@@ -66,15 +78,20 @@ class CloudBridgeWorker:
                         requests.post(
                             f"{self.bridge_url}/api/hub/response",
                             json={"cmd_id": cmd_id, "result": result},
+                            headers=self._get_headers(),
                             timeout=3
                         )
                         print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
+                elif r.status_code == 401:
+                    print(f"⚠️ [CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
+                    time.sleep(10) # Backoff on auth error
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException):
                 # Si el servidor cloud (o VPS) no está accesible o el dominio aún no se configura, esperar en silencio
                 time.sleep(5)
             except Exception as e:
                 # Solo mostrar error si es algo excepcional de lógica de programación
+                print(f"⚠️ [CLOUD BRIDGE] Error interno: {e}")
                 time.sleep(5)
 
     def _sync_devices(self):
@@ -84,6 +101,7 @@ class CloudBridgeWorker:
             requests.post(
                 f"{self.bridge_url}/api/hub/sync",
                 json={"devices": devices, "ts": datetime.now().isoformat()},
+                headers=self._get_headers(),
                 timeout=3
             )
         except Exception:

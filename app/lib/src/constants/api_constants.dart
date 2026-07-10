@@ -1,14 +1,33 @@
 // =============================================================
 // lib/src/constants/api_constants.dart
-// Constantes y endpoints para comunicación con el Hub/Backend
+// Constantes y endpoints para comunicación con Hub y Servidor
 // =============================================================
 
 class ApiConstants {
-  static const String defaultHostFromEnv = String.fromEnvironment('HUB_HOST', defaultValue: '192.168.1.100:5000');
-  static String mainBaseUrl = 'http://$defaultHostFromEnv/api';
+  // ── SERVIDOR REMOTO (Nube / Fuera de casa) ────────────────────────
+  // Maneja: Auth, Usuarios, Salas, Notificaciones, Skills
+  static const String remoteHostFromEnv =
+      String.fromEnvironment('HUB_HOST', defaultValue: 'localhost:8000');
 
-  static void updateHost(String host) {
-    final cleanHost = host.trim().replaceFirst(RegExp(r'^https?://'), '').split('/').first;
-    mainBaseUrl = 'http://$cleanHost/api';
+  /// URL base del Servidor — siempre apunta a la nube
+  static String get serverBaseUrl => 'http://$remoteHostFromEnv/api';
+
+  // ── HUB LOCAL (LAN / En casa) ─────────────────────────────────────
+  // Maneja: Control de dispositivos RF/relés/sensores ÚNICAMENTE
+  static String localHost = '192.168.1.100:5000';
+
+  // Host activo actual (puede ser local o remoto según conectividad)
+  static String activeHost = remoteHostFromEnv;
+
+  /// URL base del Hub activo — puede ser local o remoto (proxy)
+  static String get mainBaseUrl => 'http://$activeHost/api';
+  static bool isConnectedLocally = false;
+
+  static void updateHost(String host, {bool isLocal = false}) {
+    final cleanHost =
+        host.trim().replaceFirst(RegExp(r'^https?://'), '').split('/').first;
+    activeHost = cleanHost;
+    isConnectedLocally = isLocal;
   }
 }
+

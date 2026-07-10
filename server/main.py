@@ -14,6 +14,13 @@ import requests
 
 from config import SERVER_HOST, SERVER_PORT, HUB_URL, HUB_TIMEOUT
 
+# Base de datos y auth del servidor
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).parent.parent.resolve()))
+from server.db.database import ensure_tables
+from server.modules.auth.routes.api import auth_bp
+
 # Asegurar codificación UTF-8 en consola de Windows
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -26,217 +33,180 @@ try:
 except ImportError:
     pass
 
+# Registrar endpoints de Auth, Usuarios, Salas y Notificaciones
+app.register_blueprint(auth_bp, url_prefix="/api")
+
+# Crear tablas en la BD del servidor al arrancar
+ensure_tables()
+
 # Modo de operación: 'direct' (petición HTTP al Hub) o 'relay' (cola saliente para redes protegidas/NAT)
 SERVER_MODE = os.environ.get("SERVER_MODE", "auto") # 'auto', 'direct', 'relay'
 current_hub_url = HUB_URL
 
-# Almacén en memoria para peticiones en Modo Relay (cuando la red del Hub está detrás de NAT/Firewall)
-pending_commands = {} # { cmd_id: { "data": dict, "timestamp": float } }
+# Almacén en memoria para peticiones en Modo Relay (cuando el Hub está detrás de NAT/Firewall)
+# Ahora soporta múltiples Hubs
+pending_commands = {} # { hub_id: { cmd_id: { "data": dict, "timestamp": float } } }
 completed_responses = {} # { cmd_id: dict }
-cached_devices = []      # Lista sincronizada por el Hub para redes protegidas
+cached_devices = {}      # { hub_id: [ devices... ] }
 condition_lock = threading.Condition()
+
+
+def require_hub_auth(f):
+    """Verifica que el Hub envíe X-Hub-Id y X-Hub-Secret correctos para hacer polling"""
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        hub_id = request.headers.get("X-Hub-Id", "")
+        secret = request.headers.get("X-Hub-Secret", "")
+        if not hub_id or not secret:
+            return jsonify({"error": "Faltan credenciales del Hub"}), 401
+        
+        from server.db import database as db
+        row = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND relay_secret = ?", (hub_id, secret)).fetchone()
+        if not row:
+            return jsonify({"error": "Credenciales inválidas"}), 401
+        
+        # Actualizar last_seen
+        from datetime import datetime
+        db.execute("UPDATE hubs SET last_seen = ?, online = 1 WHERE hub_id = ?", (datetime.now().isoformat(), hub_id))
+        
+        request.hub_record = dict(row)
+        return f(*args, **kwargs)
+    return decorated
 
 
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({
-        "service": "IoT Bridge Server (Phone <-> Hub)",
+        "service": "Colmena Cloud Server (Multi-Hub)",
         "status": "online",
         "mode": SERVER_MODE,
-        "target_hub": current_hub_url,
-        "pending_relay_jobs": len(pending_commands),
-        "message": "Servidor activo. Soporta conexión directa y Modo Relay para redes protegidas sin IP saliente."
+        "message": "Servidor activo con arquitectura Multi-Hub."
     })
 
 
 @app.route("/api/health", methods=["GET"])
 @app.route("/api/stats", methods=["GET"])
 def health_check():
-    """Verifica el estado del servidor y del Hub"""
-    hub_online = False
-    hub_info = {}
-    
-    # Intento directo de consulta al Hub
-    try:
-        r = requests.get(f"{current_hub_url}/api/stats", timeout=2)
-        if r.status_code == 200:
-            hub_online = True
-            hub_info = r.json()
-    except Exception as e:
-        hub_info = {"status": "relay_mode_active", "note": "El Hub está detrás de firewall/NAT conectándose vía Polling Outbound."}
-
     return jsonify({
         "status": "ok",
         "server": "online",
-        "server_mode": SERVER_MODE,
-        "hub_connected": hub_online or len(completed_responses) > 0,
-        "hub_url": current_hub_url,
-        "hub_data": hub_info
+        "server_mode": SERVER_MODE
     })
 
 
-@app.route("/api/config/mode", methods=["POST"])
-def configure_mode():
-    """Configura el modo: 'direct' o 'relay'"""
-    global SERVER_MODE
-    data = request.get_json(silent=True) or {}
-    mode = data.get("mode", "auto")
-    SERVER_MODE = mode
-    print(f"⚙️ [CONFIG] Modo de servidor cambiado a: {SERVER_MODE}")
-    return jsonify({"status": "ok", "mode": SERVER_MODE})
-
-
 # =============================================================
-# RUTAS PARA EL AGENTE DEL HUB EN RED PROTEGIDA (OUTBOUND POLLING)
+# RUTAS PARA EL AGENTE DEL HUB (OUTBOUND POLLING MULTI-HUB)
 # =============================================================
 
 @app.route("/api/hub/poll", methods=["GET"])
+@require_hub_auth
 def hub_poll():
-    """
-    El Gateway Hub (o hub_agent.py) dentro de la red protegida llama a esta ruta SALIENTE.
-    Como la petición sale desde dentro hacia afuera, el firewall/NAT la permite sin problemas.
-    """
+    hub_id = request.hub_record["hub_id"]
+    
     with condition_lock:
-        # Si no hay comandos pendientes, esperar hasta 3 segundos por si entra uno (Long-Polling)
-        if not pending_commands:
+        if hub_id not in pending_commands:
+            pending_commands[hub_id] = {}
+            
+        # Si no hay comandos pendientes para este hub, esperar (Long-Polling)
+        if not pending_commands[hub_id]:
             condition_lock.wait(timeout=3.0)
             
-        if pending_commands:
+        if pending_commands[hub_id]:
             # Obtener el primer comando pendiente
-            cmd_id, job = next(iter(pending_commands.items()))
-            # Retornar el comando para que el Hub lo ejecute localmente
+            cmd_id, job = next(iter(pending_commands[hub_id].items()))
             return jsonify({"status": "job", "cmd_id": cmd_id, "payload": job["data"]}), 200
             
     return jsonify({"status": "empty"}), 200
 
 
 @app.route("/api/hub/response", methods=["POST"])
+@require_hub_auth
 def hub_response():
-    """El Gateway Hub devuelve aquí el resultado del comando ejecutado localmente."""
+    hub_id = request.hub_record["hub_id"]
     data = request.get_json(silent=True) or {}
     cmd_id = data.get("cmd_id")
     result = data.get("result", {})
     
-    if cmd_id and cmd_id in pending_commands:
+    if cmd_id and hub_id in pending_commands and cmd_id in pending_commands[hub_id]:
         with condition_lock:
-            del pending_commands[cmd_id]
+            del pending_commands[hub_id][cmd_id]
             completed_responses[cmd_id] = result
             condition_lock.notify_all()
-        print(f"📡 [HUB RELAY -> SERVER] Respuesta recibida para trabajo {cmd_id}: OK")
         return jsonify({"status": "ok"}), 200
         
-    return jsonify({"status": "error", "message": "Trabajo no encontrado o ya expiró"}), 404
+    return jsonify({"status": "error", "message": "Trabajo no encontrado"}), 404
 
 
 @app.route("/api/hub/sync", methods=["POST"])
+@require_hub_auth
 def hub_sync():
-    """El Gateway Hub sincroniza su catálogo de dispositivos aquí periódicamente."""
-    global cached_devices
+    hub_id = request.hub_record["hub_id"]
     data = request.get_json(silent=True) or {}
     devs = data.get("devices")
     if isinstance(devs, list):
-        cached_devices = devs
-        print(f"🔄 [HUB RELAY -> SERVER] Catálogo sincronizado: {len(cached_devices)} dispositivos.")
+        cached_devices[hub_id] = devs
         return jsonify({"status": "ok"}), 200
     return jsonify({"status": "error"}), 400
 
 
 # =============================================================
-# RUTAS PARA EL TELÉFONO MÓVIL
+# RUTAS PARA EL TELÉFONO MÓVIL (APP)
 # =============================================================
+from server.modules.auth.middleware import require_auth
 
-@app.route("/api/devices", methods=["GET"])
-def get_devices():
-    """Consulta dispositivos al Hub (o caché en Modo Relay)"""
-    print(f"📱 [TELÉFONO -> SERVER] Consultando lista de dispositivos...")
-    if SERVER_MODE == "relay":
-        return jsonify(cached_devices), 200
-    try:
-        r = requests.get(f"{current_hub_url}/api/devices", timeout=3)
-        return (r.content, r.status_code, r.headers.items())
-    except Exception as e:
-        print(f"⚠️ [NOTICE] Hub directo no accesible. Devolviendo caché ({len(cached_devices)} dispositivos).")
-        return jsonify(cached_devices), 200
-
-
-@app.route("/api/command", methods=["POST"])
-def relay_command():
+@app.route("/api/hubs/<hub_id>/command", methods=["POST"])
+@require_auth
+def relay_command(hub_id):
     """
-    Ruta de comando del teléfono.
-    Si la red no permite peticiones entrantes, utiliza el Modo Relay saliente.
+    Ruta de comando del teléfono, dirigida a un Hub específico.
+    Utiliza el Modo Relay (Outbound Polling) hacia el Hub objetivo.
     """
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({"status": "error", "message": "Payload JSON vacío"}), 400
+        return jsonify({"error": "Payload JSON vacío"}), 400
 
-    device_id = data.get("id")
-    cmd = data.get("cmd")
-    params = data.get("params", {})
+    from server.db import database as db
+    # Validar que el hub pertenece al usuario
+    hub = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (hub_id, request.environ.get('flask.g').user["user_id"])).fetchone()
+    if not hub:
+        return jsonify({"error": "Hub no encontrado o no pertenece al usuario"}), 404
 
-    print(f"\n" + "="*55)
-    print(f"📱 [TELÉFONO -> SERVER] Orden para dispositivo {device_id}: {cmd} | {params}")
-
-    # 1. INTENTO DIRECTO (Si el servidor y el Hub están en red local o VPN)
-    if SERVER_MODE in ["auto", "direct"]:
-        try:
-            print(f"   Intentando conexión directa al Hub ({current_hub_url})...")
-            r = requests.post(
-                f"{current_hub_url}/api/command",
-                json=data,
-                headers={"Content-Type": "application/json"},
-                timeout=3
-            )
-            if r.status_code == 200:
-                hub_res = r.json()
-                print(f"📡 [HUB DIRECTO] Ejecutado con éxito.")
-                print("="*55 + "\n")
-                return jsonify({
-                    "status": "ok",
-                    "message": "Comando ejecutado vía conexión directa",
-                    "hub_response": hub_res,
-                    "state": hub_res.get("state", params)
-                }), 200
-        except Exception as e:
-            if SERVER_MODE == "direct":
-                return jsonify({"status": "error", "message": f"Fallo directo al Hub: {e}"}), 502
-            print(f"   [NOTICE] Conexión directa falló. Pasando automáticamente a Modo Relay (Red Protegida)...")
-
-    # 2. MODO RELAY / OUTBOUND POLLING (Para redes protegidas por NAT / Firewall)
     cmd_id = str(uuid.uuid4())[:8]
-    print(f"🛡️ [MODO RELAY] Encolando trabajo {cmd_id} para que el Hub local lo consuma desde dentro...")
     
     with condition_lock:
-        pending_commands[cmd_id] = {"data": data, "timestamp": time.time()}
+        if hub_id not in pending_commands:
+            pending_commands[hub_id] = {}
+        pending_commands[hub_id][cmd_id] = {"data": data, "timestamp": time.time()}
         condition_lock.notify_all()
         
-        # Esperar hasta 6 segundos a que el agente local del Hub recoja y responda la orden
+        # Esperar hasta 6 segundos a que el Hub recoja y responda
         start_wait = time.time()
         while cmd_id not in completed_responses:
             elapsed = time.time() - start_wait
             if elapsed >= 6.0:
-                del pending_commands[cmd_id]
-                print(f"⏰ [TIMEOUT] El Hub en red local no recogió el comando en 6s.")
-                print("="*55 + "\n")
-                return jsonify({
-                    "status": "error",
-                    "message": "El Hub en la red protegida no consultó el servidor a tiempo. Verifica que hub_agent.py esté corriendo."
-                }), 504
+                if cmd_id in pending_commands.get(hub_id, {}):
+                    del pending_commands[hub_id][cmd_id]
+                return jsonify({"error": "El Hub no respondió a tiempo. Verifica que esté encendido y conectado a internet."}), 504
             condition_lock.wait(timeout=1.0)
             
         res = completed_responses.pop(cmd_id)
-        print(f"📡 [HUB RELAY] ¡El Hub procesó la orden desde su red protegida!")
-        print("="*55 + "\n")
         return jsonify({
-            "status": "ok",
-            "message": "Comando ejecutado con éxito a través de túnel saliente (Relay)",
+            "ok": True,
+            "message": "Comando ejecutado vía relay",
             "hub_response": res,
-            "state": res.get("state", params)
+            "state": res.get("state", data.get("params", {}))
         }), 200
 
 
-def _generic_proxy(path, method="GET", json_data=None):
-    """Auxiliar para reenviar peticiones al Hub directamente o via relay"""
-    url = f"{current_hub_url}/{path.lstrip('/')}"
+def _generic_proxy(hub_id, path, method="GET", json_data=None):
+    """Reenvío directo al hub usando su local_url (Solo si app y hub están en misma LAN)"""
+    from server.db import database as db
+    hub = db.execute("SELECT local_url FROM hubs WHERE hub_id = ?", (hub_id,)).fetchone()
+    if not hub or not hub["local_url"]:
+        return jsonify({"error": "Hub sin URL local configurada"}), 404
+        
+    url = f"{hub['local_url']}/{path.lstrip('/')}"
     try:
         if method == "GET":
             r = requests.get(url, timeout=4)
@@ -248,53 +218,13 @@ def _generic_proxy(path, method="GET", json_data=None):
             r = requests.request(method, url, json=json_data, timeout=4)
         return (r.content, r.status_code, r.headers.items())
     except Exception as e:
-        return jsonify({"error": f"Fallo al conectar con Hub en {url}: {e}"}), 502
+        return jsonify({"error": f"Fallo directo a {url}: {e}"}), 502
 
-@app.route("/api/devices", methods=["POST"])
-def proxy_post_devices():
-    return _generic_proxy("/api/devices", method="POST", json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/device/<device_id>", methods=["GET", "PUT", "POST", "PATCH", "DELETE"])
-def proxy_device_detail(device_id):
-    return _generic_proxy(f"/api/device/{device_id}", method=request.method, json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/pairing", methods=["POST"])
-def proxy_pairing():
-    return _generic_proxy("/api/pairing", method="POST", json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/pairing/status", methods=["GET"])
-def proxy_pairing_status():
-    return _generic_proxy("/api/pairing/status", method="GET")
-
-@app.route("/api/device-token/", methods=["POST", "PUT"])
-@app.route("/api/device-token", methods=["POST", "PUT"])
-@app.route("/device-token/", methods=["POST", "PUT"])
-@app.route("/device-token", methods=["POST", "PUT"])
-def proxy_device_token():
-    return _generic_proxy("/api/device-token", method="POST", json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/notifications", methods=["GET", "DELETE"])
-def proxy_notifications():
-    return _generic_proxy("/api/notifications", method=request.method)
-
-@app.route("/api/notifications/test", methods=["POST"])
-def proxy_notifications_test():
-    return _generic_proxy("/api/notifications/test", method="POST", json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/skills", methods=["GET", "POST"])
-def proxy_skills():
-    return _generic_proxy("/api/skills", method=request.method, json_data=request.get_json(silent=True) or {})
-
-@app.route("/api/skills/<int:skill_id>", methods=["GET", "DELETE"])
-@app.route("/api/skills/<int:skill_id>/toggle", methods=["POST"])
-@app.route("/api/skills/<int:skill_id>/execute", methods=["POST"])
-def proxy_skills_detail(skill_id):
-    path = request.path
-    return _generic_proxy(path, method=request.method, json_data=request.get_json(silent=True) or {})
 
 if __name__ == "__main__":
     print("\n" + "*"*65)
-    print("🚀 IoT Bridge Server (Soporta Redes Protegidas sin IP Saliente)")
+    print("🚀 IoT Bridge Server (Multi-Hub Architecture)")
     print(f"🌐 Escuchando en: http://{SERVER_HOST}:{SERVER_PORT}")
     print("*"*65 + "\n")
     app.run(host=SERVER_HOST, port=SERVER_PORT, debug=False, threaded=True)
+

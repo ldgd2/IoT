@@ -2,6 +2,7 @@
 IoT RF Gateway Server - main.py
 Backend ultra-liviano para Raspberry Pi
 Comunicación por radiofrecuencia (RF433/nRF24/LoRa)
+Solo controla dispositivos — Auth y usuarios viven en el Servidor.
 """
 from flask import Flask
 from datetime import datetime
@@ -27,9 +28,6 @@ from hub.core.config import API_PORT
 from hub.db.database import BaseModel
 from hub.modules.devices.models.device import Device
 from hub.modules.automation.evaluator import evaluator
-from hub.modules.devices.models.device import Device
-
-from hub.modules.automation.evaluator import evaluator
 
 from hub.modules.devices.routes.api import devices_bp
 from hub.modules.devices.routes.views import devices_view_bp
@@ -49,6 +47,11 @@ app.register_blueprint(automation_view_bp)
 app.register_blueprint(communication_bp, url_prefix="/api")
 app.register_blueprint(communication_view_bp)
 
+# Ping liviano para que la app verifique que el Hub responde en LAN
+@app.route("/api/ping", methods=["GET"])
+def hub_ping():
+    return {"ok": True, "service": "colmena-hub"}, 200
+
 start_watchdog()
 evaluator.start()
 cloud_bridge.start()
@@ -61,10 +64,9 @@ if gateway.connect():
 else:
     print("⚠️ Gateway RF No conectado. Revisa tu puerto USB/COM.")
 
-# Aseguramos de que las tablas existan al inicio invocando al padre
+# Aseguramos de que las tablas existan al inicio
 from hub.modules.communication.models.notification import DeviceToken, NotificationLog
 BaseModel.migrate_all()
-# Migrar columnas nuevas sin borrar datos existentes
 Device.migrate()
 
 @app.route("/device-token/", methods=["POST", "PUT"])
@@ -72,11 +74,6 @@ Device.migrate()
 def root_device_token():
     from hub.modules.communication.routes.api import api_device_token
     return api_device_token()
-
-
-
-
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=API_PORT, debug=False, threaded=True)

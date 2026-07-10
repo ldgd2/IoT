@@ -26,7 +26,8 @@ class AppState extends ChangeNotifier {
   final List<Device> _devices = <Device>[];
   bool _loading = false;
   String? _lastError;
-  String _hubHost = '192.168.1.100:5000';
+  String _localHubHost = '192.168.1.100:5000';
+  bool _isLocalActive = false;
 
   final Map<String, List<String>> _switchNames = <String, List<String>>{};
   final Map<String, String> _deviceKinds = <String, String>{};
@@ -34,15 +35,22 @@ class AppState extends ChangeNotifier {
   List<Device> get devices => List.unmodifiable(_devices);
   bool get loading => _loading;
   String? get lastError => _lastError;
-  String get hubHost => _hubHost;
+  String get hubHost => _isLocalActive ? _localHubHost : ApiConstants.remoteHostFromEnv;
+  String get _hubHost => hubHost; // Alias interno para enrutamiento dinámico (En Casa / Fuera de Casa)
+  bool get isLocalActive => _isLocalActive;
+  String get remoteHubHost => ApiConstants.remoteHostFromEnv;
+  String get localHubHost => _localHubHost;
 
   // -----------------------------------------------------------
   // CARGA / GUARDA
   Future<void> load() async {
     final sp = await SharedPreferences.getInstance();
 
-    _hubHost = sp.getString(_hubHostKey) ?? ApiConstants.defaultHostFromEnv;
-    ApiConstants.updateHost(_hubHost);
+    _localHubHost = sp.getString(_hubHostKey) ?? '192.168.1.100:5000';
+    ApiConstants.localHost = _localHubHost;
+    
+    // Al iniciar, probamos enrutamiento inteligente (En Casa o Fuera de Casa)
+    await checkAndRouteConnection();
 
     // Dispositivos
     final raw = sp.getString(_storeKey);
@@ -67,12 +75,30 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setHubHost(String host) async {
-    _hubHost = host.trim();
-    ApiConstants.updateHost(_hubHost);
-    final sp = await SharedPreferences.getInstance();
-    await sp.setString(_hubHostKey, _hubHost);
+  Future<void> checkAndRouteConnection() async {
+    try {
+      final uri = Uri.parse('http://$_localHubHost/api/stats');
+      final r = await http.get(uri).timeout(const Duration(milliseconds: 1200));
+      if (r.statusCode == 200) {
+        _isLocalActive = true;
+        ApiConstants.updateHost(_localHubHost, isLocal: true);
+        notifyListeners();
+        return;
+      }
+    } catch (_) {}
+    
+    // Si no responde en red local, usamos la IP Inyectada para fuera de casa (Nube / Puente)
+    _isLocalActive = false;
+    ApiConstants.updateHost(ApiConstants.remoteHostFromEnv, isLocal: false);
     notifyListeners();
+  }
+
+  Future<void> setHubHost(String host) async {
+    _localHubHost = host.trim();
+    ApiConstants.localHost = _localHubHost;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_hubHostKey, _localHubHost);
+    await checkAndRouteConnection();
   }
 
   Future<void> _save() async {

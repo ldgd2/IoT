@@ -31,3 +31,4 @@ iot_task.xml
 .vscode/
 .idea/
 *.swp
+server/credenciales/*.json
