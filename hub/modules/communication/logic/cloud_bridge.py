@@ -69,7 +69,9 @@ class CloudBridgeWorker:
                     if data.get("status") == "job":
                         cmd_id = data.get("cmd_id")
                         payload = data.get("payload", {})
-                        print(f"\n⚡ [CLOUD BRIDGE] Orden recibida desde el exterior (ID: {cmd_id})")
+                        cmd_name = payload.get("cmd", "")
+                        if cmd_name != "pairing_status":
+                            print(f"\n⚡ [CLOUD BRIDGE] Orden recibida desde el exterior (ID: {cmd_id} | CMD: {cmd_name})")
                         
                         # Procesar comando con la lógica nativa del Hub
                         result = self._execute_local_command(payload)
@@ -81,7 +83,8 @@ class CloudBridgeWorker:
                             headers=self._get_headers(),
                             timeout=3
                         )
-                        print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
+                        if cmd_name != "pairing_status":
+                            print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
                 elif r.status_code == 401:
                     print(f"⚠️ [CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
                     time.sleep(10) # Backoff on auth error

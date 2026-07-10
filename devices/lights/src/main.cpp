@@ -94,7 +94,7 @@ void setup() {
         rgbLed.showRfError();
         testSerial.printRfDiagnostics(false);
     } else {
-        colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
+        colmena.startPairingWindow(NODE_NAME);   // Activar ventana de búsqueda automática por 50s
         rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
         testSerial.printRfDiagnostics(true);
     }
@@ -102,6 +102,7 @@ void setup() {
     // Conectar callback en testSerial para disparar la misma animación al mandar PAIR por USB
     testSerial.setPairCallback([]() {
         if (connection.getRadio().isChipConnected()) {
+            colmena.startPairingWindow(NODE_NAME);
             rgbLed.startPairing();
         } else {
             rgbLed.showRfError();
@@ -129,6 +130,9 @@ void loop() {
     // 1. Mantener red Mesh (update + checkConnection automático)
     connection.update();
 
+    // Sincronizar y reintentar anuncio por 50s si el nodo está en ventana de vinculación
+    colmena.tickPairing();
+
     // Actualizar animación del LED RGB en tiempo real (efecto ola / verde / rojo) sin bloquear
     rgbLed.update();
 
@@ -144,8 +148,10 @@ void loop() {
 
             switch (pkt.command) {
 
+                case CMD_PING:
                 case CMD_REPORT:
-                    // El master arrancó después que nosotros — re-anunciarse
+                case CMD_DISCOVER:
+                    // El master o un nodo pide anuncio — responder y anunciarse
                     colmena.announce(NODE_NAME);
                     break;
 

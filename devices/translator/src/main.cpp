@@ -206,6 +206,10 @@ void loop() {
                 snprintf(lastRxPktStr, sizeof(lastRxPktStr), "RX: Ninguno");
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Modo vinculacion ACTIVO");
                 pTransport->sendAck(true, pkt.destId);
+                if (isRadioOk) {
+                    colmena.broadcastPing();
+                    colmena.broadcastSync();
+                }
             } else if (pkt.command == CMD_PAIR_STOP) {
                 isPairingMode = false;
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");
