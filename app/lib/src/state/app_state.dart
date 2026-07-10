@@ -12,6 +12,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/device.dart';
+import '../models/notification_item.dart';
+import '../constants/api_constants.dart';
 import '../services/api_client.dart';
 import '../services/mdns_resolver.dart';
 
@@ -39,7 +41,8 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     final sp = await SharedPreferences.getInstance();
 
-    _hubHost = sp.getString(_hubHostKey) ?? '192.168.1.100:5000';
+    _hubHost = sp.getString(_hubHostKey) ?? ApiConstants.defaultHostFromEnv;
+    ApiConstants.updateHost(_hubHost);
 
     // Dispositivos
     final raw = sp.getString(_storeKey);
@@ -66,6 +69,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> setHubHost(String host) async {
     _hubHost = host.trim();
+    ApiConstants.updateHost(_hubHost);
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_hubHostKey, _hubHost);
     notifyListeners();
@@ -159,6 +163,34 @@ class AppState extends ChangeNotifier {
       final r = await http.get(uri).timeout(const Duration(seconds: 4));
       return r.statusCode == 200;
     } catch (_) {
+      return false;
+    }
+  }
+
+  // -----------------------------------------------------------
+  // REGISTRO EN EL HUB (POST /api/devices)
+  /// Registra o actualiza un dispositivo en la base de datos SQLite del Hub.
+  /// Debe llamarse siempre que el usuario vincule un dispositivo RF manualmente.
+  Future<bool> registerDeviceOnHub(Device d) async {
+    final target = d.hubIp ?? _hubHost;
+    try {
+      final uri = Uri.parse('http://$target/api/devices');
+      final body = jsonEncode({
+        'device_id': d.rfNodeId ?? d.id,
+        'name': d.alias ?? d.id,
+        'type_name': d.kind ?? 'generic',
+        'category': d.room ?? 'General',
+        'rssi': d.rssi ?? -65,
+        'state': d.state,
+      });
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      ).timeout(const Duration(seconds: 5));
+      return r.statusCode >= 200 && r.statusCode < 300;
+    } catch (e) {
+      _lastError = 'registerDeviceOnHub: $e';
       return false;
     }
   }
@@ -456,6 +488,161 @@ class AppState extends ChangeNotifier {
       _replace(d.copyWith(ip: ip));
       await _save();
       notifyListeners();
+    }
+  }
+
+  // -----------------------------------------------------------
+  // VINCULACIÓN RF VÍA API (RF PAIRING MODE)
+  Future<bool> startRfPairing() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/pairing');
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'action': 'start'}),
+      ).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<bool> stopRfPairing() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/pairing');
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'action': 'stop'}),
+      ).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> checkRfPairingStatus() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/pairing/status');
+      final r = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (r.statusCode == 200) {
+        return jsonDecode(r.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      _lastError = '$e';
+    }
+    return null;
+  }
+
+  // -----------------------------------------------------------
+  // HISTORIAL Y CONTROL DE NOTIFICACIONES
+  Future<List<NotificationItem>> fetchNotificationLogs() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/notifications');
+      final r = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (r.statusCode == 200) {
+        final list = (jsonDecode(r.body) as List).cast<Map<String, dynamic>>();
+        return list.map((m) => NotificationItem.fromJson(m)).toList();
+      }
+    } catch (e) {
+      _lastError = '$e';
+    }
+    return [];
+  }
+
+  Future<bool> clearNotificationLogs() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/notifications');
+      final r = await http.delete(uri).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<bool> sendTestNotification(String title, String body) async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/notifications/test');
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'title': title, 'body': body}),
+      ).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  // -----------------------------------------------------------
+  // SKILLS / AUTOMATIZACIONES Y DISPARADORES DE NOTIFICACIÓN
+  Future<List<Map<String, dynamic>>> fetchSkills() async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/skills');
+      final r = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (r.statusCode == 200) {
+        return (jsonDecode(r.body) as List).cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      _lastError = '$e';
+    }
+    return [];
+  }
+
+  Future<bool> saveSkill(Map<String, dynamic> skillData) async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/skills');
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(skillData),
+      ).timeout(const Duration(seconds: 5));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<bool> toggleSkill(int skillId, {bool? active}) async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/skills/$skillId/toggle');
+      final body = active != null ? jsonEncode({'is_active': active}) : null;
+      final r = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      ).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<bool> deleteSkill(int skillId) async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/skills/$skillId');
+      final r = await http.delete(uri).timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
+    }
+  }
+
+  Future<bool> executeSkill(int skillId) async {
+    try {
+      final uri = Uri.parse('http://$_hubHost/api/skills/$skillId/execute');
+      final r = await http.post(uri).timeout(const Duration(seconds: 5));
+      return r.statusCode == 200;
+    } catch (e) {
+      _lastError = '$e';
+      return false;
     }
   }
 

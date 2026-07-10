@@ -3,6 +3,7 @@
 // Flujo de vinculación por Radiofrecuencia (RF Hub Colmena Gateway)
 // Comunicación 100% real con endpoints REST del servidor Python
 // =============================================================
+import 'dart:async';
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -31,11 +32,14 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   String progressMsg = '';
   List<Device> discoveredFromHub = [];
   Device? selectedHubDevice;
+  
+  Timer? _pairingTimer;
+  Map<String, dynamic>? pairingApiDevice;
 
   final List<Map<String, dynamic>> categories = [
     {'name': 'Luz', 'icon': Icons.lightbulb_outline, 'desc': 'Bombillas, luces LED'},
     {'name': 'Enchufe', 'icon': Icons.power_outlined, 'desc': 'Tomas e interruptores de potencia'},
-    {'name': 'Interruptor', 'icon': Icons.toggle_on_outlined, 'desc': 'Módulos de pared 1-4 relés'},
+    {'name': 'Interruptor', 'icon': Icons.toggle_on_outlined, 'desc': 'Interruptores de pared 1-4 botones'},
     {'name': 'Sensor Temperatura', 'icon': Icons.thermostat_outlined, 'desc': 'Clima, humedad y temperatura'},
     {'name': 'Sensor Movimiento', 'icon': Icons.sensors_outlined, 'desc': 'PIR y presencia'},
     {'name': 'Cámara', 'icon': Icons.videocam_outlined, 'desc': 'Cámaras de vigilancia RF/IP'},
@@ -54,6 +58,9 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
 
   @override
   void dispose() {
+    _pairingTimer?.cancel();
+    final app = context.read<AppState>();
+    app.stopRfPairing();
     hostCtrl.dispose();
     nodeIdCtrl.dispose();
     nameCtrl.dispose();
@@ -63,12 +70,12 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   Future<void> _verifyHubConnection() async {
     final host = hostCtrl.text.trim();
     if (host.isEmpty) {
-      _snack('Ingresa la IP y puerto del Gateway Hub RF');
+      _snack('Ingresa la dirección web de tu Central Colmena');
       return;
     }
 
     setState(() {
-      progressMsg = 'Verificando conexión con Gateway Hub RF ($host)...';
+      progressMsg = 'Verificando conexión con tu Central Colmena ($host)...';
     });
 
     final app = context.read<AppState>();
@@ -76,7 +83,7 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     final ok = await app.checkHubOnline();
 
     if (!ok) {
-      _snack('No se pudo conectar al Gateway en http://$host/api/stats. Verifica que el servidor esté activo.');
+      _snack('No se pudo conectar con la Central en http://$host. Verifica que esté encendida.');
       return;
     }
 
@@ -88,17 +95,39 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   Future<void> _startScanOnHub() async {
     setState(() {
       step = _RfStep.scanOrInput;
-      progressMsg = 'Consultando dispositivos activos en el Gateway Hub...';
+      progressMsg = 'Buscando dispositivos y activando modo de vinculación automática...';
     });
 
     final app = context.read<AppState>();
+    await app.startRfPairing();
     final list = await app.syncRfDevicesFromHub();
     setState(() {
       discoveredFromHub = list;
     });
+
+    _pairingTimer?.cancel();
+    _pairingTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+      if (step != _RfStep.scanOrInput) {
+        timer.cancel();
+        return;
+      }
+      final status = await app.checkRfPairingStatus();
+      if (status != null && status['status'] == 'success' && status['last_device'] != null) {
+        if (mounted) {
+          setState(() {
+            pairingApiDevice = Map<String, dynamic>.from(status['last_device'] as Map);
+            progressMsg = '¡Nuevo dispositivo detectado automáticamente!';
+          });
+        }
+      }
+    });
   }
 
   void _proceedToCustomize(Device? devOrNull) {
+    _pairingTimer?.cancel();
+    final app = context.read<AppState>();
+    app.stopRfPairing();
+
     if (devOrNull != null) {
       selectedHubDevice = devOrNull;
       nodeIdCtrl.text = devOrNull.rfNodeId ?? devOrNull.id;
@@ -126,24 +155,37 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
 
     final app = context.read<AppState>();
 
-    final dev = Device.fromRf(
-      rfId: nodeId,
-      name: name,
-      hubHost: app.hubHost,
-      typeName: selectedKind,
-      room: selectedRoom,
-      rssi: selectedHubDevice?.rssi ?? -65,
-      state: selectedHubDevice?.state ?? {},
-      online: true,
-    );
+    try {
+      final dev = Device.fromRf(
+        rfId: nodeId,
+        name: name,
+        hubHost: app.hubHost,
+        typeName: selectedKind,
+        room: selectedRoom,
+        rssi: selectedHubDevice?.rssi ?? -65,
+        state: selectedHubDevice?.state ?? {},
+        online: true,
+      );
 
-    await app.addOrUpdateDevice(dev);
-    await app.refreshDevice(dev);
+      // 1) Registrar en la base de datos SQLite del Hub
+      final savedOnHub = await app.registerDeviceOnHub(dev);
 
-    setState(() {
-      step = _RfStep.success;
-      progressMsg = '¡Dispositivo RF vinculado exitosamente con el Gateway Hub!';
-    });
+      // 2) Guardar localmente en SharedPreferences (siempre)
+      await app.addOrUpdateDevice(dev);
+      await app.refreshDevice(dev);
+
+      setState(() {
+        step = _RfStep.success;
+        progressMsg = savedOnHub
+            ? '¡Dispositivo RF vinculado y guardado en el Hub!'
+            : '¡Vinculado localmente! (El Hub no estaba disponible — se sincronizará cuando conectes)';
+      });
+    } catch (e) {
+      setState(() {
+        step = _RfStep.error;
+        progressMsg = 'Error al guardar el dispositivo: $e';
+      });
+    }
   }
 
   void _snack(String m) =>
@@ -175,10 +217,10 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const AppLabel('Paso 1: Conectar con Gateway Hub Colmena'),
+            const AppLabel('Paso 1: Conectar con tu Central Colmena'),
             Gap.s,
             Text(
-              'Ingresa la dirección (IP:Puerto) del servidor backend IoT RF Gateway. La app se comunicará por REST para enviar comandos RF433/nRF24/LoRa.',
+              'Confirma la dirección de tu Central Colmena para iniciar la vinculación inalámbrica con tus sensores y dispositivos de hogar.',
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             Gap.l,
@@ -188,7 +230,7 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
             ),
             Gap.xl,
             AppButton(
-              label: 'Conectar al Gateway',
+              label: 'Conectar a la Central',
               icon: Icons.hub_outlined,
               onPressed: _verifyHubConnection,
             ),
@@ -265,12 +307,100 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
             const AppLabel('Paso 3: Identificador o Escaneo RF'),
             Gap.s,
             Text(
-              'El Gateway Hub escucha paquetes RF. Selecciona un nodo detectado o ingresa el ID manualmente.',
+              'Tu Central Colmena está en modo de emparejamiento buscando nuevos sensores y módulos.',
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             Gap.l,
+            if (pairingApiDevice != null) ...[
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [cs.primary.withValues(alpha: 0.85), cs.secondary.withValues(alpha: 0.85)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: cs.primary.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.bolt, color: Colors.white, size: 28),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '¡Dispositivo Detectado en Vivo!',
+                            style: tt.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'ID: ${pairingApiDevice!['id']} | Nombre: ${pairingApiDevice!['name']} (${pairingApiDevice!['type_name'] ?? selectedKind})',
+                      style: tt.bodyMedium?.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: cs.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('Configurar y Guardar Este Dispositivo', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          final dev = Device.fromRf(
+                            rfId: pairingApiDevice!['id']?.toString() ?? '',
+                            name: pairingApiDevice!['name']?.toString() ?? 'RF Device',
+                            hubHost: context.read<AppState>().hubHost,
+                            typeName: pairingApiDevice!['type_name']?.toString() ?? selectedKind,
+                            online: true,
+                          );
+                          _proceedToCustomize(dev);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Gap.l,
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.primary.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(strokeWidth: 3, color: cs.primary),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        'Modo de vinculación activo. Buscando nuevos dispositivos en tu hogar (${context.read<AppState>().hubHost})...',
+                        style: tt.bodySmall?.copyWith(color: cs.onPrimaryContainer, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Gap.l,
+            ],
             if (discoveredFromHub.isNotEmpty) ...[
-              Text('Dispositivos reportados por el Gateway Hub:', style: tt.titleSmall),
+              Text('Dispositivos detectados en la red:', style: tt.titleSmall),
               Gap.s,
               for (final d in discoveredFromHub)
                 Card(

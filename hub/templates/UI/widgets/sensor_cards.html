@@ -1,0 +1,131 @@
+{# Widgets para Tarjetas de Telemetría de Sensores en Vivo (Temperatura, Humedad, Movimiento, Potencia, Batería) #}
+
+{% macro temperature_card(val) %}
+<div class="control-card" style="padding: 20px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--md-text-variant); font-weight: 600;">Temperatura</span>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(229, 115, 115, 0.15); display: flex; justify-content: center; align-items: center; color: #E57373;">
+            <div class="icon" style="width: 22px; height: 22px;">
+                {% include 'UI/icons/svg/thermometer.svg' ignore missing %}
+            </div>
+        </div>
+    </div>
+    <div style="font-size: 2.4rem; font-weight: 400; color: var(--md-text); margin-top: 8px; letter-spacing: -1px;">
+        <span id="sensor-temp">{{ val }}</span> <span style="font-size: 1.3rem; color: var(--md-text-variant);">°C</span>
+    </div>
+    <div style="font-size: 0.78rem; color: var(--md-text-variant); margin-top: 4px;">Ambiente en tiempo real</div>
+</div>
+{% endmacro %}
+
+{% macro humidity_card(val) %}
+<div class="control-card" style="padding: 20px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--md-text-variant); font-weight: 600;">Humedad</span>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(100, 181, 246, 0.15); display: flex; justify-content: center; align-items: center; color: #64B5F6;">
+            <div class="icon" style="width: 22px; height: 22px;">
+                {% include 'UI/icons/svg/water-percent.svg' ignore missing %}
+            </div>
+        </div>
+    </div>
+    <div style="font-size: 2.4rem; font-weight: 400; color: var(--md-text); margin-top: 8px; letter-spacing: -1px;">
+        <span id="sensor-humidity">{{ val }}</span> <span style="font-size: 1.3rem; color: var(--md-text-variant);">%</span>
+    </div>
+    <div style="font-size: 0.78rem; color: var(--md-text-variant); margin-top: 4px;">Humedad relativa</div>
+</div>
+{% endmacro %}
+
+{% macro motion_card(val) %}
+<div class="control-card" style="padding: 20px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--md-text-variant); font-weight: 600;">Movimiento PIR</span>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255, 183, 77, 0.15); display: flex; justify-content: center; align-items: center; color: #FFB74D;">
+            <div class="icon" style="width: 22px; height: 22px;">
+                {% include 'UI/icons/svg/motion-sensor.svg' ignore missing %}
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 12px;">
+        {% if val %}
+        <span id="sensor-motion-badge" style="background: rgba(229, 115, 115, 0.18); color: #E57373; padding: 8px 16px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #E57373;"></span> Movimiento Detectado
+        </span>
+        {% else %}
+        <span id="sensor-motion-badge" style="background: rgba(129, 199, 132, 0.18); color: #81C784; padding: 8px 16px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #81C784;"></span> Área Despejada
+        </span>
+        {% endif %}
+    </div>
+    <div style="font-size: 0.78rem; color: var(--md-text-variant); margin-top: 10px;">Detección por infrarrojos</div>
+</div>
+{% endmacro %}
+
+{% macro power_card(power_val, voltage_val=120) %}
+<div class="control-card" style="padding: 20px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--md-text-variant); font-weight: 600;">Consumo Eléctrico</span>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255, 241, 118, 0.15); display: flex; justify-content: center; align-items: center; color: #FFF176;">
+            <div class="icon" style="width: 22px; height: 22px;">
+                {% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}
+            </div>
+        </div>
+    </div>
+    <div style="font-size: 2.2rem; font-weight: 400; color: var(--md-text); margin-top: 8px;">
+        <span id="sensor-power">{{ power_val }}</span> <span style="font-size: 1.2rem; color: var(--md-text-variant);">W</span>
+    </div>
+    <div style="font-size: 0.85rem; color: var(--md-text-variant); margin-top: 4px;">
+        Voltaje: <strong id="sensor-voltage" style="color: var(--md-text);">{{ voltage_val }}</strong> V
+    </div>
+</div>
+{% endmacro %}
+
+{% macro battery_card(val) %}
+<div class="control-card" style="padding: 20px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span style="font-size: 0.9rem; color: var(--md-text-variant); font-weight: 600;">Batería</span>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(162, 177, 89, 0.15); display: flex; justify-content: center; align-items: center; color: var(--md-tertiary);">
+            <div class="icon" style="width: 22px; height: 22px;">
+                {% include 'UI/icons/svg/battery.svg' ignore missing %}
+            </div>
+        </div>
+    </div>
+    <div style="font-size: 2.4rem; font-weight: 400; color: var(--md-text); margin-top: 8px;">
+        <span id="sensor-battery">{{ val }}</span> <span style="font-size: 1.3rem; color: var(--md-text-variant);">%</span>
+    </div>
+    <div style="font-size: 0.78rem; color: var(--md-text-variant); margin-top: 4px;">Autonomía del nodo</div>
+</div>
+{% endmacro %}
+
+{% macro extra_params_card(device, extra_keys) %}
+{% if extra_keys | length > 0 %}
+<div class="control-card" style="padding: 20px;">
+    <h3 style="margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+        <span style="display: flex; align-items: center; gap: 10px;">
+            <div class="icon" style="width: 22px; height: 22px; color: var(--md-primary);">{% include 'UI/icons/svg/database.svg' ignore missing %}</div>
+            Parámetros Adicionales Reportados
+        </span>
+    </h3>
+    
+    <div id="other-vars-list" style="display: flex; flex-direction: column; gap: 8px;">
+        {% for k in extra_keys %}
+        <div style="display: flex; justify-content: space-between; padding: 10px 14px; background: var(--md-surface-container); border-radius: 10px; font-family: monospace; font-size: 0.92rem;">
+            <span style="color: var(--md-text-variant); font-weight: 600;">{{ k }}:</span>
+            <span style="color: var(--md-primary); font-weight: 600;">{{ device.state[k] }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+    {% set state = device.state if device.state else {} %}
+    {% if not ('temperature' in state or 'temp' in state or 'humidity' in state or 'motion' in state or 'power' in state or 'battery' in state) %}
+    <div class="control-card" style="padding: 24px; text-align: center; background: var(--md-surface-container); border: 1px dashed var(--md-outline-variant);">
+        <div class="icon" style="width: 40px; height: 40px; margin: 0 auto 10px auto; color: var(--md-tertiary);">
+            {% include 'UI/icons/svg/check.svg' ignore missing %}
+        </div>
+        <h3 style="margin: 0 0 6px 0; font-size: 1.1rem; font-weight: 600; color: var(--md-text);">Enlace Óptimo Inalámbrico</h3>
+        <p style="margin: 0; font-size: 0.88rem; color: var(--md-text-variant); max-width: 380px; margin-inline: auto;">
+            Este dispositivo está enlazado con el Gateway y procesa comandos directos desde el Hub de manera instantánea.
+        </p>
+    </div>
+    {% endif %}
+{% endif %}
+{% endmacro %}

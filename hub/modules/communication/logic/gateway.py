@@ -47,6 +47,11 @@ class IoTGateway:
         self.listener_thread = None
         self._stop_event = threading.Event()
         self.on_packet_received = None # Callback para eventos entrantes
+        self.last_tx = "Ninguno"
+        self.last_rx = "Ninguno"
+        self.pairing_status = "idle"
+        self.pairing_start_time = 0
+        self.last_paired_device = None
 
     def connect(self):
         if not self.port_string:
@@ -105,6 +110,17 @@ class IoTGateway:
             console.print(f"[red]Error abriendo puerto Serial: {e}[/red]")
             return False
 
+    def calc_checksum(self, packet_bytes_30: bytes) -> int:
+        crc = 0xFFFF
+        for b in packet_bytes_30:
+            crc ^= (b << 8)
+            for _ in range(8):
+                if crc & 0x8000:
+                    crc = ((crc << 1) ^ 0x1021) & 0xFFFF
+                else:
+                    crc = (crc << 1) & 0xFFFF
+        return crc
+
     def send_command(self, dest_id: int, command: int, device_type: int = 0, data: list = None):
         """
         Envia un comando atomico a un dispositivo de la colmena.
@@ -113,6 +129,20 @@ class IoTGateway:
             console.print("[yellow]Advertencia: Intentando enviar datos sin conexion.[/yellow]")
             return False
             
+        if command == 0x0D:
+            self.pairing_status = "active"
+            self.pairing_start_time = time.time()
+            self.last_paired_device = None
+            self.last_tx = "CMD_PAIR_START (Buscando nodos por 50s)..."
+            self.last_rx = "Esperando anuncio del nodo..."
+        elif command == 0x0E:
+            self.pairing_status = "idle"
+            self.last_tx = "CMD_PAIR_STOP (Vinculación detenida)"
+        else:
+            cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER", 6: "CONTROL"}
+            c_name = cmd_names.get(command, f"0x{command:02X}")
+            self.last_tx = f"ID {dest_id} | CMD: {c_name}"
+
         if data is None:
             data = [0, 0, 0, 0]
         
@@ -124,7 +154,9 @@ class IoTGateway:
             # Empaquetar bytes usando Struct para C++
             # Empaquetamos los primeros 26 bytes de data
             data_bytes = bytes(data[:26] + [0]*(26-len(data)))
-            binary_packet = struct.pack(self.STRUCT_FORMAT, 0, dest_id, device_type, command, data_bytes, 0)
+            header_body = struct.pack('<BBBB26s', 0, dest_id, device_type, command, data_bytes)
+            chk = self.calc_checksum(header_body)
+            binary_packet = struct.pack(self.STRUCT_FORMAT, 0, dest_id, device_type, command, data_bytes, chk)
             
             # El reporte HID es de 64 bytes, rellenamos el resto con ceros
             # El primer byte de HID out report id a veces requiere ser 0x00
@@ -174,12 +206,17 @@ class IoTGateway:
                 try:
                     # Leer 64 bytes no bloqueante
                     data = self.hid_device.read(64)
-                    if data:
-                        # Si es un ACK del traductor, el primer byte es 1 o 0
-                        # Pero si es un paquete crudo (>= 20 bytes), lo parseamos
-                        if len(data) >= self.STRUCT_SIZE:
+                    if data and len(data) >= 33:
+                        flag = data[32]
+                        if flag == 0x01: # Paquete RF válido entrante
                             unpacked = struct.unpack(self.STRUCT_FORMAT, bytes(data[:self.STRUCT_SIZE]))
                             origin, dest, dev_type, cmd, data_bytes, checksum = unpacked
+                            cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER", 6: "CONTROL", 13: "PAIR_START", 14: "PAIR_STOP"}
+                            cmd_str = cmd_names.get(cmd, f"0x{cmd:02X}")
+                            self.last_rx = f"ID {origin} ➔ Gateway | CMD: {cmd_str}"
+                            if cmd == 5:
+                                self.pairing_status = "success"
+                                self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
                             packet_dict = {
                                 "origin": origin,
                                 "dest": dest,
@@ -189,6 +226,28 @@ class IoTGateway:
                             }
                             if self.on_packet_received:
                                 self.on_packet_received(packet_dict)
+                        elif flag == 0x03: # Status / Evento JSON o texto desde el Traductor
+                            try:
+                                part1 = bytes(data[:32]).rstrip(b'\x00')
+                                part2 = bytes(data[33:64]).rstrip(b'\x00')
+                                text = (part1 + part2).decode('utf-8', errors='ignore')
+                                if text.startswith("{") and text.endswith("}"):
+                                    event_dict = json.loads(text)
+                                    if event_dict.get("event") == "pairing_timeout":
+                                        self.pairing_status = "timeout"
+                                        self.last_rx = "⏱️ TIMEOUT: El traductor reporta ventana agotada (50s)"
+                                    elif event_dict.get("event") == "pairing_success":
+                                        self.pairing_status = "success"
+                                        self.last_rx = "✔️ ÉXITO: Nuevo nodo emparejado con el traductor"
+                                        node_id = event_dict.get("nodeId") or event_dict.get("origin")
+                                        if node_id:
+                                            self.last_paired_device = {
+                                                "id": f"dev_{node_id}",
+                                                "origin": node_id,
+                                                "name": event_dict.get("name", f"Nodo {node_id}")
+                                            }
+                            except Exception:
+                                pass
                 except Exception:
                     pass
                     
@@ -199,12 +258,40 @@ class IoTGateway:
                         if line.startswith("{") and line.endswith("}"):
                             try:
                                 packet_dict = json.loads(line)
-                                if self.on_packet_received:
+                                if packet_dict.get("event") == "pairing_timeout":
+                                    self.pairing_status = "timeout"
+                                    self.last_rx = "⏱️ TIMEOUT: El traductor reporta ventana agotada (50s)"
+                                elif packet_dict.get("event") == "pairing_success":
+                                    self.pairing_status = "success"
+                                    self.last_rx = "✔️ ÉXITO: Nuevo nodo emparejado con el traductor"
+                                    node_id = packet_dict.get("nodeId") or packet_dict.get("origin")
+                                    if node_id:
+                                        self.last_paired_device = {
+                                            "id": f"dev_{node_id}",
+                                            "origin": node_id,
+                                            "name": packet_dict.get("name", f"Nodo {node_id}")
+                                        }
+                                elif "cmd" in packet_dict and "origin" in packet_dict:
+                                    cmd = packet_dict["cmd"]
+                                    origin = packet_dict["origin"]
+                                    cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER", 6: "CONTROL"}
+                                    cmd_str = cmd_names.get(cmd, f"0x{cmd:02X}")
+                                    self.last_rx = f"ID {origin} ➔ Gateway | CMD: {cmd_str}"
+                                    if cmd == 5:
+                                        self.pairing_status = "success"
+                                        self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
+                                    if self.on_packet_received: self.on_packet_received(packet_dict)
+                                elif self.on_packet_received:
                                     self.on_packet_received(packet_dict)
                             except json.JSONDecodeError:
                                 pass
                 except Exception:
                     pass
+                    
+            if self.pairing_status == "active" and self.pairing_start_time > 0:
+                if time.time() - self.pairing_start_time > 52:
+                    self.pairing_status = "timeout"
+                    self.last_rx = "⏱️ TIMEOUT: Ventana de vinculación vencida (50s)"
                     
             time.sleep(0.01) # Prevenir uso de 100% CPU
 

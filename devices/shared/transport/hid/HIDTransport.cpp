@@ -27,6 +27,15 @@ bool HIDTransport::begin() {
     // Iniciar stack HID — esto gatilla la enumeración USB con los descriptores ya configurados
     _hid.begin();
 
+    // En el core earlephilhower para RP2040, el stack USB se inicia antes de setup().
+    // Si ya enumeró como CDC, la nueva interfaz HID y el cambio de VID/PID no tomarán efecto
+    // hasta forzar una re-enumeración (detach/attach) en el bus USB.
+    if (TinyUSBDevice.mounted()) {
+        TinyUSBDevice.detach();
+        delay(20);
+        TinyUSBDevice.attach();
+    }
+
     // Bombear el stack USB mientras esperamos que el host monte el dispositivo (max 5s)
     unsigned long t = millis();
     while (!TinyUSBDevice.mounted() && (millis() - t < 5000)) {
@@ -41,6 +50,9 @@ bool HIDTransport::begin() {
 
 // ── available() ──────────────────────────────────────────────────────────────
 bool HIDTransport::available() {
+#ifdef ARDUINO_ARCH_RP2040
+    tud_task();
+#endif
     return _hasPacket;
 }
 
@@ -52,6 +64,12 @@ bool HIDTransport::readPacket(RFPacket& pkt) {
     if (sizeof(RFPacket) > 64) return false; // Sanity check
 
     memcpy(&pkt, _rxBuf, sizeof(RFPacket));
+
+    // Si el host USB/HID envió checksum en 0 (ej. desde el frontend o python sin CRC), sellar automáticamente
+    if (pkt.checksum == 0) {
+        Protocol_seal(&pkt);
+        return true;
+    }
 
     // Verificar checksum del paquete recibido
     return Protocol_verify(&pkt);
@@ -81,10 +99,22 @@ bool HIDTransport::sendAck(bool ok, uint8_t destId) {
 }
 
 // ── sendStatus() ──────────────────────────────────────────────────────────────
-// En HID no hay canal de log separado; los status se ignoran silenciosamente.
-// Para debug usar el Serial monitor si está disponible.
+// Enviar mensajes de estado o eventos JSON (ej. pairing_timeout) al HUB usando flag 0x03
 void HIDTransport::sendStatus(const char* msg) {
-    (void)msg; // HID no tiene canal de texto
+    if (!_hid.ready() || !msg) return;
+    uint8_t report[64] = {0};
+    report[32] = 0x03; // Flag 0x03: STATUS / EVENTO
+    
+    size_t len = strlen(msg);
+    if (len > 0) {
+        size_t part1 = len < 32 ? len : 32;
+        memcpy(report, msg, part1);
+        if (len > 32) {
+            size_t part2 = (len - 32) < 31 ? (len - 32) : 31;
+            memcpy(&report[33], msg + 32, part2);
+        }
+    }
+    _hid.sendReport(0, report, sizeof(report));
 }
 
 // ── Callback estático (llamado por TinyUSB en IRQ) ────────────────────────────

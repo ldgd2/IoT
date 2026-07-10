@@ -1,4 +1,5 @@
 #include "colmena/ColmenaMaster.h"
+#include <Arduino.h>
 #include <string.h>
 
 ColmenaMaster::ColmenaMaster(IConnection& conn, IParamStore& store)
@@ -12,6 +13,7 @@ ColmenaMaster::ColmenaMaster(IConnection& conn, IParamStore& store)
 }
 
 void ColmenaMaster::onPacketReceived(const RFPacket& pkt) {
+    Serial.printf("📥 [RX RF] Paquete recibido de Nodo %u | CMD: 0x%02X | Tipo: 0x%02X\r\n", pkt.originId, pkt.command, pkt.deviceType);
     NodeInfo* node = _findOrCreate(pkt.originId);
     if (!node) return;
 
@@ -21,6 +23,7 @@ void ColmenaMaster::onPacketReceived(const RFPacket& pkt) {
 
     switch (pkt.command) {
         case CMD_DISCOVER:
+            Serial.printf("🔍 [RX RF] ¡Anuncio CMD_DISCOVER recibido del Nodo %u! Procesando vinculación...\r\n", pkt.originId);
             node->features = GatewayPayload::getDiscoverFeatures(pkt);
             GatewayPayload::getDiscoverName(pkt, node->name, sizeof(node->name));
             // Responder con CONFIG_SYNC para que el nodo conozca la config de red
@@ -47,6 +50,7 @@ void ColmenaMaster::_buildSyncPacket(RFPacket& pkt, uint8_t destId) {
 void ColmenaMaster::broadcastSync() {
     RFPacket pkt;
     _buildSyncPacket(pkt, ADDR_BROADCAST);
+    Serial.println("📤 [TX RF] Enviando CONFIG_SYNC Broadcast...");
     _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
 }
 
@@ -57,6 +61,7 @@ void ColmenaMaster::broadcastPing() {
     RFPacket pkt;
     Protocol_initPacket(&pkt, ADDR_MASTER, ADDR_BROADCAST, DEV_TYPE_GATEWAY, CMD_REPORT);
     Protocol_seal(&pkt);
+    Serial.println("📤 [TX RF] Enviando CMD_REPORT (Ping) Broadcast...");
     _conn.send(&pkt, sizeof(pkt), ADDR_BROADCAST);
 }
 
@@ -64,7 +69,13 @@ void ColmenaMaster::broadcastPing() {
 void ColmenaMaster::sendSync(uint8_t destId) {
     RFPacket pkt;
     _buildSyncPacket(pkt, destId);
-    _conn.send(&pkt, sizeof(pkt), destId);
+    Serial.printf("📤 [TX RF] Enviando CONFIG_SYNC al Nodo %u...\r\n", destId);
+    bool ok = _conn.send(&pkt, sizeof(pkt), destId);
+    if (ok) {
+        Serial.printf("✔️ [TX RF] CONFIG_SYNC entregado exitosamente al Nodo %u.\r\n", destId);
+    } else {
+        Serial.printf("❌ [TX RF] Falló entrega de CONFIG_SYNC al Nodo %u.\r\n", destId);
+    }
 }
 
 void ColmenaMaster::checkHeartbeatTimeouts(uint32_t timeoutMs) {

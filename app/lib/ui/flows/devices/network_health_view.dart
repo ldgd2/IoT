@@ -64,7 +64,7 @@ class _NetworkHealthViewState extends State<NetworkHealthView> {
         children: [
           // Tarjeta de estado del Gateway RF
           _HealthMetricCard(
-            title: 'Servidor Gateway Hub RF',
+            title: 'Central Colmena (Servidor Hogar)',
             subtitle: app.hubHost,
             statusText: testingHub ? 'Probando...' : (hubOnline ? 'ONLINE • Excelente' : 'DESCONECTADO'),
             statusColor: testingHub ? Colors.amberAccent : (hubOnline ? const Color(0xFF00E5A8) : Colors.redAccent),

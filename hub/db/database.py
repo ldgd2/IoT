@@ -118,5 +118,11 @@ class BaseModel:
                     pass
         return cls(**data)
     
+    def delete(self):
+        pk = next((k for k, v in self._get_fields().items() if v.primary_key), None)
+        if not pk: return
+        pk_value = getattr(self, pk)
+        Database.execute(f"DELETE FROM {self.__table__} WHERE {pk} = ?", (pk_value,))
+
     def to_dict(self):
         return {k: getattr(self, k) for k in self._get_fields()}

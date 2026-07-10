@@ -58,6 +58,7 @@ class ChooseHomeStepSimple extends StatelessWidget {
     required this.ssids,
     required this.selected,
     required this.passCtrl,
+    required this.aliasCtrl,
     required this.mdns,
     required this.onPick,
     required this.onMdns,
@@ -68,6 +69,7 @@ class ChooseHomeStepSimple extends StatelessWidget {
   final List<String> ssids;
   final String? selected;
   final TextEditingController passCtrl;
+  final TextEditingController aliasCtrl;
   final String mdns;
   final ValueChanged<String> onPick;
   final ValueChanged<String> onMdns;
@@ -81,6 +83,8 @@ class ChooseHomeStepSimple extends StatelessWidget {
       children: [
         const AppLabel('Selecciona tu Wi-Fi'),
         Gap.m,
+        AppTextField(controller: aliasCtrl, label: 'Nombre del dispositivo'),
+        Gap.s,
         DropdownButtonFormField<String>(
           value: selected,
           items: [for (final s in ssids) DropdownMenuItem(value: s, child: Text(s))],
@@ -93,7 +97,7 @@ class ChooseHomeStepSimple extends StatelessWidget {
         TextFormField(
           initialValue: mdns,
           onChanged: onMdns,
-          decoration: const InputDecoration(labelText: 'Nombre mDNS', hintText: 'sin ".local"'),
+          decoration: const InputDecoration(labelText: 'Nombre mDNS (técnico)', hintText: 'sin ".local"'),
         ),
         Gap.m,
         Row(

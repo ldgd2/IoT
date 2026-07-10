@@ -1,20 +1,52 @@
-{% macro m3_checkbox(name, checked=False) %}
-<label class="m3-control">
-    <input type="checkbox" name="{{ name }}" {% if checked %}checked{% endif %}>
+{# Macros Jinja para Controles de Formulario, Switches y Sliders (Material 3) #}
+
+{% macro m3_switch(id='', checked=False, onchange='', scale='1.15', style_attr='') %}
+<label class="m3-switch-label" style="transform: scale({{ scale }}); display: inline-flex; align-items: center; cursor: pointer; {{ style_attr }}">
+    <input type="checkbox" 
+           {% if id %}id="{{ id }}"{% endif %} 
+           {% if checked %}checked{% endif %} 
+           {% if onchange %}onchange="{{ onchange }}"{% endif %}>
+    <span class="m3-switch"></span>
+</label>
+{% endmacro %}
+
+{% macro m3_range_slider(id='', min='0', max='255', value='0', oninput='', onchange='', extra_classes='m3-range-slider', style_attr='') %}
+<div style="padding: 10px 0; width: 100%; {{ style_attr }}">
+    <input type="range" 
+           min="{{ min }}" max="{{ max }}" value="{{ value }}" 
+           {% if id %}id="{{ id }}"{% endif %} 
+           class="{{ extra_classes }}"
+           {% if oninput %}oninput="{{ oninput }}"{% endif %}
+           {% if onchange %}onchange="{{ onchange }}"{% endif %}
+           style="width: 100%; cursor: pointer;">
+</div>
+{% endmacro %}
+
+{% macro m3_text_input(id='', placeholder='', value='', onkeyup='', onchange='', type='text', label='', style_attr='') %}
+<div style="width: 100%; {{ style_attr }}">
+    {% if label %}
+    <label {% if id %}for="{{ id }}"{% endif %} style="font-size: 0.78rem; color: var(--md-text-variant); display: block; margin-bottom: 4px; font-weight: 600;">
+        {{ label }}
+    </label>
+    {% endif %}
+    <input type="{{ type }}" 
+           {% if id %}id="{{ id }}"{% endif %} 
+           value="{{ value }}" 
+           placeholder="{{ placeholder }}" 
+           {% if onkeyup %}onkeyup="{{ onkeyup }}"{% endif %}
+           {% if onchange %}onchange="{{ onchange }}"{% endif %}
+           style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; transition: border-color 0.2s;">
+</div>
+{% endmacro %}
+
+{% macro m3_checkbox(name='', id='', checked=False, onchange='', label='') %}
+<label class="m3-control" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+    <input type="checkbox" 
+           {% if name %}name="{{ name }}"{% endif %} 
+           {% if id %}id="{{ id }}"{% endif %} 
+           {% if checked %}checked{% endif %}
+           {% if onchange %}onchange="{{ onchange }}"{% endif %}>
     <div class="m3-box"></div>
-</label>
-{% endmacro %}
-
-{% macro m3_radio(name, value, checked=False) %}
-<label class="m3-control">
-    <input type="radio" name="{{ name }}" value="{{ value }}" {% if checked %}checked{% endif %}>
-    <div class="m3-radio"></div>
-</label>
-{% endmacro %}
-
-{% macro m3_switch(name, checked=False) %}
-<label class="m3-switch-label">
-    <input type="checkbox" name="{{ name }}" {% if checked %}checked{% endif %}>
-    <div class="m3-switch"></div>
+    {% if label %}<span>{{ label }}</span>{% endif %}
 </label>
 {% endmacro %}

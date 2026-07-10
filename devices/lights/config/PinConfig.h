@@ -110,7 +110,7 @@
 #define PAIR_BUTTON_ACTIVE_LOW false
 
 #if defined(IS_RP2040)
-    #define PAIR_BUTTON_PIN  3        // GPIO3 — conectar OUT/SIG del botón táctil aquí
+    #define PAIR_BUTTON_PIN  3        // GPIO2 — conectar OUT/SIG del botón táctil aquí
 
 #elif defined(IS_ESP8266)
     #define PAIR_BUTTON_PIN  0        // D3 = GPIO0 (botón FLASH o táctil)

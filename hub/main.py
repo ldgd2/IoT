@@ -62,7 +62,16 @@ else:
     print("⚠️ Gateway RF No conectado. Revisa tu puerto USB/COM.")
 
 # Aseguramos de que las tablas existan al inicio invocando al padre
+from hub.modules.communication.models.notification import DeviceToken, NotificationLog
 BaseModel.migrate_all()
+# Migrar columnas nuevas sin borrar datos existentes
+Device.migrate()
+
+@app.route("/device-token/", methods=["POST", "PUT"])
+@app.route("/device-token", methods=["POST", "PUT"])
+def root_device_token():
+    from hub.modules.communication.routes.api import api_device_token
+    return api_device_token()
 
 
 

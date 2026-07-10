@@ -18,7 +18,7 @@
 // Evasión WiFi: Usar banda 2.500 GHz (Canal 100)
 #define RF_CHANNEL 100 
 
-// Robustez y distancia: Ancho de banda de 250kbps
-#define RF_DATARATE RF24_250KBPS
+// Robustez y distancia: Ancho de banda de 1Mbps (compatible con 100% de chips NRF24L01/Si24R1 y 4x más veloz)
+#define RF_DATARATE RF24_1MBPS
 
 #endif

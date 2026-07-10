@@ -1,20 +1,24 @@
 {% extends "UI/layout/base.html" %}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+{% import 'UI/components/inputs.html' as inp %}
 
-{% block title %}Skill Builder Visual - Gerlex IoT{% endblock %}
+{% block title %}Constructor Visual de Automatizaciones - Gerlex IoT{% endblock %}
 
 {% block content %}
 <style>
     .builder-container {
         display: flex;
-        height: calc(100vh - 80px);
+        height: calc(100vh - 84px);
         gap: 24px;
-        padding: 24px;
-        max-width: 1400px;
+        padding: 24px 32px;
+        max-width: 1500px;
         margin: 0 auto;
     }
     .toolbox {
         width: 360px;
         background: var(--md-surface-container);
+        border: 1px solid var(--md-outline-variant);
         border-radius: var(--radius-large);
         padding: 24px;
         display: flex;
@@ -28,45 +32,49 @@
         flex-direction: column;
         gap: 24px;
         overflow-y: auto;
+        padding-right: 8px;
     }
     .drop-zone {
-        background: var(--md-surface);
+        background: var(--md-surface-container-low);
         border: 2px dashed var(--md-outline-variant);
         border-radius: var(--radius-large);
-        padding: 24px;
-        min-height: 200px;
+        padding: 20px;
+        min-height: 180px;
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        transition: background 0.3s;
+        gap: 14px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .drop-zone.drag-over {
         background: var(--md-surface-variant);
         border-color: var(--md-primary);
+        box-shadow: 0 0 0 4px rgba(107, 76, 18, 0.15);
     }
     .block {
-        background: var(--md-elevated);
+        background: var(--md-surface);
         border: 1px solid var(--md-outline-variant);
         border-radius: var(--radius-medium);
-        padding: 16px;
+        padding: 14px 16px;
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 14px;
         cursor: grab;
         user-select: none;
-        transition: transform 0.1s, box-shadow 0.2s;
+        transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
     }
     .block:hover {
         background: var(--md-surface-variant);
+        border-color: var(--md-outline);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
     }
     .block:active {
         cursor: grabbing;
         transform: scale(0.98);
     }
     .block .icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
         background: var(--md-surface-variant);
         color: var(--md-on-surface-variant);
         display: flex;
@@ -76,105 +84,179 @@
     }
     .block-content {
         flex: 1;
+        min-width: 0;
     }
     .block-title {
-        font-weight: 500;
-        margin-bottom: 4px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+        color: var(--md-text);
     }
     .block-desc {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         color: var(--md-text-variant);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .dropped-block {
-        background: var(--md-tertiary);
-        color: var(--md-on-tertiary);
-        border: none;
-        cursor: pointer;
+        background: var(--md-surface);
+        border: 1.5px solid var(--md-primary);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        cursor: default;
     }
     .dropped-block[data-zone="action"] {
-        background: var(--md-primary);
-        color: var(--md-on-primary);
+        border-color: #388E3C;
     }
-    .dropped-block .icon {
-        background: rgba(255,255,255,0.2);
-        color: white;
+    .dropped-block[data-zone="condition"] {
+        border-color: var(--md-tertiary);
     }
-    .dropped-block .block-desc {
-        color: rgba(255,255,255,0.8);
+    .dropped-block .block-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
     }
-
-    /* Modal MD3 */
     .md3-dialog-backdrop {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(4px);
         display: none;
         align-items: center;
         justify-content: center;
-        z-index: 1000;
+        z-index: 2000;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .md3-dialog-backdrop.active {
+        display: flex;
+        opacity: 1;
     }
     .md3-dialog {
-        background: var(--md-surface-container);
+        background: var(--md-surface-container-high);
+        border: 1px solid var(--md-outline-variant);
         border-radius: 28px;
-        padding: 24px;
+        padding: 28px;
         width: 100%;
-        max-width: 400px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+        max-width: 460px;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.3);
+    }
+    .cfg-input {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--md-outline);
+        background: var(--md-surface);
+        color: var(--md-text);
+        font-family: inherit;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .cfg-input:focus {
+        border-color: var(--md-primary);
     }
 </style>
 
 <div class="builder-container">
     <!-- CAJA DE HERRAMIENTAS (TOOLBOX) -->
     <div class="toolbox">
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Librería de Módulos</h2>
-        <p style="font-size: 0.85rem; color: var(--md-text-variant); margin-bottom: 16px;">Arrastra los bloques al lienzo a la derecha para armar tu lógica.</p>
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 6px 0;">Libreria de Modulos</h2>
+            <p style="font-size: 0.85rem; color: var(--md-text-variant); margin: 0;">Arrastra bloques al lienzo para armar o conectar condiciones y acciones.</p>
+        </div>
         
         {% include 'views/dashboard/skills/components/conditions.html' %}
         {% include 'views/dashboard/skills/components/actions.html' %}
     </div>
 
     <!-- LIENZO (CANVAS) -->
-    <div class="canvas">
+    <div class="canvas" id="canvas">
         
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h1 style="margin-bottom: 4px;">Constructor de Lógica</h1>
-                <input type="text" id="skill_name" placeholder="Escribe el nombre de esta Skill..." style="font-size: 1.1rem; border: none; background: transparent; color: var(--md-text); outline: none; width: 400px; padding: 4px 0; border-bottom: 1px solid var(--md-outline);">
+        <!-- BARRA SUPERIOR DE CONSTRUCTOR -->
+        <div style="background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
+                <a href="/skills" style="text-decoration: none; display: flex; align-items: center;">
+                    <button class="icon-btn standard ripple-btn" title="Volver a Mis Skills" style="width: 40px; height: 40px; border-radius: 50%;">
+                        <div class="icon" style="width: 22px; height: 22px;">{% include 'UI/icons/svg/arrow-left.svg' ignore missing %}</div>
+                    </button>
+                </a>
+                <div style="flex: 1; max-width: 500px;">
+                    <label style="font-size: 0.75rem; color: var(--md-primary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Nombre de la Automatizacion (Skill)</label>
+                    <input type="text" id="skill_name" value="{{ edit_skill.name if edit_skill else '' }}" placeholder="Ej: Encender Luz de Sala por la Noche..." style="font-size: 1.15rem; font-weight: 600; border: none; background: transparent; color: var(--md-text); outline: none; width: 100%; border-bottom: 2px solid var(--md-outline-variant); padding: 4px 0;">
+                </div>
             </div>
-            <button class="btn-m3 btn-filled ripple-btn" onclick="saveAST()">Guardar y Compilar AST</button>
+
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <label class="m3-switch-label" title="Activar esta skill inmediatamente al guardar">
+                    <span style="font-size: 0.88rem; font-weight: 500; color: var(--md-text);">Activa:</span>
+                    <input type="checkbox" id="skill_active" {% if not edit_skill or edit_skill.is_active == 1 %}checked{% endif %}>
+                    <span class="m3-switch"></span>
+                </label>
+
+                <button class="btn-m3 btn-filled ripple-btn" onclick="saveSkillAST()" style="height: 44px; padding: 0 24px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <div class="icon" style="width: 18px; height: 18px;">{% include 'UI/icons/svg/check.svg' ignore missing %}</div>
+                    <span>Guardar y Compilar Skill</span>
+                </button>
+            </div>
         </div>
 
+        <!-- ZONA 1: CONDICIONES (CUANDO) -->
         <div>
-            <h3 style="margin-bottom: 12px; color: var(--md-tertiary);">CUANDO SUCEDA ESTO (Condiciones)</h3>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <span class="icon" style="width: 22px; height: 22px; color: var(--md-tertiary);">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</span>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--md-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">1. CUANDO SUCEDA ESTO (Condiciones Trigger)</h3>
+            </div>
             <div class="drop-zone" id="zone-conditions" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, 'condition')">
-                <p style="color: var(--md-text-variant); text-align: center; margin-top: 60px; pointer-events: none;">Arrastra módulos de Condiciones aquí</p>
+                <div class="placeholder-msg" style="text-align: center; padding: 44px 0; color: var(--md-text-variant); pointer-events: none;">
+                    <div class="icon" style="width: 36px; height: 36px; margin: 0 auto 10px auto; opacity: 0.6;">{% include 'UI/icons/svg/puzzle.svg' ignore missing %}</div>
+                    <span style="font-weight: 500;">Arrastra y suelta aqui modulos verdes de Condicion (Tiempo, Sensores, Boton)</span>
+                </div>
             </div>
         </div>
 
+        <!-- ZONA 2: ACCIONES (HAZ ESTO) -->
         <div>
-            <h3 style="margin-bottom: 12px; color: var(--md-primary);">HAZ ESTO (Acciones)</h3>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <span class="icon" style="width: 22px; height: 22px; color: #388E3C;">{% include 'UI/icons/svg/tune.svg' ignore missing %}</span>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: #388E3C; text-transform: uppercase; letter-spacing: 0.5px;">2. ENTONCES HAZ ESTO (Acciones RF / Sistema)</h3>
+            </div>
             <div class="drop-zone" id="zone-actions" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, 'action')">
-                <p style="color: var(--md-text-variant); text-align: center; margin-top: 60px; pointer-events: none;">Arrastra módulos de Acciones aquí</p>
+                <div class="placeholder-msg" style="text-align: center; padding: 44px 0; color: var(--md-text-variant); pointer-events: none;">
+                    <div class="icon" style="width: 36px; height: 36px; margin: 0 auto 10px auto; opacity: 0.6;">{% include 'UI/icons/svg/power.svg' ignore missing %}</div>
+                    <span style="font-weight: 500;">Arrastra y suelta aqui modulos azules de Accion (Luces, Dimmers, Enchufes, Alertas)</span>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- MODAL MD3 DE CONFIGURACION -->
-<div class="md3-dialog-backdrop" id="config-dialog">
+<!-- MODAL MD3 DE CONFIGURACIÓN DEL MÓDULO -->
+<div class="md3-dialog-backdrop" id="config-dialog" onclick="handleBackdropClick(event)">
     <div class="md3-dialog">
-        <h2 id="dialog-title" style="margin-bottom: 16px; font-weight: 500;">Configurar</h2>
-        <div id="dialog-content" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px;">
-            <!-- Contenido dinámico (Inputs de tiempo, selects, etc) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 id="dialog-title" style="margin: 0; font-weight: 600; font-size: 1.3rem; color: var(--md-primary);">Configurar Modulo</h2>
+            <button type="button" class="icon-btn standard ripple-btn" onclick="closeDialog()" style="width: 34px; height: 34px;">
+                <div class="icon" style="width: 18px; height: 18px;">{% include 'UI/icons/svg/close.svg' ignore missing %}</div>
+            </button>
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-            <button class="btn-m3 btn-text ripple-btn" onclick="closeDialog()">Cancelar</button>
-            <button class="btn-m3 btn-filled ripple-btn" onclick="saveDialog()">Confirmar</button>
+        
+        <div id="dialog-content" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 26px;">
+            <!-- Contenido dinámico generado según el tipo de bloque -->
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid var(--md-outline-variant);">
+            <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="closeDialog()" style="height: 40px;">Cancelar</button>
+            <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="saveDialog()" style="height: 40px; padding: 0 24px; font-weight: 600;">Confirmar y Aplicar</button>
         </div>
     </div>
 </div>
 
 <script>
+    const EDIT_SKILL_ID = {{ edit_skill.id if edit_skill else 'null' }};
+    const AST_JSON_DATA = {{ ast_json_str|safe if ast_json_str else '{}' }};
+    
     let draggedType = null;
     let draggedZone = null;
     let draggedHTML = null;
@@ -199,31 +281,100 @@
         ev.preventDefault();
         ev.currentTarget.classList.remove('drag-over');
 
-        // Validacion: No mezclar acciones con condiciones
         if (targetZone !== draggedZone) {
-            alert("Este bloque no pertenece a esta zona. Los módulos de Condiciones van en 'CUANDO', y las Acciones en 'HAZ ESTO'.");
+            alert("[Advertencia] Este bloque no pertenece a esta zona. Los modulos de Condiciones van en 'CUANDO', y las Acciones en 'ENTONCES HAZ ESTO'.");
             return;
         }
 
-        // Quitar el texto de placeholder si existe
-        const placeholder = ev.currentTarget.querySelector('p');
-        if (placeholder) placeholder.style.display = 'none';
-
-        // Crear el nuevo nodo
-        const newNode = document.createElement('div');
-        newNode.className = 'block dropped-block';
-        newNode.innerHTML = draggedHTML;
-        newNode.setAttribute('data-type', draggedType);
-        newNode.setAttribute('data-zone', draggedZone);
-        newNode.setAttribute('data-config', '{}');
-        
-        newNode.ondblclick = function() { openDialog(newNode); };
-        newNode.querySelector('.block-desc').innerText = "Haz doble clic para configurar";
-
+        const newNode = createBlockElement(draggedType, draggedZone, draggedHTML, {});
         ev.currentTarget.appendChild(newNode);
+        
+        const placeholder = ev.currentTarget.querySelector('.placeholder-msg');
+        if (placeholder) placeholder.style.display = 'none';
+        
+        openDialog(newNode);
     }
 
-    /* SISTEMA DE DIALOGOS MD3 DINAMICOS */
+    function createBlockElement(type, zone, htmlContent, config) {
+        const newNode = document.createElement('div');
+        newNode.className = 'block dropped-block';
+        if (htmlContent) {
+            newNode.innerHTML = htmlContent;
+        } else {
+            // Re-generar HTML basico desde el toolbox si se está cargando para edición
+            const toolboxBlock = document.querySelector(`.toolbox .block[data-type="${type}"]`);
+            if (toolboxBlock) {
+                newNode.innerHTML = toolboxBlock.innerHTML;
+            } else {
+                newNode.innerHTML = `<div class="icon"></div><div class="block-content"><div class="block-title">${type}</div><div class="block-desc">Modulo configurado</div></div>`;
+            }
+        }
+        newNode.setAttribute('data-type', type);
+        newNode.setAttribute('data-zone', zone);
+        newNode.setAttribute('data-config', JSON.stringify(config || {}));
+        
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'block-actions';
+        actionsDiv.innerHTML = `
+            <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="openDialog(this.closest('.dropped-block')); event.stopPropagation();" title="Editar configuracion" style="height: 32px; padding: 0 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+                <span>Configurar</span>
+            </button>
+            <button type="button" class="icon-btn standard ripple-btn" onclick="removeBlock(this.closest('.dropped-block')); event.stopPropagation();" title="Eliminar este modulo" style="width: 32px; height: 32px; color: #d32f2f;">
+                <div class="icon" style="width: 16px; height: 16px;">{% include 'UI/icons/svg/trash.svg' ignore missing %}</div>
+            </button>
+        `;
+        newNode.appendChild(actionsDiv);
+        newNode.ondblclick = function() { openDialog(newNode); };
+        
+        // Actualizar texto descriptivo en base al config actual
+        updateBlockDescription(newNode, type, config || {});
+        return newNode;
+    }
+
+    function updateBlockDescription(node, type, config) {
+        const descEl = node.querySelector('.block-desc');
+        if (!descEl) return;
+        
+        let displayDesc = "[Configurar] Requiere configuracion";
+        if (Object.keys(config).length > 0) {
+            if (type === 'time') displayDesc = "[Reloj] Disparo a las " + (config.time || '12:00') + " hrs";
+            else if (type === 'date') displayDesc = "[Fecha] El dia " + (config.date || '');
+            else if (type === 'weather') displayDesc = "[Clima] Si clima es " + (config.weather || 'soleado');
+            else if (type === 'location') displayDesc = "[GPS] Al " + (config.location || 'llegar');
+            else if (['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'].includes(type)) {
+                displayDesc = "[Sensor] Si " + (config.device || 'dev_1') + " " + (config.operator || '==') + " " + (config.val !== undefined ? config.val : 'ON');
+            }
+            else if (type === 'dev_button') displayDesc = "[Boton] Si " + (config.device || 'dev_1') + " == " + (config.action || 'single_click');
+            else if (['action_device', 'action_light', 'action_plug'].includes(type)) {
+                displayDesc = "[Comando] Enviar " + (config.cmd || 'TOGGLE') + " a " + (config.device || 'dev_1');
+            }
+            else if (type === 'action_dimmer') displayDesc = "[Dimmer] Luz " + (config.device || 'dev_1') + " al " + (config.brightness || '50') + "%";
+            else if (type === 'action_color') displayDesc = "[RGB] Color en " + (config.device || 'dev_1') + " al " + (config.brightness || '100') + "%";
+            else if (type === 'action_buzzer') displayDesc = "[Alarma] Sonar sirena por " + (config.seconds || '3') + "s";
+            else if (type === 'action_scene') displayDesc = "[Escena] Activar: " + (config.scene || 'SCENE_NIGHT');
+            else if (type === 'action_notify') displayDesc = "[Alerta] Notificar: \"" + (config.message || '') + "\"";
+            else if (type === 'action_delay') displayDesc = "[Pausa] Esperar " + (config.delay || '5') + " " + (config.unit || 'seg');
+            descEl.style.color = 'var(--md-text)';
+            descEl.style.fontWeight = '500';
+        }
+        descEl.innerText = displayDesc;
+    }
+
+    function removeBlock(blockEl) {
+        const zone = blockEl.closest('.drop-zone');
+        blockEl.remove();
+        if (zone && zone.querySelectorAll('.dropped-block').length === 0) {
+            const placeholder = zone.querySelector('.placeholder-msg');
+            if (placeholder) placeholder.style.display = 'block';
+        }
+    }
+
+    function handleBackdropClick(event) {
+        if (event.target === document.getElementById('config-dialog')) {
+            closeDialog();
+        }
+    }
+
     function openDialog(node) {
         activeEditingNode = node;
         const type = node.getAttribute('data-type');
@@ -232,258 +383,369 @@
 
         const titleEl = document.getElementById('dialog-title');
         const contentEl = document.getElementById('dialog-content');
-        contentEl.innerHTML = ''; // Limpiar
+        contentEl.innerHTML = '';
 
         if (type === 'time') {
-            titleEl.innerText = "Configurar Hora";
+            titleEl.innerText = "Configurar Hora de Disparo (Reloj)";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Selecciona la hora exacta</label>
-                <input type="time" id="cfg-time" value="${config.time || '12:00'}" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.2rem; background: var(--md-surface); color: var(--md-text);">
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Hora exacta (Formato 24h):</label>
+                    <input type="time" id="cfg-time" class="cfg-input" value="${config.time || '12:00'}">
+                </div>
             `;
         } 
         else if (type === 'date') {
-            titleEl.innerText = "Configurar Fecha";
+            titleEl.innerText = "Configurar Fecha Específica";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Selecciona el día</label>
-                <input type="date" id="cfg-date" value="${config.date || ''}" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.2rem; background: var(--md-surface); color: var(--md-text);">
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Día específico:</label>
+                    <input type="date" id="cfg-date" class="cfg-input" value="${config.date || ''}">
+                </div>
             `;
         }
         else if (type === 'weather') {
             titleEl.innerText = "Condición Climática";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Condición atmosférica actual:</label>
-                <select id="cfg-weather" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.1rem; background: var(--md-surface); color: var(--md-text);">
-                    <option value="soleado" ${config.weather === 'soleado' ? 'selected' : ''}>Soleado / Despejado</option>
-                    <option value="nublado" ${config.weather === 'nublado' ? 'selected' : ''}>Nublado</option>
-                    <option value="lluvioso" ${config.weather === 'lluvioso' ? 'selected' : ''}>Lluvioso</option>
-                    <option value="frio" ${config.weather === 'frio' ? 'selected' : ''}>Temperatura bajo 0°C</option>
-                </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Condición exterior:</label>
+                    <select id="cfg-weather" class="cfg-input">
+                        <option value="soleado" ${config.weather === 'soleado' ? 'selected' : ''}>Soleado / Despejado</option>
+                        <option value="nublado" ${config.weather === 'nublado' ? 'selected' : ''}>Nublado</option>
+                        <option value="lluvioso" ${config.weather === 'lluvioso' ? 'selected' : ''}>Lluvioso</option>
+                        <option value="frio" ${config.weather === 'frio' ? 'selected' : ''}>Temperatura bajo 0 C</option>
+                    </select>
+                </div>
             `;
         }
         else if (type === 'location') {
-            titleEl.innerText = "Ubicación (Geofencing)";
+            titleEl.innerText = "Ubicación (Geofencing GPS)";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Evento geográfico:</label>
-                <select id="cfg-loc" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; font-size: 1.1rem; background: var(--md-surface); color: var(--md-text);">
-                    <option value="llegar" ${config.location === 'llegar' ? 'selected' : ''}>Al llegar a casa</option>
-                    <option value="salir" ${config.location === 'salir' ? 'selected' : ''}>Al salir de casa</option>
-                </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Evento geográfico:</label>
+                    <select id="cfg-loc" class="cfg-input">
+                        <option value="llegar" ${config.location === 'llegar' ? 'selected' : ''}>Al llegar a casa</option>
+                        <option value="salir" ${config.location === 'salir' ? 'selected' : ''}>Al salir de casa</option>
+                    </select>
+                </div>
             `;
         }
         else if (['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'].includes(type)) {
-            titleEl.innerText = "Leer Valor de Sensor / Dispositivo";
+            titleEl.innerText = "Lectura de Sensor / Estado de Dispositivo";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Elige el dispositivo:</label>
-                <select id="cfg-dev-trigger" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Condición requerida:</label>
-                <div style="display: flex; gap: 8px;">
-                    <select id="cfg-operator" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
-                        <option value="==" ${config.operator === '==' ? 'selected' : ''}>Es igual a (==)</option>
-                        <option value=">" ${config.operator === '>' ? 'selected' : ''}>Es mayor a (>)</option>
-                        <option value="<" ${config.operator === '<' ? 'selected' : ''}>Es menor a (<)</option>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Selecciona el Nodo o Sensor:</label>
+                    <select id="cfg-dev-trigger" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Nodo Sensor 1 (dev_1)</option>
+                        {% endif %}
                     </select>
-                    <input type="text" id="cfg-val" value="${config.val || ''}" placeholder="Ej: 25, ON, Detectado" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+                </div>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Condición de comparación:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <select id="cfg-operator" class="cfg-input" style="flex: 1;">
+                            <option value="==" ${config.operator === '==' ? 'selected' : ''}>Es igual a (==)</option>
+                            <option value=">" ${config.operator === '>' ? 'selected' : ''}>Es mayor a (>)</option>
+                            <option value="<" ${config.operator === '<' ? 'selected' : ''}>Es menor a (<)</option>
+                            <option value="!=" ${config.operator === '!=' ? 'selected' : ''}>Es distinto de (!=)</option>
+                        </select>
+                        <input type="text" id="cfg-val" class="cfg-input" value="${config.val !== undefined ? config.val : 'ON'}" placeholder="Ej: 25, ON, OFF, 1" style="flex: 1;">
+                    </div>
+                    <span style="font-size: 0.78rem; color: var(--md-text-variant); margin-top: 4px; display: block;">* Para sensores usa numeros (Ej: 26). Para movimiento/luces usa ON u OFF.</span>
                 </div>
             `;
         }
         else if (type === 'dev_button') {
-            titleEl.innerText = "Evento de Botón / Interruptor";
+            titleEl.innerText = "Evento de Botón / Interruptor Físico";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Elige el Botón Físico:</label>
-                <select id="cfg-dev-btn" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Acción requerida:</label>
-                <select id="cfg-btn-action" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    <option value="single_click" ${config.action === 'single_click' ? 'selected' : ''}>1 Clic</option>
-                    <option value="double_click" ${config.action === 'double_click' ? 'selected' : ''}>Doble Clic</option>
-                    <option value="hold" ${config.action === 'hold' ? 'selected' : ''}>Mantener Presionado</option>
-                </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Selecciona el Botón Físico:</label>
+                    <select id="cfg-dev-btn" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Botón RF 1 (dev_1)</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Acción física requerida:</label>
+                    <select id="cfg-btn-action" class="cfg-input">
+                        <option value="single_click" ${config.action === 'single_click' ? 'selected' : ''}>1 Clic (Sencillo)</option>
+                        <option value="double_click" ${config.action === 'double_click' ? 'selected' : ''}>Doble Clic</option>
+                        <option value="hold" ${config.action === 'hold' ? 'selected' : ''}>Mantener Presionado</option>
+                    </select>
+                </div>
             `;
-        }
+        } 
         else if (['action_device', 'action_light', 'action_plug'].includes(type)) {
-            titleEl.innerText = "Acción: Dispositivo";
+            titleEl.innerText = "Acción RF: Conmutar Dispositivo";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Dispositivo Destino:</label>
-                <select id="cfg-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Comando a enviar:</label>
-                <select id="cfg-cmd" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    <option value="ON" ${config.cmd === 'ON' ? 'selected' : ''}>Encender (ON)</option>
-                    <option value="OFF" ${config.cmd === 'OFF' ? 'selected' : ''}>Apagar (OFF)</option>
-                    <option value="TOGGLE" ${config.cmd === 'TOGGLE' ? 'selected' : ''}>Alternar (Toggle)</option>
-                </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Dispositivo / Actuador Destino:</label>
+                    <select id="cfg-dev" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Luz / Enchufe 1 (dev_1)</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Comando a enviar por RF:</label>
+                    <select id="cfg-cmd" class="cfg-input">
+                        <option value="ON" ${config.cmd === 'ON' ? 'selected' : ''}>Encender (ON)</option>
+                        <option value="OFF" ${config.cmd === 'OFF' ? 'selected' : ''}>Apagar (OFF)</option>
+                        <option value="TOGGLE" ${config.cmd === 'TOGGLE' ? 'selected' : ''}>Alternar (Toggle)</option>
+                    </select>
+                </div>
             `;
         }
         else if (type === 'action_dimmer') {
-            titleEl.innerText = "Acción: Atenuador (Dimmer)";
+            titleEl.innerText = "Acción: Regular Brillo (Dimmer)";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Seleccionar Luz Dimmable:</label>
-                <select id="cfg-dimmer-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Nivel de Brillo (0-100%):</label>
-                <input type="range" id="cfg-dimmer-val" value="${config.brightness || '50'}" min="0" max="100" style="width: 100%; margin-top: 8px;">
-                <div style="text-align: center; font-weight: bold; margin-top: 4px;" id="cfg-dimmer-label">${config.brightness || '50'}%</div>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Dispositivo Dimmable:</label>
+                    <select id="cfg-dimmer-dev" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Luz Dimmable 1 (dev_1)</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text);">Intensidad (0% a 100%):</label>
+                        <span id="cfg-dimmer-label" style="font-weight: 700; color: var(--md-primary); font-size: 1.1rem;">${config.brightness || '50'}%</span>
+                    </div>
+                    <input type="range" id="cfg-dimmer-val" value="${config.brightness || '50'}" min="0" max="100" style="width: 100%; height: 6px; border-radius: 4px; accent-color: var(--md-primary);">
+                </div>
             `;
-            // Pequeño hack para actualizar el label del rango en tiempo real:
             setTimeout(() => {
-                document.getElementById('cfg-dimmer-val').oninput = function() {
-                    document.getElementById('cfg-dimmer-label').innerText = this.value + "%";
-                };
-            }, 100);
+                const slider = document.getElementById('cfg-dimmer-val');
+                if (slider) {
+                    slider.oninput = function() {
+                        document.getElementById('cfg-dimmer-label').innerText = this.value + "%";
+                    };
+                }
+            }, 50);
         }
         else if (type === 'action_color') {
-            titleEl.innerText = "Acción: Modificar Color/Brillo";
+            titleEl.innerText = "Acción: Color y Brillo RGB";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Seleccionar Luz RGB/Dimmable:</label>
-                <select id="cfg-color-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Color (Opcional):</label>
-                <input type="color" id="cfg-color" value="${config.color || '#ffffff'}" style="width: 100%; height: 40px; border: none; background: transparent; cursor: pointer;">
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Brillo (0-100%):</label>
-                <input type="number" id="cfg-bright" value="${config.brightness || '100'}" min="0" max="100" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Luz o Tira LED RGB:</label>
+                    <select id="cfg-color-dev" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Tira LED 1 (dev_1)</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 16px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Color RGB:</label>
+                        <input type="color" id="cfg-color" value="${config.color || '#ff9800'}" style="width: 100%; height: 44px; border: none; border-radius: 12px; cursor: pointer; background: transparent;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Brillo (%):</label>
+                        <input type="number" id="cfg-bright" class="cfg-input" value="${config.brightness || '100'}" min="0" max="100">
+                    </div>
+                </div>
             `;
         }
         else if (type === 'action_buzzer') {
-            titleEl.innerText = "Acción: Sirena / Buzzer";
+            titleEl.innerText = "Acción: Sonar Sirena / Buzzer";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Dispositivo con Buzzer:</label>
-                <select id="cfg-buzz-dev" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    {% for d in devices %}
-                    <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-                <label style="font-size: 0.9rem; color: var(--md-text-variant); margin-top: 8px;">Duración (Segundos):</label>
-                <input type="number" id="cfg-buzz-sec" value="${config.seconds || '3'}" min="1" max="60" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Dispositivo con Alarma:</label>
+                    <select id="cfg-buzz-dev" class="cfg-input">
+                        {% if devices and devices|length > 0 %}
+                            {% for d in devices %}
+                            <option value="{{ d.device_id }}" ${config.device === '{{ d.device_id }}' ? 'selected' : ''}>{{ d.name }} ({{ d.device_id }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="dev_1">Sirena 1 (dev_1)</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Duración del sonido (segundos):</label>
+                    <input type="number" id="cfg-buzz-sec" class="cfg-input" value="${config.seconds || '3'}" min="1" max="60">
+                </div>
             `;
         }
         else if (type === 'action_scene') {
-            titleEl.innerText = "Acción: Activar Escena";
+            titleEl.innerText = "Acción: Activar Escena Predefinida";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Escena Predefinida:</label>
-                <select id="cfg-scene" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); font-family: inherit; background: var(--md-surface); color: var(--md-text);">
-                    <option value="SCENE_NIGHT">Modo Noche (Apagar Todo)</option>
-                    <option value="SCENE_PARTY">Modo Fiesta (Luces de Colores)</option>
-                    <option value="SCENE_AWAY">Modo Vacaciones</option>
-                </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Escena a invocar:</label>
+                    <select id="cfg-scene" class="cfg-input">
+                        <option value="SCENE_NIGHT" ${config.scene === 'SCENE_NIGHT' ? 'selected' : ''}>Modo Noche (Apagar Todas las Luces)</option>
+                        <option value="SCENE_PARTY" ${config.scene === 'SCENE_PARTY' ? 'selected' : ''}>Modo Fiesta (Colores Dinámicos)</option>
+                        <option value="SCENE_AWAY" ${config.scene === 'SCENE_AWAY' ? 'selected' : ''}>Modo Vacaciones (Simulación de Presencia)</option>
+                    </select>
+                </div>
             `;
         }
         else if (type === 'action_notify') {
             titleEl.innerText = "Acción: Notificación Push";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Mensaje a enviar:</label>
-                <input type="text" id="cfg-msg" value="${config.message || ''}" placeholder="Ej: Se ha detectado movimiento!" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Mensaje de alerta a enviar:</label>
+                    <input type="text" id="cfg-msg" class="cfg-input" value="${config.message || ''}" placeholder="Ej: ¡Se ha detectado movimiento en el Patio!">
+                </div>
             `;
         }
         else if (type === 'action_delay') {
-            titleEl.innerText = "Acción: Pausa / Retraso";
+            titleEl.innerText = "Acción: Pausa / Retraso Temporal";
             contentEl.innerHTML = `
-                <label style="font-size: 0.9rem; color: var(--md-text-variant);">Esperar este tiempo antes del siguiente paso:</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="number" id="cfg-delay" value="${config.delay || '5'}" min="1" style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
-                    <select id="cfg-delay-unit" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text);">
-                        <option value="seg" ${config.unit === 'seg' ? 'selected' : ''}>Segundos</option>
-                        <option value="min" ${config.unit === 'min' ? 'selected' : ''}>Minutos</option>
-                    </select>
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: 600; color: var(--md-text); display: block; margin-bottom: 6px;">Tiempo de espera antes del siguiente comando:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="cfg-delay" class="cfg-input" value="${config.delay || '5'}" min="1" style="flex: 2;">
+                        <select id="cfg-delay-unit" class="cfg-input" style="flex: 1;">
+                            <option value="seg" ${config.unit === 'seg' ? 'selected' : ''}>Segundos</option>
+                            <option value="min" ${config.unit === 'min' ? 'selected' : ''}>Minutos</option>
+                        </select>
+                    </div>
                 </div>
             `;
         }
 
-        document.getElementById('config-dialog').style.display = 'flex';
+        const backdrop = document.getElementById('config-dialog');
+        backdrop.style.display = 'flex';
+        setTimeout(() => backdrop.classList.add('active'), 10);
     }
 
     function closeDialog() {
-        document.getElementById('config-dialog').style.display = 'none';
-        activeEditingNode = null;
+        const backdrop = document.getElementById('config-dialog');
+        backdrop.classList.remove('active');
+        setTimeout(() => {
+            backdrop.style.display = 'none';
+            activeEditingNode = null;
+        }, 200);
     }
 
     function saveDialog() {
         if (!activeEditingNode) return;
         const type = activeEditingNode.getAttribute('data-type');
         let newConfig = {};
-        let displayDesc = "";
 
-        // Guardar Condidiones
+        // Guardar Condiciones
         if (type === 'time') {
             newConfig.time = document.getElementById('cfg-time').value;
-            displayDesc = "A las " + newConfig.time;
         } else if (type === 'date') {
             newConfig.date = document.getElementById('cfg-date').value;
-            displayDesc = "Día " + newConfig.date;
         } else if (type === 'weather') {
             newConfig.weather = document.getElementById('cfg-weather').value;
-            displayDesc = "Clima: " + newConfig.weather;
         } else if (type === 'location') {
             newConfig.location = document.getElementById('cfg-loc').value;
-            displayDesc = "Ubicación: Al " + newConfig.location;
         } else if (['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'].includes(type)) {
             newConfig.device = document.getElementById('cfg-dev-trigger').value;
             newConfig.operator = document.getElementById('cfg-operator').value;
             newConfig.val = document.getElementById('cfg-val').value;
-            displayDesc = "Si " + newConfig.device + " " + newConfig.operator + " " + newConfig.val;
         } else if (type === 'dev_button') {
             newConfig.device = document.getElementById('cfg-dev-btn').value;
             newConfig.action = document.getElementById('cfg-btn-action').value;
-            displayDesc = "Si " + newConfig.device + " == " + newConfig.action;
         } 
-        
         // Guardar Acciones
         else if (['action_device', 'action_light', 'action_plug'].includes(type)) {
             newConfig.device = document.getElementById('cfg-dev').value;
             newConfig.cmd = document.getElementById('cfg-cmd').value;
-            displayDesc = "Mandar " + newConfig.cmd + " a " + newConfig.device;
         } else if (type === 'action_dimmer') {
             newConfig.device = document.getElementById('cfg-dimmer-dev').value;
             newConfig.brightness = document.getElementById('cfg-dimmer-val').value;
-            displayDesc = "Fijar " + newConfig.device + " al " + newConfig.brightness + "%";
         } else if (type === 'action_color') {
             newConfig.device = document.getElementById('cfg-color-dev').value;
             newConfig.color = document.getElementById('cfg-color').value;
             newConfig.brightness = document.getElementById('cfg-bright').value;
-            displayDesc = "Color " + newConfig.color + " | " + newConfig.brightness + "% brillo";
         } else if (type === 'action_buzzer') {
             newConfig.device = document.getElementById('cfg-buzz-dev').value;
             newConfig.seconds = document.getElementById('cfg-buzz-sec').value;
-            displayDesc = "Sonar " + newConfig.device + " por " + newConfig.seconds + "s";
         } else if (type === 'action_scene') {
             newConfig.scene = document.getElementById('cfg-scene').value;
-            displayDesc = "Activar Escena: " + newConfig.scene;
         } else if (type === 'action_notify') {
             newConfig.message = document.getElementById('cfg-msg').value;
-            displayDesc = "Notificar: '" + newConfig.message + "'";
         } else if (type === 'action_delay') {
             newConfig.delay = document.getElementById('cfg-delay').value;
             newConfig.unit = document.getElementById('cfg-delay-unit').value;
-            displayDesc = "Pausa de " + newConfig.delay + " " + newConfig.unit;
         }
 
         activeEditingNode.setAttribute('data-config', JSON.stringify(newConfig));
-        activeEditingNode.querySelector('.block-desc').innerText = displayDesc;
-        
+        updateBlockDescription(activeEditingNode, type, newConfig);
         closeDialog();
     }
 
-    /* GENERADOR DE AST */
-    function compileAST() {
-        let skillName = prompt("Nombre de la Automatización:", "Mi Nueva Skill");
-        if (!skillName) return;
+    /* CARGAR SKILL EXISTENTE PARA EDICIÓN */
+    window.addEventListener('DOMContentLoaded', () => {
+        if (AST_JSON_DATA && Object.keys(AST_JSON_DATA).length > 0) {
+            const zoneCond = document.getElementById('zone-conditions');
+            const zoneAct = document.getElementById('zone-actions');
+            
+            if (AST_JSON_DATA.conditions && Array.isArray(AST_JSON_DATA.conditions)) {
+                AST_JSON_DATA.conditions.forEach(c => {
+                    const cfg = c.config || {
+                        time: c.time, date: c.date, weather: c.weather, location: c.location,
+                        device: c.device, operator: c.operator, val: c.val, action: c.action
+                    };
+                    const node = createBlockElement(c.type, 'condition', null, cfg);
+                    zoneCond.appendChild(node);
+                });
+                if (AST_JSON_DATA.conditions.length > 0) {
+                    const placeholder = zoneCond.querySelector('.placeholder-msg');
+                    if (placeholder) placeholder.style.display = 'none';
+                }
+            }
+            
+            if (AST_JSON_DATA.actions && Array.isArray(AST_JSON_DATA.actions)) {
+                AST_JSON_DATA.actions.forEach(a => {
+                    const cfg = a.config || {
+                        device: a.device, cmd: a.cmd, brightness: a.brightness, color: a.color,
+                        seconds: a.seconds, scene: a.scene, message: a.message, delay: a.delay, unit: a.unit
+                    };
+                    const node = createBlockElement(a.type, 'action', null, cfg);
+                    zoneAct.appendChild(node);
+                });
+                if (AST_JSON_DATA.actions.length > 0) {
+                    const placeholder = zoneAct.querySelector('.placeholder-msg');
+                    if (placeholder) placeholder.style.display = 'none';
+                }
+            }
+        }
+    });
+
+    /* COMPILADOR Y GUARDADO DE SKILLS AST EN SERVIDOR */
+    async function saveSkillAST() {
+        const nameInput = document.getElementById('skill_name');
+        let skillName = nameInput ? nameInput.value.trim() : '';
+        if (!skillName) {
+            skillName = prompt("Nombre de la Automatizacion (Skill):", "Mi Nueva Automatizacion");
+            if (!skillName) return;
+            if (nameInput) nameInput.value = skillName;
+        }
+
+        const condNodes = document.querySelectorAll('#zone-conditions .dropped-block');
+        const actNodes = document.querySelectorAll('#zone-actions .dropped-block');
+
+        if (condNodes.length === 0 || actNodes.length === 0) {
+            alert("[Advertencia] Por favor añade al menos una condición ('CUANDO SUCEDA ESTO') y una acción ('ENTONCES HAZ ESTO') para crear la Skill.");
+            return;
+        }
         
         const ast = {
             name: skillName,
@@ -491,44 +753,66 @@
             actions: []
         };
 
-        const canvas = document.getElementById('canvas');
-        
-        // Condiciones
-        document.querySelectorAll('#zone-conditions .dropped-block').forEach(el => {
+        condNodes.forEach(el => {
+            const type = el.getAttribute('data-type');
+            const cfg = JSON.parse(el.getAttribute('data-config') || '{}');
             ast.conditions.push({
-                type: el.getAttribute('data-type'),
-                config: JSON.parse(el.getAttribute('data-config') || '{}')
+                type: type,
+                config: cfg,
+                time: cfg.time,
+                device: cfg.device,
+                operator: cfg.operator,
+                val: cfg.val,
+                action: cfg.action,
+                weather: cfg.weather,
+                location: cfg.location
             });
         });
 
-        // Acciones
-        document.querySelectorAll('#zone-actions .dropped-block').forEach(el => {
+        actNodes.forEach(el => {
+            const type = el.getAttribute('data-type');
+            const cfg = JSON.parse(el.getAttribute('data-config') || '{}');
             ast.actions.push({
-                type: el.getAttribute('data-type'),
-                config: JSON.parse(el.getAttribute('data-config') || '{}')
+                type: type,
+                config: cfg,
+                device: cfg.device,
+                cmd: cfg.cmd,
+                brightness: cfg.brightness,
+                color: cfg.color,
+                seconds: cfg.seconds,
+                scene: cfg.scene,
+                message: cfg.message,
+                delay: cfg.delay,
+                unit: cfg.unit
             });
         });
 
-        console.log("AST Compilado:", JSON.stringify(ast, null, 2));
-        
-        // Enviar al servidor
-        fetch('/api/skills', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: skillName, ast: ast })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.ok) {
-                alert("¡Lógica Compilada y Guardada exitosamente en el Evaluador!");
-                window.location.href = "/skills"; // Redirigir a la lista
+        const isActive = document.getElementById('skill_active').checked ? 1 : 0;
+        const payload = {
+            name: skillName,
+            is_active: isActive,
+            ast: ast
+        };
+        if (EDIT_SKILL_ID !== null) {
+            payload.id = EDIT_SKILL_ID;
+        }
+
+        try {
+            const res = await fetch('/api/skills', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                alert("[Exito] Automatizacion '" + skillName + "' compilada y guardada exitosamente en la Colmena.");
+                window.location.href = "/skills";
             } else {
-                alert("Error guardando la Skill.");
+                alert("[Error] Al guardar la Skill: " + (data.error || "Error de servidor"));
             }
-        })
-        .catch(e => {
-            alert("Error de red: " + e);
-        });
+        } catch (err) {
+            alert("[Error] Problema de comunicacion con el servidor: " + err);
+        }
     }
 </script>
 {% endblock %}

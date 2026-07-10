@@ -33,8 +33,20 @@ def process_incoming_packet(data):
                 device_type = data.get("type", 0)
                 
                 reg_info = DeviceRegistry.describe(device_type, features)
+                from hub.modules.communication.logic.gateway import gateway
                 
                 if not dev:
+                    if gateway.pairing_status not in ("active", "success"):
+                        # Si llega CMD_DISCOVER de un nodo RF desconocido y el Hub NO está en modo vinculación, no lo creamos en la interfaz
+                        log = RFLog(
+                            ts=datetime.now().isoformat(),
+                            device_id=device_id,
+                            rssi=0,
+                            payload={"warn": "ignored_discover_not_pairing"},
+                            direction="RX"
+                        )
+                        log.save()
+                        return {"ok": True, "action": "ignored_not_pairing"}, 200
                     dev = Device(device_id=device_id)
                 
                 dev.name = device_name
@@ -59,6 +71,22 @@ def process_incoming_packet(data):
                 dev.state = current_state
                 dev.status = "online"
                 dev.save()
+                
+                if gateway.pairing_status in ("active", "success"):
+                    was_active = (gateway.pairing_status == "active")
+                    gateway.pairing_status = "success"
+                    gateway.last_paired_device = {
+                        "id": device_id,
+                        "name": dev.name,
+                        "type_name": dev.type_name,
+                        "category": dev.category
+                    }
+                    if was_active:
+                        try:
+                            from hub.modules.communication.logic.notifier import PushNotifier
+                            PushNotifier.notify_device_connected(dev)
+                        except Exception:
+                            pass
                 
                 return {"ok": True, "action": "discovered", "registry": reg_info}, 200
 
@@ -97,12 +125,42 @@ def process_incoming_packet(data):
         payload   = data.get("payload", {})
 
     dev = Device.get(device_id)
+    from hub.modules.communication.logic.gateway import gateway
     if not dev:
-        dev = Device(
-            device_id=device_id,
-            name=data.get("name", f"Device {device_id}"),
-            type_name=data.get("type", "generic")
-        )
+        if "origin" in data and gateway.pairing_status not in ("active", "success"):
+            # Paquete RF (heartbeat/reporte) de un nodo desconocido cuando el Hub no está emparejando.
+            # No crear automáticamente el dispositivo, solo registrar el paquete para depuración.
+            log = RFLog(
+                ts=datetime.now().isoformat(),
+                device_id=device_id,
+                rssi=rssi if 'rssi' in locals() else 0,
+                payload=payload,
+                direction="RX"
+            )
+            log.save()
+            return {"ok": True, "action": "ignored_unpaired"}, 200
+        else:
+            dev = Device(
+                device_id=device_id,
+                name=data.get("name", f"Device {device_id}"),
+                type_name=data.get("type", "generic")
+            )
+            if gateway.pairing_status in ("active", "success"):
+                was_active = (gateway.pairing_status == "active")
+                gateway.pairing_status = "success"
+                if not gateway.last_paired_device:
+                    gateway.last_paired_device = {
+                        "id": device_id,
+                        "name": dev.name,
+                        "type_name": dev.type_name,
+                        "category": dev.category
+                    }
+                    if was_active:
+                        try:
+                            from hub.modules.communication.logic.notifier import PushNotifier
+                            PushNotifier.notify_device_connected(dev)
+                        except Exception:
+                            pass
     
     dev.update(payload, rssi if 'rssi' in locals() else 0)
 
@@ -181,13 +239,28 @@ def api_pairing():
         return jsonify({"ok": False, "error": "Gateway no conectado"}), 400
         
     if action == "start":
+        gateway.last_paired_device = None
         res = gateway.send_command(0x00, 0x0D)
         return jsonify({"ok": res, "mode": "pairing_started"})
     elif action == "stop":
+        gateway.pairing_start_time = 0
         res = gateway.send_command(0x00, 0x0E)
         return jsonify({"ok": res, "mode": "pairing_stopped"})
     else:
         return jsonify({"ok": False, "error": "Accion invalida"}), 400
+
+@communication_bp.route("/pairing/status", methods=["GET"])
+def api_pairing_status():
+    from hub.modules.communication.logic.gateway import gateway
+    import time
+    elapsed = int(time.time() - gateway.pairing_start_time) if gateway.pairing_start_time > 0 else 0
+    return jsonify({
+        "status": gateway.pairing_status,
+        "last_tx": gateway.last_tx,
+        "last_rx": gateway.last_rx,
+        "elapsed": elapsed,
+        "last_device": gateway.last_paired_device
+    })
 
 @communication_bp.route("/ports", methods=["GET"])
 def api_ports():
@@ -296,3 +369,39 @@ def api_settings():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@communication_bp.route("/device-token/", methods=["POST", "PUT"])
+@communication_bp.route("/device-token", methods=["POST", "PUT"])
+def api_device_token():
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+    if not token:
+        return jsonify({"error": "token requerido"}), 400
+    
+    from hub.modules.communication.models.notification import DeviceToken
+    dt = DeviceToken(token=token, platform=data.get("platform", "android"), updated_at=datetime.now().isoformat())
+    dt.save()
+    return jsonify({"ok": True, "message": "Token FCM registrado exitosamente en el Hub"})
+
+@communication_bp.route("/notifications", methods=["GET"])
+def api_get_notifications():
+    from hub.modules.communication.models.notification import NotificationLog
+    logs = [l.to_dict() for l in NotificationLog.all()]
+    # Ordenar del más reciente al más antiguo
+    logs.sort(key=lambda x: x.get("ts", ""), reverse=True)
+    return jsonify(logs)
+
+@communication_bp.route("/notifications", methods=["DELETE"])
+def api_clear_notifications():
+    from hub.db.database import Database
+    Database.execute("DELETE FROM notification_logs")
+    return jsonify({"ok": True, "message": "Historial de notificaciones limpiado"})
+
+@communication_bp.route("/notifications/test", methods=["POST"])
+def api_test_notification():
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "Prueba de Notificación")
+    body = data.get("body", "El sistema de notificaciones push de la Colmena funciona correctamente.")
+    from hub.modules.communication.logic.notifier import PushNotifier
+    PushNotifier.send_notification(title=title, body=body, event_type="info")
+    return jsonify({"ok": True, "message": "Notificación de prueba enviada"})

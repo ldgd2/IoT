@@ -26,7 +26,8 @@ public:
         STATE_IDLE,
         STATE_PAIRING,
         STATE_SUCCESS,
-        STATE_TIMEOUT
+        STATE_TIMEOUT,
+        STATE_RF_ERROR
     };
 
     RGBIndicator() : _strip(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800),
@@ -37,6 +38,15 @@ public:
         _strip.setBrightness(130); // Brillo elegante y potente sin cegar
         _strip.clear();
         _strip.show();
+    }
+
+    void showRfError() {
+        if (_state != STATE_RF_ERROR) {
+            _state = STATE_RF_ERROR;
+            _strip.setBrightness(130);
+            _strip.setPixelColor(0, _strip.Color(255, 0, 0)); // Rojo mantenido / fijo por error de RF
+            _strip.show();
+        }
     }
 
     void startPairing() {
@@ -53,60 +63,85 @@ public:
         if (_state == STATE_PAIRING) {
             _state = STATE_SUCCESS;
             _statusStartMs = millis();
-            _strip.setPixelColor(0, _strip.Color(0, 255, 0)); // Verde brillante
+            _lastWaveMs = millis();
+            _strip.setBrightness(130);
+            _strip.setPixelColor(0, _strip.Color(0, 255, 0)); // Verde brillante inicial
             _strip.show();
         }
     }
 
-    void update(ColmenaNode& colmena, const char* nodeName) {
+    void update() {
         unsigned long now = millis();
 
         switch (_state) {
             case STATE_IDLE:
+            case STATE_RF_ERROR:
+                // En error de radiofrecuencia (rojo mantenido) o en reposo, no animar
                 break;
 
             case STATE_PAIRING:
-                // 1. Verificar timeout de 30 segundos
-                if (now - _startMs >= 30000UL) {
+                // 1. Verificar timeout de 50 segundos (Igualado con la ventana del traductor)
+                if (now - _startMs >= 50000UL) {
                     _state = STATE_TIMEOUT;
                     _statusStartMs = now;
-                    _strip.setPixelColor(0, _strip.Color(255, 0, 0)); // Rojo brillante
+                    _lastWaveMs = now;
+                    _strip.setBrightness(130);
+                    _strip.setPixelColor(0, _strip.Color(255, 0, 0)); // Rojo brillante inicial
                     _strip.show();
                     break;
                 }
 
-                // 2. Re-anunciar automáticamente cada 4 segundos para asegurar que el master escuche
-                if (now - _lastAnnounceMs >= 4000UL) {
-                    _lastAnnounceMs = now;
-                    colmena.announce(nodeName);
-                }
-
-                // 3. Animación "Ola de Colores" en tiempo real (arcoíris fluido ~60 FPS)
+                // 2. Animación "Ola de Colores" fluida y visible (arcoíris continuo ~60 FPS)
                 if (now - _lastWaveMs >= 16UL) {
                     _lastWaveMs = now;
-                    _hue += 450; // Avanza el tono por toda la rueda de color (0 a 65535)
-                    _strip.setPixelColor(0, _strip.ColorHSV(_hue, 255, 255));
+                    _hue += 600; // Avanza rápidamente por toda la rueda de color (0 a 65535) en ~1.8s
+
+                    // Pulsaciones suaves (breathing): el brillo oscila suavemente entre 140 y 255 en ciclos de 2s
+                    // Al mantener mínimo 140, los colores oscuros como azul, violeta y rosado se ven espectaculares y brillantes
+                    uint32_t cycle = now % 2000;
+                    uint8_t val;
+                    if (cycle < 1000) {
+                        val = 140 + (cycle * 115) / 1000;
+                    } else {
+                        val = 255 - ((cycle - 1000) * 115) / 1000;
+                    }
+
+                    _strip.setPixelColor(0, _strip.ColorHSV(_hue, 255, val));
                     _strip.show();
                 }
                 break;
 
-            case STATE_SUCCESS:
-                // Mantener verde por 5 segundos y luego apagar
-                if (now - _statusStartMs >= 5000UL) {
+            case STATE_SUCCESS: {
+                // Si se vincula: muestra color verde y desaparece lentamente (3 segundos)
+                unsigned long elapsed = now - _statusStartMs;
+                if (elapsed >= 3000UL) {
                     _strip.clear();
                     _strip.show();
                     _state = STATE_IDLE;
+                } else if (now - _lastWaveMs >= 30UL) {
+                    _lastWaveMs = now;
+                    uint8_t green = 255 - (uint8_t)((elapsed * 255UL) / 3000UL);
+                    _strip.setPixelColor(0, _strip.Color(0, green, 0));
+                    _strip.show();
                 }
                 break;
+            }
 
-            case STATE_TIMEOUT:
-                // Mantener rojo por 5 segundos (según requerimiento) y luego apagar
-                if (now - _statusStartMs >= 5000UL) {
+            case STATE_TIMEOUT: {
+                // Si no se conecta: muestra rojo y desaparece lentamente (3 segundos)
+                unsigned long elapsed = now - _statusStartMs;
+                if (elapsed >= 3000UL) {
                     _strip.clear();
                     _strip.show();
                     _state = STATE_IDLE;
+                } else if (now - _lastWaveMs >= 30UL) {
+                    _lastWaveMs = now;
+                    uint8_t red = 255 - (uint8_t)((elapsed * 255UL) / 3000UL);
+                    _strip.setPixelColor(0, _strip.Color(red, 0, 0));
+                    _strip.show();
                 }
                 break;
+            }
         }
     }
 
@@ -127,6 +162,7 @@ public:
     void init() {}
     void startPairing() {}
     void onPacketReceived() {}
+    void showRfError() {}
     void update(ColmenaNode& colmena, const char* nodeName) {}
 };
 #endif

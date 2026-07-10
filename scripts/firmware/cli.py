@@ -59,15 +59,18 @@ def firmware_wizard():
         choices=[
             "Solo Luces (lights)",
             "Solo Traductor Gateway (translator)",
+            "Solo Prueba Líricas (lyrics)",
             "COMPILAR TODOS LOS DISPOSITIVOS"
         ]
     ).ask()
     if not device_choice: return
     
     if "TODOS" in device_choice:
-        targets = ["lights", "translator"]
+        targets = ["lights", "translator", "lyrics"]
     elif "Luces" in device_choice:
         targets = ["lights"]
+    elif "Líricas" in device_choice or "lyrics" in device_choice:
+        targets = ["lyrics"]
     else:
         targets = ["translator"]
 

@@ -234,6 +234,64 @@ def relay_command():
         }), 200
 
 
+def _generic_proxy(path, method="GET", json_data=None):
+    """Auxiliar para reenviar peticiones al Hub directamente o via relay"""
+    url = f"{current_hub_url}/{path.lstrip('/')}"
+    try:
+        if method == "GET":
+            r = requests.get(url, timeout=4)
+        elif method == "POST":
+            r = requests.post(url, json=json_data, headers={"Content-Type": "application/json"}, timeout=4)
+        elif method == "DELETE":
+            r = requests.delete(url, timeout=4)
+        else:
+            r = requests.request(method, url, json=json_data, timeout=4)
+        return (r.content, r.status_code, r.headers.items())
+    except Exception as e:
+        return jsonify({"error": f"Fallo al conectar con Hub en {url}: {e}"}), 502
+
+@app.route("/api/devices", methods=["POST"])
+def proxy_post_devices():
+    return _generic_proxy("/api/devices", method="POST", json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/device/<device_id>", methods=["GET", "PUT", "POST", "PATCH", "DELETE"])
+def proxy_device_detail(device_id):
+    return _generic_proxy(f"/api/device/{device_id}", method=request.method, json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/pairing", methods=["POST"])
+def proxy_pairing():
+    return _generic_proxy("/api/pairing", method="POST", json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/pairing/status", methods=["GET"])
+def proxy_pairing_status():
+    return _generic_proxy("/api/pairing/status", method="GET")
+
+@app.route("/api/device-token/", methods=["POST", "PUT"])
+@app.route("/api/device-token", methods=["POST", "PUT"])
+@app.route("/device-token/", methods=["POST", "PUT"])
+@app.route("/device-token", methods=["POST", "PUT"])
+def proxy_device_token():
+    return _generic_proxy("/api/device-token", method="POST", json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/notifications", methods=["GET", "DELETE"])
+def proxy_notifications():
+    return _generic_proxy("/api/notifications", method=request.method)
+
+@app.route("/api/notifications/test", methods=["POST"])
+def proxy_notifications_test():
+    return _generic_proxy("/api/notifications/test", method="POST", json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/skills", methods=["GET", "POST"])
+def proxy_skills():
+    return _generic_proxy("/api/skills", method=request.method, json_data=request.get_json(silent=True) or {})
+
+@app.route("/api/skills/<int:skill_id>", methods=["GET", "DELETE"])
+@app.route("/api/skills/<int:skill_id>/toggle", methods=["POST"])
+@app.route("/api/skills/<int:skill_id>/execute", methods=["POST"])
+def proxy_skills_detail(skill_id):
+    path = request.path
+    return _generic_proxy(path, method=request.method, json_data=request.get_json(silent=True) or {})
+
 if __name__ == "__main__":
     print("\n" + "*"*65)
     print("🚀 IoT Bridge Server (Soporta Redes Protegidas sin IP Saliente)")

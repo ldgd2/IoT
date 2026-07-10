@@ -115,6 +115,18 @@ public:
      */
     bool tickPairButton(const char* nodeName);
 
+    /**
+     * @brief Inicia el modo de vinculación continua por ventana de 50 segundos.
+     * Reintenta el anuncio y negociación DHCP periódicamente para igualar el tiempo del Gateway.
+     * @param nodeName  Nombre legible del nodo
+     */
+    void startPairingWindow(const char* nodeName);
+
+    /**
+     * @brief Mantiene activa la ventana de vinculación de 50s. Llamado automáticamente por tickHeartbeat().
+     */
+    void tickPairing();
+
 private:
     unsigned long _lastHeartbeatMs;
 
@@ -124,6 +136,12 @@ private:
     bool          _pairLastState;     // Estado anterior (para detección de flanco)
     unsigned long _pairDebounceMs;    // Timestamp del último cambio detectado
     unsigned long _pairLastAnnounce;  // Timestamp del último announce por botón
+
+    // Ventana de vinculación de 50s en el Nodo
+    bool          _isPairingMode;
+    unsigned long _pairingStartMs;
+    unsigned long _lastPairingRetryMs;
+    char          _pairingNodeName[16];
 };
 
 #endif // COLMENA_NODE_H

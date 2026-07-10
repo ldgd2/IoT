@@ -30,12 +30,14 @@ class _ProvisionFlowState extends State<ProvisionFlow> {
   List<String> ssids = <String>[];
   String? selectedHomeSsid;
   final passCtrl = TextEditingController();
+  final aliasCtrl = TextEditingController(text: 'Mi dispositivo');
   String mdnsName = 'mi-esp';
   String progressMsg = '';
 
   @override
   void dispose() {
     passCtrl.dispose();
+    aliasCtrl.dispose();
     super.dispose();
   }
 
@@ -197,17 +199,22 @@ class _ProvisionFlowState extends State<ProvisionFlow> {
   try {
     final app = context.read<AppState>();
     final mdnsHost = mdns.endsWith('.local') ? mdns : '$mdns.local';
+    final alias = aliasCtrl.text.trim();
 
     final dev = Device.fromHost(
       hostMdns: mdnsHost,
-      ip: ip,       // fallback
+      ip: ip,
       port: 80,
       relayCount: 4,
+      alias: alias.isNotEmpty ? alias : mdnsHost,
     );
 
     await app.addOrUpdateDevice(dev);
     await app.refreshDevice(dev);
-  } catch (_) {}
+  } catch (e) {
+    _fail('Error al guardar el dispositivo: $e');
+    return;
+  }
 
   setState(() {
     step = _Step.success;
@@ -272,6 +279,7 @@ class _ProvisionFlowState extends State<ProvisionFlow> {
               ssids: ssids,
               selected: selectedHomeSsid,
               passCtrl: passCtrl,
+              aliasCtrl: aliasCtrl,
               mdns: mdnsName,
               onPick: (s) => setState(() => selectedHomeSsid = s),
               onMdns: (v) => setState(() => mdnsName = v),

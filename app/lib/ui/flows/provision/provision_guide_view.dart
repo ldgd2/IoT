@@ -180,15 +180,15 @@ class _InteractiveProvisionGuideViewState extends State<InteractiveProvisionGuid
           ),
           const SizedBox(height: 12),
           Text(
-            'Selecciona si tu módulo se empareja mediante red Wi-Fi directa (ESP) o a través del Gateway Hub por Radiofrecuencia.',
+            'Selecciona si tu dispositivo se empareja por red Wi-Fi directa o de forma inalámbrica a través de tu Central Colmena.',
             style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 28),
           _ChannelSelectOption(
             icon: Icons.podcasts_rounded,
-            title: 'Radiofrecuencia (Gateway Hub RF)',
-            desc: 'Para sensores de clima, movimiento, luces RF 433MHz / nRF24.',
+            title: 'Vinculación Inalámbrica (Central Colmena)',
+            desc: 'Para sensores de clima, movimiento, luces e interruptores automáticos.',
             color: const Color(0xFF00E5A8),
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const RfProvisionFlow()));
@@ -197,8 +197,8 @@ class _InteractiveProvisionGuideViewState extends State<InteractiveProvisionGuid
           const SizedBox(height: 14),
           _ChannelSelectOption(
             icon: Icons.wifi_tethering,
-            title: 'Punto de Acceso Wi-Fi (ESP)',
-            desc: 'Para módulos con chip ESP8266 / ESP32 en red local.',
+            title: 'Conexión Wi-Fi Directa',
+            desc: 'Para dispositivos inteligentes que crean su propia red temporal de configuración.',
             color: cs.primary,
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const ProvisionFlow()));
@@ -238,7 +238,7 @@ class _InteractiveProvisionGuideViewState extends State<InteractiveProvisionGuid
           ),
           const SizedBox(height: 32),
           AppButton(
-            label: 'Comenzar Emparejamiento RF',
+            label: 'Emparejar con Central Colmena',
             icon: Icons.podcasts,
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const RfProvisionFlow()));

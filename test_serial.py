@@ -252,14 +252,49 @@ class TestSerial(QMainWindow):
 
     def _log_tx(self, text):
         ts = time.strftime("%H:%M:%S")
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                import json
+                pkt = json.loads(text)
+                cmd = pkt.get("cmd", 0)
+                dest = pkt.get("dest", 0)
+                cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER", 6: "CONTROL", 13: "PAIR_START", 14: "PAIR_STOP"}
+                c_name = cmd_names.get(cmd, f"0x{cmd:02X}")
+                self.console_view.append(f'<span style="color:#f9e2af;"><b>[{ts}] [TX ➔ GATEWAY/NODO]</b> 📤 Dest: <b>ID {dest}</b> | CMD: <b>{c_name}</b> | Payload: {pkt.get("data", [])}</span>')
+                return
+            except Exception:
+                pass
         self.console_view.append(f'<span style="color:#f9e2af;"><b>[{ts}] [TX ➔ NODO]</b> {text}</span>')
 
     def _log_rx(self, text):
         ts = time.strftime("%H:%M:%S")
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                import json
+                pkt = json.loads(text)
+                if "event" in pkt:
+                    evt = pkt.get("event")
+                    st = pkt.get("status", "")
+                    color = "#f5c2e7" if "success" in evt or "paired" in st else "#f38ba8" if "timeout" in evt else "#89dceb"
+                    self.console_view.append(f'<span style="color:{color};"><b>[{ts}] [RX ⬅ EVENTO]</b> 🔔 <b>{evt.upper()}</b> | Estado: {st}</span>')
+                    return
+                elif "cmd" in pkt and "origin" in pkt:
+                    cmd = pkt.get("cmd")
+                    origin = pkt.get("origin")
+                    dest = pkt.get("dest", 0)
+                    data = pkt.get("data", [])
+                    cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER (ANUNCIO)", 6: "CONTROL", 13: "PAIR_START", 14: "PAIR_STOP"}
+                    c_name = cmd_names.get(cmd, f"0x{cmd:02X}")
+                    color = "#a6e3a1" if cmd == 5 else "#89dceb"
+                    self.console_view.append(f'<span style="color:{color};"><b>[{ts}] [RX ⬅ PAQUETE RF24]</b> 📦 Origen: <b>ID {origin}</b> ➔ Dest: <b>ID {dest}</b> | CMD: <b>{c_name}</b> | Data: {data}</span>')
+                    return
+            except Exception:
+                pass
+
         color = "#a6e3a1"
-        if "ERROR" in text.upper() or "FAIL" in text.upper():
+        if "ERROR" in text.upper() or "FAIL" in text.upper() or "TIMEOUT" in text.upper():
             color = "#f38ba8"
-        elif "ANUNCIO" in text.upper() or "PAIR" in text.upper() or "✔️" in text:
+        elif "ANUNCIO" in text.upper() or "PAIR" in text.upper() or "✔️" in text or "ÉXITO" in text.upper():
             color = "#f5c2e7"
         self.console_view.append(f'<span style="color:{color};"><b>[{ts}] [RX ⬅ NODO]</b> {text}</span>')
 

@@ -1,28 +1,41 @@
-{# Macros Jinja para generar botones reutilizables #}
+{# Macros Jinja para Botones e Iconos Reutilizables (Material 3) #}
 
-{% macro m3_button(text, style='filled', extra_classes='ripple-btn', icon='') %}
-<button class="btn-m3 btn-{{ style }} {{ extra_classes }}">
-    {% if icon %}
-        {{ icon|safe }}
+{% macro m3_button(text, style='filled', extra_classes='ripple-btn', icon_path='', onclick='', id='', title='', type='button', style_attr='') %}
+<button type="{{ type }}" 
+        {% if id %}id="{{ id }}"{% endif %} 
+        class="btn-m3 btn-{{ style }} {{ extra_classes }}" 
+        {% if onclick %}onclick="{{ onclick }}"{% endif %}
+        {% if title %}title="{{ title }}"{% endif %}
+        {% if style_attr %}style="{{ style_attr }}"{% endif %}>
+    {% if icon_path %}
+        <div class="icon" style="width: 20px; height: 20px;">
+            {% include icon_path ignore missing %}
+        </div>
     {% endif %}
-    {{ text }}
+    <span>{{ text }}</span>
 </button>
 {% endmacro %}
 
-{% macro m3_fab_large(icon, extra_classes='ripple-btn') %}
-<button class="fab-large {{ extra_classes }}">
-    {{ icon|safe }}
+{% macro m3_icon_btn(icon_path, style='standard', extra_classes='ripple-btn', onclick='', id='', title='', style_attr='width: 40px; height: 40px;') %}
+<button type="button" 
+        {% if id %}id="{{ id }}"{% endif %} 
+        class="icon-btn {{ style }} {{ extra_classes }}" 
+        {% if onclick %}onclick="{{ onclick }}"{% endif %}
+        {% if title %}title="{{ title }}"{% endif %}
+        style="border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; {{ style_attr }}">
+    <div class="icon" style="width: 22px; height: 22px;">
+        {% include icon_path ignore missing %}
+    </div>
 </button>
 {% endmacro %}
 
-{% macro m3_fab(icon, variant='', extra_classes='ripple-btn') %}
-<button class="fab-normal {{ variant }} {{ extra_classes }}">
-    {{ icon|safe }}
-</button>
-{% endmacro %}
-
-{% macro m3_icon_btn(icon, style='standard', extra_classes='ripple-btn') %}
-<button class="icon-btn {{ style }} {{ extra_classes }}">
-    {{ icon|safe }}
+{% macro m3_fab(icon_path, variant='normal', extra_classes='ripple-btn', onclick='', title='', style_attr='') %}
+<button type="button" class="fab-{{ variant }} {{ extra_classes }}"
+        {% if onclick %}onclick="{{ onclick }}"{% endif %}
+        {% if title %}title="{{ title }}"{% endif %}
+        {% if style_attr %}style="{{ style_attr }}"{% endif %}>
+    <div class="icon" style="width: 24px; height: 24px;">
+        {% include icon_path ignore missing %}
+    </div>
 </button>
 {% endmacro %}

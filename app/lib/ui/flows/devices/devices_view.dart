@@ -10,6 +10,7 @@ import 'package:bthapp/ui/components/index.dart';
 import 'package:bthapp/src/state/app_state.dart';
 import 'package:bthapp/ui/flows/devices/devices_widgets.dart' as dvw;
 import 'device_detail_view.dart';
+import 'notifications_view.dart';
 import 'package:bthapp/ui/flows/provision/add_device_sheet.dart';
 
 class DevicesView extends StatefulWidget {
@@ -47,6 +48,11 @@ class _DevicesViewState extends State<DevicesView> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Centro de Notificaciones',
+            icon: const Icon(Icons.notifications_active_outlined, size: 26, color: Color(0xFF00E5A8)),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+          ),
           IconButton(
             tooltip: 'Añadir Dispositivo',
             icon: const Icon(Icons.add_circle_outline, size: 26),
@@ -111,10 +117,12 @@ class _DevicesViewState extends State<DevicesView> {
                             itemCount: filteredDevices.length,
                             itemBuilder: (context, i) {
                               final d = filteredDevices[i];
+                              final names = app.getSwitchNames(d.id, d.relays.length);
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: dvw.SmartDeviceCard(
                                   device: d,
+                                  switchNames: names,
                                   onTap: () async {
                                     await Navigator.of(context).push(
                                       MaterialPageRoute(
@@ -124,9 +132,8 @@ class _DevicesViewState extends State<DevicesView> {
                                     if (!context.mounted) return;
                                     context.read<AppState>().refreshDevice(d);
                                   },
-                                  onToggleQuick: (val) async {
-                                    await context.read<AppState>().setRelay(d, 1, val);
-                                  },
+                                  onToggleRelay: (index1, val) =>
+                                      context.read<AppState>().setRelay(d, index1, val),
                                 ),
                               );
                             },
@@ -167,7 +174,7 @@ class _EmptyState extends StatelessWidget {
             Text('Bienvenido a Mi Hogar Colmena', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             Gap.s,
             Text(
-              'No tienes dispositivos configurados aún. Añade luces, cámaras, enchufes o sensores por Wi-Fi directo o a través del Gateway Hub RF.',
+              'No tienes dispositivos configurados aún. Añade luces, cámaras, enchufes o sensores de forma sencilla por Wi-Fi o a través de tu Central Colmena.',
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),

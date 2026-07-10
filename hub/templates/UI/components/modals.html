@@ -1,0 +1,28 @@
+{# Macros Jinja para Modales y Cuadros de Diálogo (Material 3) #}
+
+{% macro m3_modal_header(title, subtitle='', icon_path='UI/icons/svg/information-outline.svg', onclose='closeModal()') %}
+<div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--md-outline-variant);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        {% if icon_path %}
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(107, 76, 18, 0.12); display: flex; align-items: center; justify-content: center; color: var(--md-primary);">
+            <div class="icon" style="width: 24px; height: 24px;">{% include icon_path ignore missing %}</div>
+        </div>
+        {% endif %}
+        <div>
+            <h2 style="font-size: 1.35rem; font-weight: 500; margin: 0; color: var(--md-text);">{{ title }}</h2>
+            {% if subtitle %}<span style="font-size: 0.82rem; color: var(--md-text-variant);">{{ subtitle }}</span>{% endif %}
+        </div>
+    </div>
+    <button type="button" class="icon-btn standard ripple-btn" onclick="{{ onclose }}" style="width: 38px; height: 38px; border-radius: 50%;">
+        <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/close.svg' ignore missing %}</div>
+    </button>
+</div>
+{% endmacro %}
+
+{% macro m3_modal_box(id, content_html, onclose='closeModal()', extra_classes='m3-modal-box', style_attr='max-width: 760px; width: 95%; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;') %}
+<div id="{{ id }}" class="m3-modal-overlay" onclick="if(event.target === this) {{ onclose }}">
+    <div class="{{ extra_classes }}" style="{{ style_attr }}">
+        {{ content_html|safe }}
+    </div>
+</div>
+{% endmacro %}

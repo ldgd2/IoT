@@ -15,8 +15,8 @@
 // Todos los nodos de la colmena deben usar el mismo canal.
 #define RF_CHANNEL   100
 
-// Velocidad de datos. 250kbps = mayor alcance y robustez.
+// Velocidad de datos. 1Mbps = estándar hardware universal (compatible con 100% de chips NRF24L01/Si24R1 y 4x más veloz).
 // Opciones: RF24_250KBPS, RF24_1MBPS, RF24_2MBPS
-#define RF_DATARATE  RF24_250KBPS
+#define RF_DATARATE  RF24_1MBPS
 
 #endif // RADIO_CONFIG_H

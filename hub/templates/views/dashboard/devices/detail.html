@@ -1,31 +1,422 @@
-{% extends "UI/layout/base.html" %}
-
-{% block title %}Detalle del Dispositivo{% endblock %}
+{% extends 'UI/layout/base.html' %}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+{% import 'UI/widgets/device_cards.html' as dev_card %}
+{% import 'UI/widgets/control_cards.html' as ctrl %}
+{% import 'UI/widgets/sensor_cards.html' as sens %}
+{% import 'UI/widgets/device_modals.html' as mod %}
 
 {% block content %}
-<div style="padding: 24px; max-width: 800px; margin: 0 auto;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
-        <div>
-            <h1 style="margin-bottom: 8px;">{{ device.name }}</h1>
-            <p style="color: var(--md-text-variant); font-family: monospace;">ID: {{ device.device_id }}</p>
+<div style="max-width: 1400px; margin: 0 auto; padding: 24px 16px;">
+
+    <!-- BARRA DE NAVEGACIÓN SUPERIOR (BREADCRUMB / ACCIONES) -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button type="button" class="icon-btn standard ripple-btn" onclick="window.location.href='/devices/'" title="Volver al listado de dispositivos" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--md-outline-variant);">
+                <div class="icon" style="width: 24px; height: 24px;">
+                    {% include 'UI/icons/svg/arrow-left.svg' ignore missing %}
+                </div>
+            </button>
+            <span style="font-size: 0.95rem; color: var(--md-text-variant); font-weight: 500;">
+                <a href="/devices/" style="color: var(--md-text-variant); text-decoration: none;">Dispositivos</a> 
+                <span style="margin: 0 6px;">/</span> 
+                <strong style="color: var(--md-text);">Consola de Control</strong>
+            </span>
         </div>
-        <a href="/devices" style="text-decoration: none;">
-            <button class="btn-m3 btn-outlined ripple-btn">Volver</button>
-        </a>
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <!-- Indicador de Enlace en Vivo -->
+            <div id="live-connection-badge" class="m3-chip tonal" style="height: 36px; padding: 0 16px; border-radius: 18px; font-weight: 600;">
+                <span id="sync-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--md-tertiary); display: inline-block;"></span>
+                <span id="sync-text">Sincronizado con Gateway</span>
+            </div>
+            
+            <button type="button" class="icon-btn tonal ripple-btn" onclick="loadDeviceState()" title="Sincronizar variables manualmente" style="width: 44px; height: 44px; border-radius: 50%;">
+                <div class="icon" style="width: 22px; height: 22px;">
+                    {% include 'UI/icons/svg/refresh.svg' ignore missing %}
+                </div>
+            </button>
+        </div>
     </div>
 
-    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 24px;">
-        <h3 style="margin-top: 0;">Estado Actual</h3>
-        <ul style="list-style: none; padding: 0; margin: 16px 0;">
-            <li style="margin-bottom: 8px;"><strong>Tipo:</strong> {{ device.device_type | title }}</li>
-            <li style="margin-bottom: 8px;"><strong>Status:</strong> {{ device.status }}</li>
-            <li style="margin-bottom: 8px;"><strong>Señal:</strong> {{ device.rssi }} dBm</li>
-            <li style="margin-bottom: 8px;"><strong>Última vez visto:</strong> {{ device.last_seen }}</li>
-            <li style="margin-bottom: 8px;"><strong>Mensajes TX/RX:</strong> {{ device.msg_count }}</li>
-        </ul>
+    <!-- WIDGET 1: CABECERA DEL DISPOSITIVO (HERO HEADER CARD) -->
+    {{ dev_card.device_header_card(device) }}
+
+    <!-- PANELES PRINCIPALES: ACTUADORES EN VIVO & TELEMETRÍA DE SENSORES -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 32px; align-items: start;">
         
-        <h4>Variables / Sensores (Raw JSON)</h4>
-        <pre style="background: var(--md-surface); padding: 16px; border-radius: 8px; overflow-x: auto;"><code>{{ device.state | tojson(indent=2) }}</code></pre>
+        <!-- COLUMNA 1: PANEL DE CONTROL E INTERACTUADORES -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="font-size: 1.3rem; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 12px; height: 12px; border-radius: 4px; background: var(--md-primary); display: inline-block;"></span>
+                    Control y Actuadores en Vivo
+                </h2>
+                <span style="font-size: 0.8rem; color: var(--md-text-variant);">Comandos instantáneos vía Hub</span>
+            </div>
+
+            <div id="controls-container" style="display: flex; flex-direction: column; gap: 20px;">
+                {% set state = device.state if device.state else {} %}
+                
+                <!-- 1. SWITCH RELAY ON/OFF -->
+                {% set has_relay = ('on' in state) or ('relay' in (device.feature_keys or '')) or (device.category in ['switching', 'security', 'light', 'actuator']) or ((device.type_code|int) in [1, 2, 3, 5, 7, 8, 9, 48, 0x30]) or ('luz' in device.name|lower) or ('foco' in device.name|lower) or ('relay' in device.name|lower) or ('enchufe' in device.name|lower) or ('switch' in device.name|lower) or ('lámpara' in device.name|lower) or ('lampara' in device.name|lower) or ('bombilla' in device.name|lower) or ('afuera' in device.name|lower) or ('sala' in device.name|lower) or ('patio' in device.name|lower) or (device.modifiable_params | selectattr('key', 'equalto', 'on') | list | length > 0) %}
+                {% if has_relay %}
+                    {{ ctrl.relay_control_card(state) }}
+                {% endif %}
+
+                <!-- 2. CONTROL DE BRILLO PWM (DIMMER) -->
+                {% set has_dimmer = ('brightness' in state) or ('dimmer' in (device.feature_keys or '')) or ((device.type_code|int) in [2, 4, 9]) or ('luz' in device.name|lower) or ('foco' in device.name|lower) or ('dimmer' in device.name|lower) or ('lámpara' in device.name|lower) or ('lampara' in device.name|lower) or ('bombilla' in device.name|lower) or (device.modifiable_params | selectattr('key', 'equalto', 'brightness') | list | length > 0) %}
+                {% if has_dimmer %}
+                    {{ ctrl.dimmer_control_card(state) }}
+                {% endif %}
+
+                <!-- 3. POSICIÓN DE PERSIANA / CORTINA -->
+                {% set has_curtain = ('position' in state) or ((device.type_code|int) == 6) or (device.modifiable_params | selectattr('key', 'equalto', 'position') | list | length > 0) %}
+                {% if has_curtain %}
+                    {{ ctrl.curtain_control_card(state) }}
+                {% endif %}
+
+                <!-- 4. TERMOSTATO / CLIMA HVAC -->
+                {% set has_hvac = ('target_temp' in state) or (device.category == 'hvac') or ((device.type_code|int) in [32, 33, 34, 35, 0x20, 0x21, 0x22, 0x23]) or (device.modifiable_params | selectattr('key', 'equalto', 'target_temp') | list | length > 0) %}
+                {% if has_hvac %}
+                    {{ ctrl.hvac_control_card(state) }}
+                {% endif %}
+
+                <!-- 5. OTROS PARÁMETROS MODIFICABLES PERSONALIZADOS -->
+                {% if device.modifiable_params %}
+                    {% for mp in device.modifiable_params %}
+                        {% if mp.key not in ['on', 'brightness', 'target_temp', 'mode', 'position'] %}
+                            {{ ctrl.custom_param_card(mp, state) }}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+
+                <!-- SI EL DISPOSITIVO NO TIENE ACTUADORES ESPECÍFICOS PREDEFINIDOS -->
+                {% if not has_relay and not has_dimmer and not has_curtain and not has_hvac and (not device.modifiable_params or device.modifiable_params|length == 0) %}
+                    {{ ctrl.monitoring_fallback_card() }}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- COLUMNA 2: TELEMETRÍA DE SENSORES Y ESTADO ACTUAL -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="font-size: 1.3rem; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 12px; height: 12px; border-radius: 4px; background: var(--md-secondary); display: inline-block;"></span>
+                    Lecturas de Sensores en Vivo
+                </h2>
+                <span style="font-size: 0.8rem; color: var(--md-text-variant);">Telemetría RF y sensores en tiempo real</span>
+            </div>
+
+            <!-- TARJETAS DE SENSORES (LEGO WIDGETS) -->
+            <div id="sensors-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                {% if 'temperature' in state or 'temp' in state or ('temperature' in (device.feature_keys or '')) or ((device.type_code|int) in [17, 0x11]) or (device.readonly_params | selectattr('key', 'equalto', 'temperature') | list | length > 0) %}
+                    {{ sens.temperature_card(state.get('temperature', state.get('temp', '--'))) }}
+                {% endif %}
+
+                {% if 'humidity' in state or ('humidity' in (device.feature_keys or '')) or (device.readonly_params | selectattr('key', 'equalto', 'humidity') | list | length > 0) %}
+                    {{ sens.humidity_card(state.get('humidity', '--')) }}
+                {% endif %}
+
+                {% if 'motion' in state or ('motion' in (device.feature_keys or '')) or ((device.type_code|int) in [18, 0x12]) or (device.readonly_params | selectattr('key', 'equalto', 'motion') | list | length > 0) %}
+                    {{ sens.motion_card(state.get('motion')) }}
+                {% endif %}
+
+                {% if 'power' in state or 'voltage' in state or ('energy' in (device.feature_keys or '')) or ((device.type_code|int) in [25, 0x19]) %}
+                    {{ sens.power_card(state.get('power', 0), state.get('voltage', 120)) }}
+                {% endif %}
+
+                {% if 'battery' in state or ('battery' in (device.feature_keys or '')) %}
+                    {{ sens.battery_card(state.get('battery', 100)) }}
+                {% endif %}
+            </div>
+
+            <!-- OTRAS VARIABLES O ESTADO OPERATIVO -->
+            {% set extra_keys = [] %}
+            {% if device.state %}
+                {% for k in device.state.keys() %}
+                    {% if k not in ['on', 'brightness', 'position', 'target_temp', 'mode', 'temperature', 'humidity', 'motion', 'power', 'battery', 'voltage'] %}
+                        {% set _ = extra_keys.append(k) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            {{ sens.extra_params_card(device, extra_keys) }}
+
+            <!-- BOTÓN PARA ELIMINAR O REINICIAR -->
+            <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px;">
+                <button type="button" class="btn-m3 btn-text ripple-btn" onclick="deleteThisDevice()" style="color: var(--md-error); display: flex; align-items: center; gap: 8px; font-weight: 600; height: 40px;">
+                    <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/delete.svg' ignore missing %}</div>
+                    Desvincular / Eliminar Dispositivo
+                </button>
+            </div>
+        </div>
+
     </div>
+
 </div>
+
+<!-- WIDGET MODAL: ESPECIFICACIONES Y DIAGNÓSTICO TÉCNICO -->
+{{ mod.specifications_modal(device) }}
+
+<style>
+.control-card {
+    background: var(--md-surface);
+    border-radius: var(--radius-large);
+    padding: 24px;
+    border: 1px solid var(--md-outline-variant);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+    display: flex;
+    flex-direction: column;
+}
+.control-card:hover {
+    border-color: var(--md-outline);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+.control-card.active-state {
+    background: linear-gradient(145deg, var(--md-surface), rgba(107, 76, 18, 0.06));
+    border-color: rgba(107, 76, 18, 0.35);
+}
+.spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+.spec-table th, .spec-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--md-outline-variant);
+    text-align: left;
+}
+.spec-table th {
+    color: var(--md-text-variant);
+    font-weight: 600;
+    width: 35%;
+}
+.feature-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--md-surface);
+    border-radius: 12px;
+    border: 1px solid var(--md-outline-variant);
+}
+</style>
+
+<script>
+const DEVICE_ID = "{{ device.device_id }}";
+
+function openInfoModal() {
+    const overlay = document.getElementById('infoModalOverlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+function closeInfoModal() {
+    const overlay = document.getElementById('infoModalOverlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+function handleModalOverlayClick(event) {
+    if (event.target.id === 'infoModalOverlay') {
+        closeInfoModal();
+    }
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeInfoModal();
+});
+
+async function sendCommand(param, value) {
+    showSyncing(true);
+    try {
+        const payload = { device_id: DEVICE_ID };
+        payload[param] = value;
+        
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success' || res.ok) {
+            showSyncing(false, 'Comando Enviado (' + param + ': ' + value + ')');
+            setTimeout(loadDeviceState, 600);
+        } else {
+            alert('Error al enviar comando: ' + (data.error or 'Desconocido'));
+            showSyncing(false, 'Error en envío');
+        }
+    } catch (e) {
+        console.error("Error enviando comando:", e);
+        alert('Error de red al conectar con el Hub.');
+        showSyncing(false, 'Error de red');
+    }
+}
+
+function sendRelayCommand(statusBool) {
+    sendCommand('on', statusBool);
+}
+
+function sendCustomParam(key, val) {
+    sendCommand(key, val);
+}
+
+function previewDimmer(val) {
+    const pctEl = document.getElementById('dimmer-percentage');
+    const rawEl = document.getElementById('dimmer-raw');
+    if (pctEl) pctEl.innerText = Math.round((val / 255.0) * 100) + '%';
+    if (rawEl) rawEl.innerText = val;
+}
+
+function sendDimmerCommand(val) {
+    sendCommand('brightness', parseInt(val));
+}
+
+function setPresetDimmer(val) {
+    const slider = document.getElementById('ctrl-dimmer-slider');
+    if (slider) {
+        slider.value = val;
+        previewDimmer(val);
+    }
+    sendDimmerCommand(val);
+}
+
+function stepTargetTemp(delta) {
+    const slider = document.getElementById('ctrl-temp-slider');
+    let current = 22.0;
+    if (slider) current = parseFloat(slider.value);
+    
+    let next = Math.round((current + delta) * 10) / 10;
+    if (next < 16) next = 16;
+    if (next > 32) next = 32;
+    
+    if (slider) slider.value = next;
+    const disp = document.getElementById('target-temp-display');
+    if (disp) disp.innerText = next + '°C';
+    
+    sendCustomParam('target_temp', next);
+}
+
+function sendHvacMode(mode) {
+    const disp = document.getElementById('hvac-mode-display');
+    if (disp) disp.innerText = mode;
+    sendCustomParam('mode', mode);
+}
+
+function sendCustomCommand() {
+    const key = document.getElementById('custom-param-key').value.trim();
+    let val = document.getElementById('custom-param-value').value.trim();
+    
+    if (!key) {
+        alert("Escribe el nombre del parámetro (Key)");
+        return;
+    }
+    
+    if (val === 'true') val = true;
+    else if (val === 'false') val = false;
+    else if (!isNaN(val) && val !== '') val = Number(val);
+    
+    sendCommand(key, val);
+}
+
+async function loadDeviceState() {
+    showSyncing(true, 'Sincronizando con Hardware...');
+    try {
+        const res = await fetch('/api/devices');
+        if (!res.ok) return;
+        const devices = await res.json();
+        const dev = devices.find(d => d.device_id === DEVICE_ID);
+        
+        if (dev) {
+            const rssiEl = document.getElementById('dev-rssi');
+            if (rssiEl) rssiEl.innerText = dev.rssi;
+            
+            const lastSeenEl = document.getElementById('dev-last-seen');
+            if (lastSeenEl && dev.last_seen) {
+                lastSeenEl.innerText = dev.last_seen.includes('T') ? dev.last_seen.split('T')[1].substring(0, 8) : dev.last_seen;
+            }
+            
+            if (dev.state) {
+                const state = dev.state;
+                if ('on' in state) {
+                    const cb = document.getElementById('ctrl-relay-checkbox');
+                    if (cb) cb.checked = state.on;
+                    const card = document.getElementById('card-relay');
+                    if (card) {
+                        if (state.on) card.classList.add('active-state');
+                        else card.classList.remove('active-state');
+                    }
+                }
+                
+                if ('brightness' in state) {
+                    const slider = document.getElementById('ctrl-dimmer-slider');
+                    if (slider && document.activeElement !== slider) {
+                        slider.value = state.brightness;
+                        previewDimmer(state.brightness);
+                    }
+                }
+                
+                if ('position' in state) {
+                    const el = document.getElementById('curtain-percentage');
+                    if (el) el.innerText = state.position + '%';
+                }
+                if ('target_temp' in state) {
+                    const el = document.getElementById('target-temp-display');
+                    if (el) el.innerText = state.target_temp + '°C';
+                }
+                if ('temperature' in state || 'temp' in state) {
+                    const el = document.getElementById('sensor-temp');
+                    if (el) el.innerText = state.temperature || state.temp;
+                }
+                if ('humidity' in state) {
+                    const el = document.getElementById('sensor-humidity');
+                    if (el) el.innerText = state.humidity;
+                }
+                if ('power' in state) {
+                    const el = document.getElementById('sensor-power');
+                    if (el) el.innerText = state.power;
+                }
+            }
+            showSyncing(false, 'Sincronizado');
+        }
+    } catch (e) {
+        console.error("Error sincronizando estado:", e);
+        showSyncing(false, 'Error de conexión');
+    }
+}
+
+function showSyncing(isSyncing, customText) {
+    const badge = document.getElementById('live-connection-badge');
+    const dot = document.getElementById('sync-dot');
+    const text = document.getElementById('sync-text');
+    
+    if (!badge || !dot || !text) return;
+    
+    if (isSyncing) {
+        dot.style.background = 'var(--md-primary)';
+        dot.style.boxShadow = '0 0 8px var(--md-primary)';
+        text.innerText = customText || 'Transmitiendo RF...';
+    } else {
+        dot.style.background = 'var(--md-tertiary)';
+        dot.style.boxShadow = 'none';
+        text.innerText = customText || 'Sincronizado con Gateway';
+    }
+}
+
+async function deleteThisDevice() {
+    if (!confirm('¿Estás seguro de que deseas desvincular el dispositivo "' + DEVICE_ID + '"?')) return;
+    try {
+        const res = await fetch('/api/devices/' + DEVICE_ID, { method: 'DELETE' });
+        if (res.ok) {
+            window.location.href = '/devices/';
+        } else {
+            alert('No se pudo eliminar el dispositivo.');
+        }
+    } catch (e) {
+        alert('Error de red al intentar eliminar.');
+    }
+}
+
+setInterval(loadDeviceState, 3000);
+</script>
 {% endblock %}

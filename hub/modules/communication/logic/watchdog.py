@@ -15,6 +15,11 @@ def _watchdog_loop():
                     if dt > OFFLINE_TIMEOUT and dev.status != "offline":
                         dev.status = "offline"
                         dev.save()
+                        try:
+                            from hub.modules.communication.logic.notifier import PushNotifier
+                            PushNotifier.notify_device_disconnected(dev)
+                        except Exception:
+                            pass
                 except ValueError:
                     pass
         time.sleep(10)

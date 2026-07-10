@@ -89,9 +89,24 @@ void setup() {
     // 4. Conectar a la red Mesh (intentar arranque sin bloquear si falla)
     connection.begin();
 
-    // 5. Anunciar presencia al master e iniciar efecto ola de colores (30s) en YD-RP2040
-    colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
-    rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
+    // 5. Verificar salud física del chip de radio (¡Solo es error RF si el chip SPI no responde!)
+    if (!connection.getRadio().isChipConnected()) {
+        rgbLed.showRfError();
+        testSerial.printRfDiagnostics(false);
+    } else {
+        colmena.announce(NODE_NAME);   // NODE_NAME definido en PinConfig.h
+        rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
+        testSerial.printRfDiagnostics(true);
+    }
+
+    // Conectar callback en testSerial para disparar la misma animación al mandar PAIR por USB
+    testSerial.setPairCallback([]() {
+        if (connection.getRadio().isChipConnected()) {
+            rgbLed.startPairing();
+        } else {
+            rgbLed.showRfError();
+        }
+    });
 
     // 6. Botón de vinculación táctil (opcional) — activo solo si PAIR_BUTTON_PIN está definido
 #ifdef PAIR_BUTTON_PIN
@@ -101,30 +116,23 @@ void setup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
+    bool chipOk = connection.getRadio().isChipConnected();
+
     // 0. Diagnóstico e interacción Serial por USB (siempre activo para responder órdenes aunque esté sin RF)
-    testSerial.update(colmena, relays, NODE_NAME, NODE_ID);
+    testSerial.update(colmena, relays, chipOk, NODE_NAME, NODE_ID);
+
+    // Verificar salud continua del módulo RF (si se quema o desconecta -> rojo mantenido)
+    if (!chipOk) {
+        rgbLed.showRfError();
+    }
 
     // 1. Mantener red Mesh (update + checkConnection automático)
     connection.update();
 
     // Actualizar animación del LED RGB en tiempo real (efecto ola / verde / rojo) sin bloquear
-    rgbLed.update(colmena, NODE_NAME);
+    rgbLed.update();
 
-    // 2. Reconexión automática si se perdió la red
-    if (!connection.isConnected()) {
-        if (!reconectando) {
-            reconectando = true;
-        }
-        bool ok = connection.reconnect();
-        if (ok) {
-            reconectando = false;
-            colmena.announce(NODE_NAME);  // Re-anunciar tras reconectar
-        }
-        return;
-    }
-    reconectando = false;
-
-    // 3. Procesar paquetes RF entrantes
+    // 2. Procesar paquetes RF entrantes
     if (connection.available()) {
         RFPacket pkt;
         if (connection.receive(&pkt, sizeof(pkt))) {
@@ -179,24 +187,15 @@ void loop() {
     // 4. Heartbeat automático (envía cada heartbeatInterval segundos)
     colmena.tickHeartbeat(relays.getMask());
 
-    // 5. Botón de vinculación táctil — re-anuncia al master y da feedback visual en relay y LED RGB
+    // 5. Botón de vinculación táctil — re-anuncia al master y dispara el arcoíris en el LED RGB
 #ifdef PAIR_BUTTON_PIN
     if (colmena.tickPairButton(NODE_NAME)) {
-        // Iniciar animación "Ola de Colores" en el LED RGB NeoPixel del YD-RP2040 por 30 segundos
-        rgbLed.startPairing();
-
-        // Confirmación física en tiempo real al tocar el botón táctil:
-        // Hacemos una rápida secuencia de destellos (doble parpadeo) en el relay 0
-        relays.toggle(0);
-        delay(80);
-        relays.toggle(0);
-        delay(80);
-        relays.toggle(0);
-        delay(80);
-        relays.toggle(0);
+        // Iniciar animación "Ola de Colores" si la radio está sana, o rojo fijo si hay error RF
+        if (connection.getRadio().isChipConnected()) {
+            rgbLed.startPairing();
+        } else {
+            rgbLed.showRfError();
+        }
     }
 #endif
-
-    // 6. Diagnóstico e interacción Serial por USB (fácil de eliminar en producción)
-    testSerial.update(colmena, relays, NODE_NAME, NODE_ID);
 }

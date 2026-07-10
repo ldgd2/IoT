@@ -126,15 +126,6 @@ body.theme-dark.color-green {
     --md-outline-variant: #43483F;
     --md-elevated: #262B23;
 }
-    
-    /* Radios de Material 3 */
-    --radius-full: 100px;
-    --radius-extra-large: 28px;
-    --radius-large: 16px;
-    --radius-medium: 12px;
-    
-    --md-easing: cubic-bezier(0.2, 0, 0, 1);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -146,6 +137,26 @@ body {
     overflow: hidden; /* Evita scroll global, el scroll estará por secciones */
     display: flex;
     height: 100vh;
+}
+
+/* --- MATERIAL 3 ICON SYSTEM & SVG SCALING --- */
+.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    fill: currentColor;
+    object-fit: contain;
+}
+/* Corregir escalado interno 0.5 o transformaciones desalineadas en paths SVG */
+.icon svg path[transform*="scale(0.5)"] {
+    transform: none !important;
 }
 
 /* --- LAYOUT PRINCIPAL (Flexbox Hardware Accelerated) --- */
@@ -465,3 +476,77 @@ details[open] > summary .chevron {
 .m3-chip.tonal { background: var(--md-surface-variant); border-color: transparent; }
 .m3-chip.input-chip { background: var(--md-elevated); border: 1px solid var(--md-outline-variant); border-radius: 8px; }
 .m3-chip svg { width: 18px; height: 18px; }
+
+/* --- M3 MODALS & DIALOGS --- */
+.m3-modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    z-index: 1000; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s cubic-bezier(0.2, 0, 0, 1);
+    padding: 20px;
+}
+.m3-modal-overlay.active {
+    opacity: 1; pointer-events: auto;
+}
+.m3-modal-box {
+    background: var(--md-surface-container); border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-extra-large); max-width: 720px; width: 100%; max-height: 85vh;
+    overflow-y: auto; box-shadow: 0 24px 48px rgba(0,0,0,0.25);
+    transform: scale(0.92) translateY(20px); transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    padding: 32px; display: flex; flex-direction: column; gap: 24px;
+}
+.m3-modal-overlay.active .m3-modal-box {
+    transform: scale(1) translateY(0);
+}
+.m3-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--md-outline-variant); padding-bottom: 16px;
+}
+.m3-modal-header h2 {
+    font-size: 1.4rem; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 10px; color: var(--md-text);
+}
+
+/* --- CONTROL & SENSOR CARDS --- */
+.control-card {
+    background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-large); padding: 24px; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    display: flex; flex-direction: column; gap: 16px;
+}
+.control-card:hover {
+    border-color: var(--md-primary); box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+.control-card.active-state {
+    background: rgba(107, 76, 18, 0.08); border-color: var(--md-primary);
+}
+.m3-range-slider {
+    width: 100%; height: 8px; border-radius: 4px; background: var(--md-outline-variant);
+    outline: none; -webkit-appearance: none; appearance: none; cursor: pointer; transition: background 0.2s;
+}
+.m3-range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--md-primary); box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    transition: transform 0.15s, background 0.15s;
+}
+.m3-range-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+}
+
+/* --- FEATURE ITEMS IN MODAL --- */
+.feature-item {
+    background: var(--md-surface); border: 1px solid var(--md-outline-variant);
+    border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 10px; transition: transform 0.15s;
+}
+.feature-item:hover {
+    transform: translateX(4px); border-color: var(--md-outline);
+}
+.spec-table {
+    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+}
+.spec-table th, .spec-table td {
+    padding: 12px 16px; border-bottom: 1px solid var(--md-outline-variant); text-align: left;
+}
+.spec-table th {
+    color: var(--md-text-variant); font-weight: 500; width: 35%;
+}
+

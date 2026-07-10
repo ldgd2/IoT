@@ -76,8 +76,8 @@ public:
     /** @brief Animación fluida de entrada (intro) al arrancar el gateway. */
     void drawIntroAnimation();
 
-    /** @brief Animación de radar/búsqueda durante modo vinculación y sincronización. */
-    void drawPairingAnimation(const char* colmenaName, uint8_t step);
+    /** @brief Animación de radar/búsqueda durante modo vinculación y sincronización con recuadro de paquetes RX/TX. */
+    void drawPairingAnimation(const char* colmenaName, uint8_t step, const char* lastRx = nullptr, const char* lastTx = nullptr);
 
     /** @brief Alerta animada en tiempo real cuando se detecta o conecta un dispositivo. */
     void drawDeviceDetectedAnimation(const char* nodeName, uint8_t nodeId, uint8_t devType);
@@ -86,6 +86,10 @@ public:
     void drawLiveStatusScreen(const char* status, uint8_t nodeCount,
                               const char* colmenaName, const char* lastActivity,
                               uint8_t animFrame);
+
+    /** @brief Segunda pantalla de resumen (rotación cada 10s): estadísticas y config de red RF. */
+    void drawNetworkStatsScreen(const char* status, uint8_t channel, uint8_t dataRate,
+                                const char* transportMode, uint8_t animFrame);
 
     // ── Sistema de Errores Formateados y Easter Eggs ──────────────────────────
 

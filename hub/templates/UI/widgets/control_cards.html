@@ -1,0 +1,188 @@
+{# Widgets para Tarjetas de Control y Actuadores en Vivo (Relay, Dimmer, Persiana, Termostato) #}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/inputs.html' as inp %}
+
+{% macro relay_control_card(state) %}
+<div class="control-card {% if state.get('on') %}active-state{% endif %}" id="card-relay">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: var(--md-surface-container); display: flex; justify-content: center; align-items: center; color: var(--md-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div class="icon" style="width: 32px; height: 32px;">
+                    {% include 'UI/icons/svg/power.svg' ignore missing %}
+                </div>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 1.2rem; font-weight: 600;">Interruptor de Alimentación (ON / OFF)</h3>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant);">Controla el encendido o apagado general del dispositivo</p>
+            </div>
+        </div>
+
+        <div>
+            {{ inp.m3_switch('ctrl-relay-checkbox', checked=state.get('on'), onchange='sendRelayCommand(this.checked)') }}
+        </div>
+    </div>
+
+    <!-- Botones de Acción Rápida -->
+    <div style="display: flex; gap: 12px; padding-top: 18px; border-top: 1px solid var(--md-outline-variant); margin-top: 6px;">
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendRelayCommand(true)" style="flex: 1; justify-content: center; height: 42px; display: flex; align-items: center; gap: 8px; font-weight: 600;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--md-tertiary);"></span> Encender (ON)
+        </button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="sendRelayCommand(false)" style="flex: 1; justify-content: center; height: 42px; display: flex; align-items: center; gap: 8px; font-weight: 600;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--md-error);"></span> Apagar (OFF)
+        </button>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro dimmer_control_card(state) %}
+{% set cur_bright = (state.get('brightness', 255) if state else 255) | int %}
+<div class="control-card" id="card-dimmer">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: var(--md-surface-container); display: flex; justify-content: center; align-items: center; color: var(--md-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div class="icon" style="width: 32px; height: 32px;">
+                    {% include 'UI/icons/svg/brightness-6.svg' ignore missing %}
+                </div>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 1.2rem; font-weight: 600;">Regulador de Brillo (Dimmer)</h3>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant);">Ajusta la intensidad lumínica o PWM (0-255)</p>
+            </div>
+        </div>
+
+        <div style="text-align: right;">
+            <span id="dimmer-percentage" style="font-size: 1.5rem; font-weight: 600; color: var(--md-primary);">
+                {{ ((cur_bright / 255.0) * 100) | int }}%
+            </span>
+            <div style="font-size: 0.78rem; color: var(--md-text-variant); font-family: monospace;">
+                PWM: <span id="dimmer-raw">{{ cur_bright }}</span>
+            </div>
+        </div>
+    </div>
+
+    {{ inp.m3_range_slider('ctrl-dimmer-slider', min='0', max='255', value=cur_bright, oninput='previewDimmer(this.value)', onchange='sendDimmerCommand(this.value)') }}
+
+    <!-- Presets Rápidos de Brillo -->
+    <div style="display: flex; gap: 8px; justify-content: space-between;">
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="setPresetDimmer(0)" style="flex: 1; padding: 0; justify-content: center; height: 36px; font-size: 0.85rem; font-weight: 600;">0%</button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="setPresetDimmer(64)" style="flex: 1; padding: 0; justify-content: center; height: 36px; font-size: 0.85rem; font-weight: 600;">25%</button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="setPresetDimmer(128)" style="flex: 1; padding: 0; justify-content: center; height: 36px; font-size: 0.85rem; font-weight: 600;">50%</button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="setPresetDimmer(191)" style="flex: 1; padding: 0; justify-content: center; height: 36px; font-size: 0.85rem; font-weight: 600;">75%</button>
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="setPresetDimmer(255)" style="flex: 1; padding: 0; justify-content: center; height: 36px; font-size: 0.85rem; font-weight: 600;">100%</button>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro curtain_control_card(state) %}
+{% set cur_pos = state.get('position', 0) %}
+<div class="control-card" id="card-curtain">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: var(--md-surface-container); display: flex; justify-content: center; align-items: center; color: var(--md-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div class="icon" style="width: 32px; height: 32px;">
+                    {% include 'UI/icons/svg/window-shutter.svg' ignore missing %}
+                </div>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 1.2rem; font-weight: 600;">Apertura de Persiana / Cortina</h3>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant);">Ajusta el nivel porcentual de apertura (0-100%)</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <span id="curtain-percentage" style="font-size: 1.5rem; font-weight: 600; color: var(--md-primary);">
+                {{ cur_pos }}%
+            </span>
+        </div>
+    </div>
+    
+    {{ inp.m3_range_slider('', min='0', max='100', value=cur_pos, onchange='sendCustomParam("position", parseInt(this.value))') }}
+
+    <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="sendCustomParam('position', 0)" style="flex: 1; justify-content: center; height: 36px;">Cerrada (0%)</button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="sendCustomParam('position', 50)" style="flex: 1; justify-content: center; height: 36px;">Mitad (50%)</button>
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendCustomParam('position', 100)" style="flex: 1; justify-content: center; height: 36px;">Abierta (100%)</button>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro hvac_control_card(state) %}
+<div class="control-card" id="card-hvac">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: var(--md-surface-container); display: flex; justify-content: center; align-items: center; color: var(--md-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div class="icon" style="width: 32px; height: 32px;">
+                    {% include 'UI/icons/svg/thermostat.svg' ignore missing %}
+                </div>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 1.2rem; font-weight: 600;">Consola de Termostato (HVAC)</h3>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant);">Ajuste de temperatura deseada y modo</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <span id="target-temp-display" style="font-size: 1.6rem; font-weight: 600; color: var(--md-primary);">
+                {{ state.get('target_temp', 22) }}°C
+            </span>
+            <div style="font-size: 0.78rem; color: var(--md-text-variant); text-transform: uppercase; font-weight: 600;">
+                Modo: <span id="hvac-mode-display">{{ state.get('mode', 'auto') }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 0;">
+        <button type="button" class="icon-btn tonal ripple-btn" onclick="stepTargetTemp(-0.5)" style="width: 44px; height: 44px; border-radius: 14px; font-size: 1.4rem; font-weight: 600;">-</button>
+        {{ inp.m3_range_slider('ctrl-temp-slider', min='16', max='32', value=state.get('target_temp', 22), oninput='document.getElementById("target-temp-display").innerText = this.value + "°C"', onchange='sendCustomParam("target_temp", parseFloat(this.value))') }}
+        <button type="button" class="icon-btn tonal ripple-btn" onclick="stepTargetTemp(0.5)" style="width: 44px; height: 44px; border-radius: 14px; font-size: 1.4rem; font-weight: 600;">+</button>
+    </div>
+
+    <div style="display: flex; gap: 10px; border-top: 1px solid var(--md-outline-variant); padding-top: 16px;">
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendHvacMode('cool')" style="flex: 1; justify-content: center; height: 40px; display: flex; align-items: center; gap: 6px; font-weight: 600;">
+            <div class="icon" style="width: 18px; height: 18px; color: #64B5F6;">{% include 'UI/icons/svg/snowflake.svg' ignore missing %}</div> Enfriar
+        </button>
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendHvacMode('heat')" style="flex: 1; justify-content: center; height: 40px; display: flex; align-items: center; gap: 6px; font-weight: 600;">
+            <div class="icon" style="width: 18px; height: 18px; color: #E57373;">{% include 'UI/icons/svg/fire.svg' ignore missing %}</div> Calentar
+        </button>
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendHvacMode('auto')" style="flex: 1; justify-content: center; height: 40px; display: flex; align-items: center; gap: 6px; font-weight: 600;">
+            <div class="icon" style="width: 18px; height: 18px; color: var(--md-primary);">{% include 'UI/icons/svg/auto-mode.svg' ignore missing %}</div> Auto
+        </button>
+        <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="sendHvacMode('off')" style="flex: 1; justify-content: center; height: 40px; font-weight: 600;">Off</button>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro custom_param_card(mp, state) %}
+<div class="control-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; border-radius: 14px; background: var(--md-surface-container); display: flex; justify-content: center; align-items: center; color: var(--md-primary);">
+                <div class="icon" style="width: 24px; height: 24px;">{% include 'UI/icons/svg/tune.svg' ignore missing %}</div>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 1.1rem; font-weight: 600;">{{ mp.label }} (`{{ mp.key }}`)</h3>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--md-text-variant);">{{ mp.desc }}</p>
+            </div>
+        </div>
+        {% if mp.control == 'switch' %}
+        {{ inp.m3_switch('', checked=state.get(mp.key), onchange='sendCustomParam("' ~ mp.key ~ '", this.checked)', scale='1.1') }}
+        {% endif %}
+    </div>
+    {% if mp.control != 'switch' %}
+    <div style="display: flex; gap: 10px; margin-top: 12px;">
+        <input type="text" id="input-{{ mp.key }}" value="{{ state.get(mp.key, mp.default or '') }}" style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: monospace;">
+        <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="sendCustomParam('{{ mp.key }}', document.getElementById('input-{{ mp.key }}').value)">Aplicar</button>
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro monitoring_fallback_card() %}
+<div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 28px; text-align: center; border: 1px dashed var(--md-outline-variant);">
+    <div class="icon" style="width: 44px; height: 44px; margin: 0 auto 12px auto; color: var(--md-primary);">
+        {% include 'UI/icons/svg/access-point.svg' ignore missing %}
+    </div>
+    <h3 style="margin: 0 0 6px 0; font-weight: 600; font-size: 1.15rem;">Dispositivo de Monitoreo en Vivo</h3>
+    <p style="margin: 0; font-size: 0.9rem; color: var(--md-text-variant); max-width: 400px; margin-inline: auto;">
+        Este dispositivo funciona monitoreando continuamente su entorno. Puedes visualizar todas sus mediciones de sensores en tiempo real en el panel lateral.
+    </p>
+</div>
+{% endmacro %}

@@ -59,11 +59,35 @@ public:
         Serial.println(action);
     }
 
+    typedef void (*PairCallback)();
+
+    void setPairCallback(PairCallback cb) {
+        _pairCallback = cb;
+    }
+
+    /**
+     * @brief Imprime en el puerto COM el diagnóstico detallado del módulo de radiofrecuencia.
+     */
+    void printRfDiagnostics(bool chipConnected) {
+        Serial.println("\n--- 📡 DIAGNÓSTICO DE RADIO RF24 ---");
+        if (chipConnected) {
+            Serial.println("✔️ CHIP NRF24L01: CONECTADO Y FUNCIONANDO OK");
+        } else {
+            Serial.println("❌ ERROR FATAL DE RADIO FRECUENCIA: CHIP NRF24 NO RESPONDE");
+            Serial.println("  [Causas probables y soluciones]:");
+            Serial.println("  1. Voltaje/Ruido: Poner condensador de 10uF-100uF entre VCC y GND del nRF24");
+            Serial.println("  2. Alimentación: Debe estar a 3.3V (¡NUNCA a 5V ni VBUS o se quema!)");
+            Serial.println("  3. Cableado SPI en RP2040: CE=14, CSN=15, SCK=18, MOSI=19, MISO=16");
+            Serial.println("  4. Módulo dañado: Si tocó 5V o se invirtió polaridad, el chip se daña.");
+        }
+        Serial.println("------------------------------------\n");
+    }
+
     /**
      * @brief Escucha y procesa comandos entrantes por el puerto USB Serial.
      * Debe ser llamado periódicamente dentro de `loop()`.
      */
-    void update(ColmenaNode& colmena, RelayBank& relays, const char* nodeName, uint8_t nodeId) {
+    void update(ColmenaNode& colmena, RelayBank& relays, bool rfChipConnected, const char* nodeName, uint8_t nodeId) {
         while (Serial.available() > 0) {
             char c = Serial.read();
             if (c == '\r') continue;
@@ -75,18 +99,47 @@ public:
                     if (_rxBuf == "PAIR" || _rxBuf == "DISCOVER" || _rxBuf == "ANNOUNCE") {
                         Serial.println("\n=================================================");
                         Serial.println("⚡ [TEST SERIAL] Orden de emparejamiento (PAIR) recibida.");
-                        Serial.println("📡 Enviando trama de anuncio (CMD_DISCOVER) por RF...");
-                        colmena.announce(nodeName);
-                        Serial.println("✔️ [TEST SERIAL] Paquete de anuncio RF transmitido.");
+                        Serial.println("📡 Iniciando ventana de búsqueda de 50 segundos por RF...");
+                        colmena.startPairingWindow(nodeName);
+                        if (_pairCallback) {
+                            _pairCallback();
+                        }
+                        Serial.println("✔️ [TEST SERIAL] Ventana de vinculación (50s) activada en el nodo.");
                         Serial.println("=================================================\n");
 
-                    } else if (_rxBuf == "STATUS") {
+                    } else if (_rxBuf == "STATUS" || _rxBuf == "RF" || _rxBuf == "RADIO") {
                         Serial.println("\n--- ℹ️ DIAGNÓSTICO DEL NODO ---");
                         Serial.print("Nombre:       "); Serial.println(nodeName);
                         Serial.print("ID de Nodo:   "); Serial.println(nodeId);
                         Serial.print("Relays Mask:  0b"); Serial.println(relays.getMask(), BIN);
                         Serial.print("Uptime (s):   "); Serial.println(millis() / 1000);
-                        Serial.println("---------------------------------\n");
+                        Serial.print("Estado GPIO 3:"); Serial.println(digitalRead(3) == HIGH ? " HIGH (3.3V - Tocado)" : " LOW (0V - Reposo/GND)");
+                        printRfDiagnostics(rfChipConnected);
+
+                    } else if (_rxBuf == "BUTTON" || _rxBuf == "BOTON" || _rxBuf == "PIN" || _rxBuf == "TTP223") {
+                        Serial.println("\n--- 🔍 DIAGNÓSTICO EN TIEMPO REAL DEL BOTÓN Y ESCANEO DE PINES ---");
+                        Serial.println("Pin configurado en código para el botón: GPIO 3");
+                        Serial.print("⚡ Lectura actual en GPIO 3: ");
+                        if (digitalRead(3) == HIGH) {
+                            Serial.println("HIGH (3.3V/3.9V) ➔ ¡SEÑAL DETECTADA CORRECTAMENTE EN GPIO 3!");
+                        } else {
+                            Serial.println("LOW (0V) ➔ EN REPOSO O NO CONECTADO A ESTE GPIO");
+                        }
+                        Serial.println("\n📡 ESCANEANDO TODOS LOS PINES GPIO DE LA PLACA...");
+                        Serial.print("👉 Pines que están recibiendo voltaje (HIGH) en este instante: ");
+                        bool found = false;
+                        for (int p = 0; p <= 28; p++) {
+                            // Omitir pines SPI del radio para no generar lecturas falsas (14, 15, 16, 18, 19)
+                            if (p == 14 || p == 15 || p == 16 || p == 18 || p == 19 || p == 23 || p == 24 || p == 25) continue;
+                            if (digitalRead(p) == HIGH) {
+                                Serial.print("[GPIO "); Serial.print(p); Serial.print("] ");
+                                found = true;
+                            }
+                        }
+                        if (!found) {
+                            Serial.print("NINGUNO (Todos los GPIOs de usuario están en 0V)");
+                        }
+                        Serial.println("\n----------------------------------------------------------------\n");
 
                     } else if (_rxBuf == "ON") {
                         Serial.println("💡 [TEST SERIAL PRUEBA LOCAL] Encendiendo relés localmente...");
@@ -97,7 +150,7 @@ public:
                         relays.setAll(false);
 
                     } else if (_rxBuf == "HELP" || _rxBuf == "?") {
-                        Serial.println("Comandos soportados: PAIR, STATUS, ON, OFF");
+                        Serial.println("Comandos soportados: PAIR, STATUS, BUTTON, RF, ON, OFF");
 
                     } else {
                         Serial.print("⚠️ Comando no reconocido: "); Serial.println(_rxBuf);
@@ -112,6 +165,7 @@ public:
 
 private:
     String _rxBuf = "";
+    PairCallback _pairCallback = nullptr;
 };
 
 #endif // TEST_SERIAL_H

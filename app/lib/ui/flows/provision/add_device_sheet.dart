@@ -48,8 +48,8 @@ class AddDeviceSheet extends StatelessWidget {
 
             // Opcion 1: Hotspot Wi-Fi
             _OptionCard(
-              title: 'Punto de Acceso Wi-Fi (Hotspot)',
-              subtitle: 'Configura dispositivos ESP directos por mDNS o IP conectándote a su red AP temporal.',
+              title: 'Conexión Wi-Fi Directa',
+              subtitle: 'Conecta y configura nuevos dispositivos inteligentes a través de su red inalámbrica temporal.',
               icon: Icons.wifi_tethering,
               iconColor: cs.primary,
               onTap: () {
@@ -64,8 +64,8 @@ class AddDeviceSheet extends StatelessWidget {
 
             // Opcion 2: Radiofrecuencia RF
             _OptionCard(
-              title: 'Radiofrecuencia (Colmena Gateway)',
-              subtitle: 'Empareja sensores, luces, cámaras o enchufes conectados al Hub Gateway RF (433MHz/nRF24/LoRa).',
+              title: 'Vinculación Inalámbrica (Central Colmena)',
+              subtitle: 'Conecta sensores, luces, interruptores y módulos automáticos gestionados por tu Central de forma instantánea.',
               icon: Icons.podcasts_rounded,
               iconColor: const Color(0xFF00E5A8),
               onTap: () {

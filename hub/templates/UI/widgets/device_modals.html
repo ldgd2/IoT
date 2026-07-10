@@ -1,0 +1,269 @@
+{# Widgets para Modales de Especificaciones, Diagnóstico e Información Rápida #}
+{% import 'UI/components/modals.html' as mod %}
+{% import 'UI/components/buttons.html' as btn %}
+
+{% macro specifications_modal(device) %}
+<div id="infoModalOverlay" class="m3-modal-overlay" onclick="handleModalOverlayClick(event)">
+    <div class="m3-modal-box">
+        
+        <!-- ENCABEZADO DEL MODAL -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--md-outline-variant);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(107, 76, 18, 0.15); display: flex; align-items: center; justify-content: center; color: var(--md-primary);">
+                    <div class="icon" style="width: 24px; height: 24px;">{% include 'UI/icons/svg/information-outline.svg' ignore missing %}</div>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.4rem; font-weight: 500; margin: 0; color: var(--md-text);">Especificaciones y Diagnóstico Técnico</h2>
+                    <span style="font-size: 0.85rem; color: var(--md-text-variant);">Metadatos completos del hardware RF</span>
+                </div>
+            </div>
+            <button type="button" class="icon-btn standard ripple-btn" onclick="closeInfoModal()" style="width: 38px; height: 38px; border-radius: 50%;">
+                <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/close.svg' ignore missing %}</div>
+            </button>
+        </div>
+
+        <!-- SECCIÓN 1: IDENTIFICACIÓN Y TIPO -->
+        <div>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--md-primary); margin: 0 0 12px 0;">
+                1. Identificación y Clasificación de Hardware
+            </h3>
+            <table class="spec-table">
+                <tbody>
+                    <tr>
+                        <th>Nombre del Nodo</th>
+                        <td style="font-weight: 600;">{{ device.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>ID de Dispositivo</th>
+                        <td style="font-family: monospace;">{{ device.device_id }}</td>
+                    </tr>
+                    <tr>
+                        <th>Tipo de Hardware</th>
+                        <td>
+                            <strong style="color: var(--md-text);">{{ device.type_name | title }}</strong>
+                            <span style="font-family: monospace; color: var(--md-text-variant); margin-left: 8px;">(Código: 0x{{ '%02X' % (device.type_code or 0) }})</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Categoría Operativa</th>
+                        <td><span class="m3-chip tonal" style="height: 24px; font-size: 0.8rem;">{{ device.category | title }}</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SECCIÓN 2: CAPACIDADES DETECTADAS (FEATURES BITMASK) -->
+        <div>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--md-primary); margin: 0 0 12px 0; display: flex; justify-content: space-between; align-items: center;">
+                <span>2. Módulos y Características de Hardware Detectadas</span>
+                <span style="font-size: 0.8rem; font-family: monospace; background: var(--md-surface); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--md-outline-variant);">
+                    Bitmask: 0x{{ '%02X' % (device.features or 0) }}
+                </span>
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--md-text-variant); margin: 0 0 12px 0;">
+                El protocolo RF consulta automáticamente qué módulos posee el nodo ("cuantos relay o dependiendo que tipo que se puede modificar, etc"):
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                {% if device.feature_labels and device.feature_labels | length > 0 %}
+                    {% for i in range(device.feature_labels | length) %}
+                    <div class="feature-item">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--md-primary);"></span>
+                            <div>
+                                <strong style="font-size: 0.95rem; display: block;">{{ device.feature_labels[i] }}</strong>
+                                <span style="font-size: 0.8rem; color: var(--md-text-variant);">Key técnica: <code>{{ device.feature_keys[i] if device.feature_keys and i < device.feature_keys|length else 'feature' }}</code></span>
+                            </div>
+                        </div>
+                        <div>
+                            {% set fk = device.feature_keys[i] if device.feature_keys and i < device.feature_keys|length else '' %}
+                            {% if fk in ['relay', 'dimmer'] or device.category in ['switching', 'hvac', 'security'] %}
+                            <span style="background: rgba(107, 76, 18, 0.12); color: var(--md-primary); padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--md-primary);"></span> Control Modificable
+                            </span>
+                            {% else %}
+                            <span style="background: rgba(162, 177, 89, 0.15); color: var(--md-tertiary); padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--md-tertiary);"></span> Sensor Solo Lectura
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="feature-item" style="justify-content: center; color: var(--md-text-variant);">
+                        No se declararon flags de hardware en el paquete de descubrimiento.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: QUÉ SE PUEDE MODIFICAR VS DE SOLO LECTURA -->
+        <div>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--md-primary); margin: 0 0 12px 0;">
+                3. Guía de Parámetros: ¿Qué se puede modificar desde el Hub?
+            </h3>
+            
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--md-text); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                    <div class="icon" style="width: 18px; height: 18px; color: var(--md-primary);">{% include 'UI/icons/svg/tune.svg' ignore missing %}</div>
+                    Parámetros y Actuadores Modificables en Tiempo Real:
+                </h4>
+                {% if device.modifiable_params and device.modifiable_params | length > 0 %}
+                    <table class="spec-table" style="background: var(--md-surface); border-radius: 12px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: var(--md-surface-container);">
+                                <th style="width: 25%;">Variable (Key)</th>
+                                <th style="width: 30%;">Control / Tipo</th>
+                                <th>Descripción de Comportamiento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mparam in device.modifiable_params %}
+                            <tr>
+                                <td><code style="font-size: 0.95rem; color: var(--md-primary); font-weight: 600;">{{ mparam.key }}</code></td>
+                                <td style="font-weight: 500;">{{ mparam.label }}<br><span style="font-size: 0.75rem; color: var(--md-text-variant);">({{ mparam.type }})</span></td>
+                                <td style="font-size: 0.85rem; color: var(--md-text-variant);">{{ mparam.desc }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="padding: 12px 16px; background: var(--md-surface); border-radius: 10px; font-size: 0.85rem; color: var(--md-text-variant);">
+                        Este dispositivo no tiene actuadores predefinidos modificables (es un nodo de sensado o telemetría).
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Sensores de Solo Lectura -->
+            <div>
+                <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--md-text); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                    <div class="icon" style="width: 18px; height: 18px; color: var(--md-text-variant);">{% include 'UI/icons/svg/lock.svg' ignore missing %}</div>
+                    Parámetros de Solo Lectura (Sensado / Telemetría):
+                </h4>
+                {% if device.readonly_params and device.readonly_params | length > 0 %}
+                    <table class="spec-table" style="background: var(--md-surface); border-radius: 12px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: var(--md-surface-container);">
+                                <th style="width: 25%;">Variable (Key)</th>
+                                <th style="width: 30%;">Sensor / Unidad</th>
+                                <th>Descripción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rparam in device.readonly_params %}
+                            <tr>
+                                <td><code style="font-size: 0.95rem; color: var(--md-text);">{{ rparam.key }}</code></td>
+                                <td style="font-weight: 500;">{{ rparam.label }} (<strong>{{ rparam.unit }}</strong>)</td>
+                                <td style="font-size: 0.85rem; color: var(--md-text-variant);">{{ rparam.desc }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="padding: 12px 16px; background: var(--md-surface); border-radius: 10px; font-size: 0.85rem; color: var(--md-text-variant);">
+                        No hay sensores pasivos de solo lectura registrados.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: DIAGNÓSTICO Y CONECTIVIDAD -->
+        <div>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--md-primary); margin: 0 0 12px 0;">
+                4. Estadísticas de Red RF y Diagnóstico
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                <div style="background: var(--md-surface); padding: 14px; border-radius: 12px; border: 1px solid var(--md-outline-variant);">
+                    <div style="font-size: 0.75rem; color: var(--md-text-variant); font-weight: 600;">Señal RSSI</div>
+                    <div style="font-size: 1.2rem; font-weight: 600; color: var(--md-primary); margin-top: 4px;">{{ device.rssi }} dBm</div>
+                </div>
+                <div style="background: var(--md-surface); padding: 14px; border-radius: 12px; border: 1px solid var(--md-outline-variant);">
+                    <div style="font-size: 0.75rem; color: var(--md-text-variant); font-weight: 600;">Paquetes Recibidos</div>
+                    <div style="font-size: 1.2rem; font-weight: 600; color: var(--md-text); margin-top: 4px;">{{ device.msg_count }} msgs</div>
+                </div>
+                <div style="background: var(--md-surface); padding: 14px; border-radius: 12px; border: 1px solid var(--md-outline-variant);">
+                    <div style="font-size: 0.75rem; color: var(--md-text-variant); font-weight: 600;">Última Actividad</div>
+                    <div style="font-size: 0.95rem; font-weight: 600; color: var(--md-text); margin-top: 6px;">{{ device.last_seen.split('T')[1][:8] if 'T' in device.last_seen else device.last_seen }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 5: CONSOLA AVANZADA DE COMANDOS Y MEMORIA JSON -->
+        <div>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--md-primary); margin: 0 0 12px 0;">
+                5. Consola Avanzada de Comandos y Memoria JSON
+            </h3>
+            <details style="background: var(--md-surface); border-radius: 12px; padding: 16px; border: 1px solid var(--md-outline-variant);">
+                <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; outline: none; font-size: 0.9rem;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <div class="icon" style="width: 18px; height: 18px; color: var(--md-primary);">{% include 'UI/icons/svg/console.svg' ignore missing %}</div>
+                        Abrir Consola de Inyección de Comandos (`cmd: "set"`)
+                    </span>
+                    <span style="color: var(--md-primary); font-size: 0.8rem;">Desplegar ↓</span>
+                </summary>
+                <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px solid var(--md-outline-variant);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.75rem; color: var(--md-text-variant); display: block; margin-bottom: 4px; font-weight: 600;">Key</label>
+                            <input type="text" id="custom-param-key" placeholder="ej. color, speed" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface-container); color: var(--md-text); font-family: monospace;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.75rem; color: var(--md-text-variant); display: block; margin-bottom: 4px; font-weight: 600;">Value</label>
+                            <input type="text" id="custom-param-value" placeholder="ej. true, 128" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface-container); color: var(--md-text); font-family: monospace;">
+                        </div>
+                    </div>
+                    <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="sendCustomCommand()" style="margin-top: 4px; justify-content: center; height: 38px; font-size: 0.85rem;">
+                        Enviar Comando al Dispositivo
+                    </button>
+                </div>
+            </details>
+        </div>
+
+        <!-- PIE DEL MODAL -->
+        <div style="display: flex; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--md-outline-variant);">
+            <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="closeInfoModal()">
+                Entendido y Cerrar
+            </button>
+        </div>
+
+    </div>
+</div>
+{% endmacro %}
+
+{% macro table_quick_info_modal() %}
+<div id="quickInfoModal" class="m3-modal-overlay" onclick="closeQuickInfo()">
+    <div class="m3-modal-box" style="max-width: 600px;" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(107, 76, 18, 0.15); display: flex; align-items: center; justify-content: center; color: var(--md-primary);">
+                    <div class="icon" style="width: 24px; height: 24px;">{% include 'UI/icons/svg/information-outline.svg' ignore missing %}</div>
+                </div>
+                <div>
+                    <h3 id="modalDevName" style="margin: 0; font-size: 1.3rem; font-weight: 600;">Detalles</h3>
+                    <p id="modalDevId" style="margin: 0; font-size: 0.8rem; color: var(--md-text-variant); font-family: monospace;"></p>
+                </div>
+            </div>
+            <button type="button" class="icon-btn standard ripple-btn" onclick="closeQuickInfo()" style="width: 36px; height: 36px; border-radius: 50%;">
+                <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/close.svg' ignore missing %}</div>
+            </button>
+        </div>
+
+        <div style="margin-bottom: 16px; background: var(--md-surface); padding: 14px; border-radius: 12px;">
+            <p id="modalDevType" style="margin: 0 0 6px 0; font-size: 0.9rem;"></p>
+            <p id="modalDevFeatures" style="margin: 0; font-size: 0.85rem; color: var(--md-text-variant);"></p>
+        </div>
+
+        <div id="modalDevParams" style="display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 18px;">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <a id="modalDevLink" href="#" class="btn-m3 btn-tonal ripple-btn" style="text-decoration: none; height: 38px; display: flex; align-items: center;">
+                Consola Completa del Dispositivo
+            </a>
+            <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="closeQuickInfo()" style="height: 38px;">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+{% endmacro %}

@@ -1,78 +1,226 @@
 {% extends "UI/layout/base.html" %}
-{% import 'UI/widgets/cards.html' as cards %}
 {% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+{% import 'UI/components/inputs.html' as inp %}
+{% import 'UI/widgets/device_modals.html' as mod %}
 
 {% block title %}Dispositivos - Gerlex IoT{% endblock %}
 
 {% block content %}
-<div style="padding: 24px; max-width: 1200px; margin: 0 auto;">
+<div style="padding: 24px 32px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px;">
     
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+    <!-- ENCABEZADO PRINCIPAL -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
         <div>
-            <h1 style="margin-bottom: 8px;">Dispositivos Conectados</h1>
-            <p style="color: var(--md-text-variant);">Administra tus nodos de hardware RF y WiFi.</p>
+            <h1 style="margin-bottom: 8px; font-size: 2.3rem; font-weight: 500; letter-spacing: -0.5px;">Dispositivos Conectados</h1>
+            <p style="color: var(--md-text-variant); margin: 0; font-size: 1.05rem;">Administra y controla en tiempo real tus nodos de hardware RF y sensores IoT.</p>
         </div>
         <a href="/devices/new" style="text-decoration: none;">
-            <button class="btn-m3 btn-filled ripple-btn" style="display: flex; align-items: center; gap: 8px;">
-                <div class="icon" style="width: 18px; height: 18px;">
-                    {% include 'UI/icons/svg/plus.svg' ignore missing %}
-                </div>
-                Vincular Nuevo Dispositivo
-            </button>
+            {{ btn.m3_button('Vincular Nuevo Dispositivo', 'filled', icon_path='UI/icons/svg/plus.svg') }}
         </a>
     </div>
 
-    <!-- TABLA DE DISPOSITIVOS -->
-    <div style="background: var(--md-surface-container); border-radius: var(--radius-large); overflow: hidden;">
+    <!-- TABLA MODULAR DE DISPOSITIVOS -->
+    <div style="background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.04);">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
-                <tr style="border-bottom: 1px solid var(--md-outline-variant);">
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">ID Nodo</th>
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Nombre</th>
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Tipo</th>
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Señal (RSSI)</th>
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Estado</th>
-                    <th style="padding: 16px 24px; font-weight: 500; color: var(--md-text-variant);">Acciones</th>
+                <tr style="border-bottom: 1px solid var(--md-outline-variant); background: var(--md-surface);">
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">ID Nodo</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">Dispositivo e Información</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">Tipo / Categoría</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">Capacidades (Features)</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">Señal RF</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant);">Estado</th>
+                    <th style="padding: 16px 20px; font-weight: 600; color: var(--md-text-variant); text-align: right;">Control en Vivo</th>
                 </tr>
             </thead>
             <tbody>
-                {% for dev in devices %}
-                <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.2s;">
-                    <td style="padding: 16px 24px; font-family: monospace;">{{ dev.device_id }}</td>
-                    <td style="padding: 16px 24px; font-weight: 500;">{{ dev.name }}</td>
-                    <td style="padding: 16px 24px;">{{ dev.device_type | title }}</td>
-                    <td style="padding: 16px 24px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <div class="icon" style="width: 16px; height: 16px; color: var(--md-primary);">
-                                {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
-                                {% include svg_path ignore missing %}
+                {% if devices and devices|length > 0 %}
+                    {% for dev in devices %}
+                    <tr style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                        
+                        <!-- 1. ID -->
+                        <td style="padding: 16px 20px; font-family: monospace; color: var(--md-text-variant);">
+                            <code>{{ dev.device_id }}</code>
+                        </td>
+                        
+                        <!-- 2. NOMBRE E CONO DE INFORMACIN -->
+                        <td style="padding: 16px 20px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 40px; height: 40px; border-radius: 12px; background: var(--md-surface); display: flex; justify-content: center; align-items: center; color: var(--md-primary); border: 1px solid var(--md-outline-variant);">
+                                    <div class="icon" style="width: 22px; height: 22px;">
+                                        {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
+                                        {% include svg_path ignore missing %}
+                                    </div>
+                                </div>
+                                <a href="/devices/{{ dev.device_id }}" style="font-weight: 600; font-size: 1.05rem; color: var(--md-text); text-decoration: none;">{{ dev.name }}</a>
+                                
+                                <button type="button" class="icon-btn tonal ripple-btn" 
+                                        data-id="{{ dev.device_id }}"
+                                        data-name="{{ dev.name }}"
+                                        data-type="{{ dev.type_name | title }}"
+                                        data-category="{{ dev.category | title }}"
+                                        data-rssi="{{ dev.rssi }}"
+                                        data-bitmask="0x{{ '%02X' % (dev.features or 0) }}"
+                                        data-modifiable='{{ (dev.modifiable_params or []) | tojson }}'
+                                        data-readonly='{{ (dev.readonly_params or []) | tojson }}'
+                                        onclick="triggerQuickInfo(this)"
+                                        title="Ver especificaciones y detalles del dispositivo" 
+                                        style="width: 32px; height: 32px; border-radius: 50%; color: var(--md-primary); background: rgba(107, 76, 18, 0.1);">
+                                    <div class="icon" style="width: 18px; height: 18px;">
+                                        {% include 'UI/icons/svg/information-outline.svg' ignore missing %}
+                                    </div>
+                                </button>
                             </div>
-                            {{ dev.rssi }} dBm
-                        </div>
-                    </td>
-                    <td style="padding: 16px 24px;">
-                        {% if dev.status == 'online' %}
-                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-tertiary); color: var(--md-on-tertiary);">Online</span>
-                        {% else %}
-                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; background: var(--md-error-container); color: var(--md-on-error-container);">Offline</span>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 16px 24px;">
-                        <a href="/device/{{ dev.device_id }}">
-                            <button class="btn-m3 btn-text ripple-btn" style="padding: 8px 16px;">Ver</button>
-                        </a>
-                    </td>
-                </tr>
+                        </td>
+
+                        <!-- 3. TIPO / CATEGORA -->
+                        <td style="padding: 16px 20px;">
+                            <strong style="display: block; color: var(--md-text);">{{ (dev.type_name or dev.device_type or 'generic') | title }}</strong>
+                            <span style="font-size: 0.8rem; color: var(--md-text-variant); text-transform: uppercase;">{{ dev.category }}</span>
+                        </td>
+
+                        <!-- 4. FEATURES & TOGGLE -->
+                        <td style="padding: 16px 20px;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                {% if dev.feature_labels and dev.feature_labels | length > 0 %}
+                                    {% for fl in dev.feature_labels[:2] %}
+                                        {{ chip.m3_chip(fl, style='tonal') }}
+                                    {% endfor %}
+                                    {% if dev.feature_labels | length > 2 %}
+                                        {{ chip.m3_chip('+' ~ (dev.feature_labels|length - 2), style='standard') }}
+                                    {% endif %}
+                                {% else %}
+                                    <span style="font-size: 0.82rem; color: var(--md-text-variant);">Genrico</span>
+                                {% endif %}
+
+                                {% set state = dev.state if dev.state else {} %}
+                                {% set is_switching = ('on' in state) or ('relay' in (dev.feature_keys or '')) or (dev.category in ['switching', 'security']) or ((dev.type_code|int) in [1, 2, 3, 5, 7, 8, 9, 48, 0x30]) or ('luz' in dev.name|lower) or ('foco' in dev.name|lower) or ('relay' in dev.name|lower) or ('enchufe' in dev.name|lower) or ('switch' in dev.name|lower) or ('lámpara' in dev.name|lower) or ('lampara' in dev.name|lower) or ('bombilla' in dev.name|lower) or ('afuera' in dev.name|lower) or ('sala' in dev.name|lower) or ('patio' in dev.name|lower) or (dev.modifiable_params | selectattr('key', 'equalto', 'on') | list | length > 0) %}
+                                {% if is_switching %}
+                                <label class="m3-switch-label" onclick="event.stopPropagation();" title="Encender / Apagar">
+                                    <input type="checkbox" {% if state.get('on') %}checked{% endif %} onchange="sendQuickToggle('{{ dev.device_id }}', this.checked)">
+                                    <span class="m3-switch" style="transform: scale(0.9);"></span>
+                                </label>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 5. RSSI -->
+                        <td style="padding: 16px 20px;">
+                            <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--md-primary);">
+                                <div class="icon" style="width: 16px; height: 16px;">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</div>
+                                {{ dev.rssi }} dBm
+                            </span>
+                        </td>
+
+                        <!-- 6. ESTADO -->
+                        <td style="padding: 16px 20px;">
+                            {{ chip.m3_status_badge(dev.status) }}
+                        </td>
+
+                        <!-- 7. ACCIONES -->
+                        <td style="padding: 16px 20px; text-align: right;">
+                            <a href="/devices/{{ dev.device_id }}" style="text-decoration: none;">
+                                {{ btn.m3_button('Control →', 'tonal', style_attr='height: 36px; padding: 0 16px; font-size: 0.85rem;') }}
+                            </a>
+                        </td>
+
+                    </tr>
+                    {% endfor %}
                 {% else %}
-                <tr>
-                    <td colspan="6" style="padding: 48px; text-align: center; color: var(--md-text-variant);">
-                        No hay dispositivos vinculados. Espera a que un nodo se conecte o emita un paquete de descubrimiento.
-                    </td>
-                </tr>
-                {% endfor %}
+                    <tr>
+                        <td colspan="7" style="padding: 64px 24px; text-align: center;">
+                            <div class="icon" style="width: 48px; height: 48px; margin: 0 auto 16px auto; color: var(--md-outline);">
+                                {% include 'UI/icons/svg/router-wireless.svg' ignore missing %}
+                            </div>
+                            <h3 style="margin: 0 0 8px 0; font-weight: 500;">No hay dispositivos registrados en la tabla</h3>
+                            <p style="color: var(--md-text-variant); margin: 0 0 20px 0;">Enciende tus nodos RF para que aparezcan automáticamente o configúralos.</p>
+                            <a href="/devices/new" style="text-decoration: none;">
+                                {{ btn.m3_button('Configuración Manual', 'tonal') }}
+                            </a>
+                        </td>
+                    </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
-
 </div>
+
+<!-- WIDGET MODAL RÁPIDO DE TABLA -->
+{{ mod.table_quick_info_modal() }}
+
+<script>
+function triggerQuickInfo(btn) {
+    const id = btn.getAttribute('data-id') || '';
+    const name = btn.getAttribute('data-name') || '';
+    const type = btn.getAttribute('data-type') || '';
+    const category = btn.getAttribute('data-category') || '';
+    const rssi = btn.getAttribute('data-rssi') || '';
+    const bitmask = btn.getAttribute('data-bitmask') || '';
+    
+    let modifiable = [];
+    let readonly = [];
+    try { modifiable = JSON.parse(btn.getAttribute('data-modifiable') || '[]'); } catch(e) {}
+    try { readonly = JSON.parse(btn.getAttribute('data-readonly') || '[]'); } catch(e) {}
+
+    showQuickInfo(id, name, type, category, rssi, bitmask, modifiable, readonly);
+}
+
+function showQuickInfo(id, name, type, category, rssi, bitmask, modifiable, readonly) {
+    document.getElementById('modalDevName').innerText = name;
+    document.getElementById('modalDevId').innerText = 'ID: ' + id;
+    document.getElementById('modalDevType').innerText = 'Tipo: ' + type + ' (' + category + ')';
+    document.getElementById('modalDevFeatures').innerText = 'Bitmask HW: ' + bitmask + ' | Señal: ' + rssi + ' dBm';
+    document.getElementById('modalDevLink').href = '/devices/' + id;
+
+    const container = document.getElementById('modalDevParams');
+    let html = '';
+    
+    if (modifiable && modifiable.length > 0) {
+        html += `<h4 style="margin: 6px 0 4px 0; font-size: 0.85rem; color: var(--md-primary);">Parámetros Modificables:</h4>`;
+        modifiable.forEach(m => {
+            html += `<div style="padding: 8px 12px; background: var(--md-surface-container); border-radius: 8px; font-size: 0.85rem; display: flex; justify-content: space-between;"><strong>${m.label}</strong> <code>${m.key}</code></div>`;
+        });
+    }
+    if (readonly && readonly.length > 0) {
+        html += `<h4 style="margin: 10px 0 4px 0; font-size: 0.85rem; color: var(--md-text-variant);">Sensores (Solo Lectura):</h4>`;
+        readonly.forEach(r => {
+            html += `<div style="padding: 8px 12px; background: var(--md-surface-container); border-radius: 8px; font-size: 0.85rem; display: flex; justify-content: space-between;"><span>${r.label}</span> <strong>${r.unit}</strong></div>`;
+        });
+    }
+    if (!html) html = `<div style="padding: 12px; color: var(--md-text-variant);">Nodo estándar sin parámetros declarados.</div>`;
+    
+    container.innerHTML = html;
+    const overlay = document.getElementById('quickInfoModal');
+    if (overlay) overlay.classList.add('active');
+}
+
+function closeQuickInfo() {
+    const overlay = document.getElementById('quickInfoModal');
+    if (overlay) overlay.classList.remove('active');
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeQuickInfo();
+});
+
+async function sendQuickToggle(deviceId, statusBool) {
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                device_id: deviceId,
+                on: statusBool
+            })
+        });
+        const data = await res.json();
+        if (data.status !== 'success' && !res.ok) {
+            alert('Error al enviar comando: ' + (data.error || 'Desconocido'));
+        }
+    } catch (err) {
+        console.error('Error al conmutar dispositivo:', err);
+    }
+}
+</script>
 {% endblock %}

@@ -8,15 +8,69 @@ ColmenaNode::ColmenaNode(IConnection& conn, IParamStore& store)
       _pairActiveLow(true),
       _pairLastState(false),
       _pairDebounceMs(0),
-      _pairLastAnnounce(0)
-{}
+      _pairLastAnnounce(0),
+      _isPairingMode(false),
+      _pairingStartMs(0),
+      _lastPairingRetryMs(0)
+{
+    _pairingNodeName[0] = '\0';
+}
+
+void ColmenaNode::startPairingWindow(const char* nodeName) {
+    _isPairingMode = true;
+    _pairingStartMs = millis();
+    _lastPairingRetryMs = 0; // Para que tickPairing dispare el primer anuncio inmediatamente en el siguiente ciclo del loop
+    if (nodeName) {
+        strncpy(_pairingNodeName, nodeName, sizeof(_pairingNodeName) - 1);
+        _pairingNodeName[sizeof(_pairingNodeName) - 1] = '\0';
+    } else {
+        _pairingNodeName[0] = '\0';
+    }
+    Serial.println("\n=================================================");
+    Serial.println("🔍 [VINCULACIÓN NODO] Ventana de búsqueda activa por 50 segundos...");
+    Serial.println("=================================================");
+}
+
+void ColmenaNode::tickPairing() {
+    if (!_isPairingMode) return;
+    
+    unsigned long now = millis();
+    if (now - _pairingStartMs > 50000UL) {
+        _isPairingMode = false;
+        Serial.println("\n⏱️ [VINCULACIÓN NODO] Tiempo agotado (50s) sin respuesta del Gateway. Deteniendo búsqueda.\n");
+        return;
+    }
+    
+    if (now - _lastPairingRetryMs > 2500UL) {
+        _lastPairingRetryMs = now;
+        unsigned long quedan = (50000UL - (now - _pairingStartMs)) / 1000UL;
+        Serial.printf("\n🔄 [VINCULACIÓN 50s] Buscando Gateway (Quedan %lu seg)...\r\n", quedan);
+        announce(_pairingNodeName);
+    }
+}
 
 void ColmenaNode::announce(const char* nodeName) {
+    if (nodeName && nodeName != _pairingNodeName) {
+        strncpy(_pairingNodeName, nodeName, sizeof(_pairingNodeName) - 1);
+        _pairingNodeName[sizeof(_pairingNodeName) - 1] = '\0';
+    }
+    if (!_conn.isConnected()) {
+        Serial.println("🔄 [TX RF] Verificando enlace RF y conectividad con el Gateway...");
+        _conn.reconnect();
+    }
     RFPacket pkt;
     Protocol_initPacket(&pkt, _p.nodeId, ADDR_MASTER, _p.deviceType, CMD_DISCOVER);
-    LightPayload::setDiscovery(pkt, nodeName, _p.features, _p.fwVersion);
+    LightPayload::setDiscovery(pkt, _pairingNodeName, _p.features, _p.fwVersion);
     Protocol_seal(&pkt);
-    _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
+    
+    Serial.printf("📤 [TX RF] Enviando CMD_DISCOVER (Anuncio) al Master [ID Orig: %u -> Dest: 0]\r\n", _p.nodeId);
+    bool ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
+    if (ok) {
+        Serial.println("✔️ [TX RF] ¡CMD_DISCOVER entregado y confirmado por el Gateway!");
+        _isPairingMode = false;
+    } else {
+        Serial.println("❌ [TX RF] Falló envío. (Se reintentará automáticamente sin bloquear el botón/LED).");
+    }
 }
 
 void ColmenaNode::sendHeartbeat(uint16_t relayMask, uint8_t brightness) {
@@ -29,11 +83,21 @@ void ColmenaNode::sendHeartbeat(uint16_t relayMask, uint8_t brightness) {
     pkt.data[2] = (uint8_t)(relayMask & 0xFF);
     pkt.data[3] = (uint8_t)((relayMask >> 8) & 0xFF);
     Protocol_seal(&pkt);
-    _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
+    Serial.printf("📤 [TX RF] Enviando CMD_HEARTBEAT al Master [ID Orig: %u]\r\n", _p.nodeId);
+    bool ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
+    if (!ok) {
+        ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
+    }
+    if (ok) {
+        Serial.println("✔️ [TX RF] Heartbeat enviado OK.");
+    } else {
+        Serial.println("❌ [TX RF] Falló envío de Heartbeat.");
+    }
     _lastHeartbeatMs = millis();
 }
 
 void ColmenaNode::tickHeartbeat(uint16_t relayMask, uint8_t brightness) {
+    tickPairing();
     unsigned long interval = (unsigned long)_p.heartbeatInterval * 1000UL;
     if (millis() - _lastHeartbeatMs >= interval) {
         sendHeartbeat(relayMask, brightness);
@@ -41,11 +105,14 @@ void ColmenaNode::tickHeartbeat(uint16_t relayMask, uint8_t brightness) {
 }
 
 void ColmenaNode::applySync(const RFPacket& pkt) {
+    _isPairingMode = false;
+    Serial.printf("📥 [RX RF] Recibido CONFIG_SYNC del Gateway (CH: %u, Rate: %u)\r\n", GatewayPayload::getConfigChannel(pkt), GatewayPayload::getConfigDataRate(pkt));
     _p.rfChannel         = GatewayPayload::getConfigChannel(pkt);
     _p.rfDataRate        = GatewayPayload::getConfigDataRate(pkt);
     _p.heartbeatInterval = GatewayPayload::getConfigHeartbeat(pkt);
     GatewayPayload::getConfigName(pkt, _p.colmenaName, sizeof(_p.colmenaName));
     save();
+    Serial.println("✔️ [RX RF] Configuración de red sincronizada y guardada.");
 }
 
 // ── Botón de vinculación ──────────────────────────────────────────────────
@@ -59,7 +126,6 @@ void ColmenaNode::initPairButton(uint8_t pin, bool activeLow) {
     // Si es active-high (botón táctil TTP223 a VCC), usar INPUT_PULLDOWN donde exista o INPUT.
 #if defined(IS_RP2040) || defined(ARDUINO_ARCH_RP2040)
     pinMode(pin, activeLow ? INPUT_PULLUP : INPUT_PULLDOWN);
-    pinMode(24, INPUT_PULLUP); // Botón físico integrado KEY/USR en YD-RP2040 (GP24)
 #elif defined(IS_ESP32) || defined(ARDUINO_ARCH_ESP32)
     pinMode(pin, activeLow ? INPUT_PULLUP : INPUT_PULLDOWN);
 #else
@@ -76,13 +142,6 @@ bool ColmenaNode::tickPairButton(const char* nodeName) {
     if (_pairPin != 255) {
         rawPressed = (digitalRead(_pairPin) == LOW) == _pairActiveLow;
     }
-
-#if defined(IS_RP2040) || defined(ARDUINO_ARCH_RP2040)
-    // En YD-RP2040, el botón físico integrado (KEY/USR) está conectado a tierra en GP24
-    if (digitalRead(24) == LOW) {
-        rawPressed = true;
-    }
-#endif
 
     if (!rawPressed) {
         _pairLastState  = false;
@@ -106,14 +165,14 @@ bool ColmenaNode::tickPairButton(const char* nodeName) {
         return false;
     }
 
-    // Cooldown de 30 segundos mientras el modo vinculación está en curso
-    if ((now - _pairLastAnnounce) < 30000UL) {
+    // Cooldown de 2 segundos entre pulsaciones exitosas de vinculación
+    if ((now - _pairLastAnnounce) < 2000UL) {
         return false;
     }
 
     // ✔ ¡Botón mantenido por 1.2 segundos! Disparar modo vinculación
     _pairLastAnnounce = now;
-    Serial.println("\n[BOTÓN] ¡Modo vinculación activado! Disparando anuncio por RF (CMD_DISCOVER)...");
-    announce(nodeName);
+    Serial.println("\n[BOTÓN] ¡Modo vinculación activado! Disparando ventana de búsqueda por 50s...");
+    startPairingWindow(nodeName);
     return true;
 }

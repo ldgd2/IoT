@@ -222,17 +222,18 @@ class _RoomCard extends StatelessWidget {
               );
             }
             final d = devices[index - 1];
+            final names = context.read<AppState>().getSwitchNames(d.id, d.relays.length);
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: dvw.SmartDeviceCard(
                 device: d,
+                switchNames: names,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (_) => DeviceDetailView(deviceId: d.id)));
                 },
-                onToggleQuick: (val) async {
-                  await context.read<AppState>().setRelay(d, 1, val);
-                },
+                onToggleRelay: (index1, val) =>
+                    context.read<AppState>().setRelay(d, index1, val),
               ),
             );
           },

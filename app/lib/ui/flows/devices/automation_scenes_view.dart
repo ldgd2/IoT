@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bthapp/src/state/app_state.dart';
+import 'skill_notification_builder_view.dart';
 
 class AutomationScenesView extends StatefulWidget {
   const AutomationScenesView({super.key});
@@ -17,6 +18,26 @@ class AutomationScenesView extends StatefulWidget {
 
 class _AutomationScenesViewState extends State<AutomationScenesView> {
   String? runningScene;
+  List<Map<String, dynamic>> hubSkills = [];
+  bool isLoadingSkills = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHubSkills();
+  }
+
+  Future<void> _loadHubSkills() async {
+    setState(() => isLoadingSkills = true);
+    final app = context.read<AppState>();
+    final list = await app.fetchSkills();
+    if (mounted) {
+      setState(() {
+        hubSkills = list;
+        isLoadingSkills = false;
+      });
+    }
+  }
 
   final List<Map<String, dynamic>> scenes = [
     {
@@ -95,32 +116,164 @@ class _AutomationScenesViewState extends State<AutomationScenesView> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Escenas y Rutinas', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'Automatizaciones Rápidas',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadHubSkills,
+            tooltip: 'Sincronizar Skills',
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Ejecuta comandos coordinados en todos tus dispositivos Wi-Fi y RF con un toque.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 20),
-          for (var i = 0; i < scenes.length; i++) ...[
-            _SceneCard(
-              scene: scenes[i],
-              isRunning: runningScene == scenes[i]['id'],
-              onTap: () => _runScene(scenes[i]['id'] as String, scenes[i]['title'] as String),
-            ).animate().fadeIn(delay: Duration(milliseconds: i * 80)).slideX(begin: 0.05, end: 0),
-            const SizedBox(height: 16),
-          ],
         ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadHubSkills,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // TARJETA PRINCIPAL PARA CREAR SKILLS / NOTIFICACIONES
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF6A11CB), const Color(0xFF2575FC)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF6A11CB).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, color: Colors.white, size: 28),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Rutinas y Alertas Inteligentes',
+                          style: tt.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Crea reglas inteligentes y arrastra ítems de notificación para recibir alertas instantáneas cuando un sensor se active o un dispositivo cambie de estado.',
+                    style: tt.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF6A11CB),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                      ),
+                      icon: const Icon(Icons.add_circle_outline, size: 22),
+                      label: const Text('Crear Rutina y Alerta Automática', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final res = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SkillNotificationBuilderView()),
+                        );
+                        if (res == true) _loadHubSkills();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn().scale(duration: 300.ms, curve: Curves.easeOutBack),
+            const SizedBox(height: 24),
+
+            // SECCIÓN DE SKILLS GUARDADAS EN EL HUB
+            if (hubSkills.isNotEmpty) ...[
+              Text(
+                'Rutinas Activas en tu Hogar',
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Estas rutinas se ejecutan de forma autónoma día y noche en tu Central Colmena.',
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < hubSkills.length; i++) ...[
+                Card(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primary.withValues(alpha: 0.2),
+                      child: Icon(Icons.hub, color: cs.primary),
+                    ),
+                    title: Text(hubSkills[i]['name']?.toString() ?? 'Skill Colmena', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    subtitle: Text('ID #${hubSkills[i]['id']} | Estado: ${hubSkills[i]['is_active'] == 1 ? 'Activa' : 'Pausada'}', style: tt.bodySmall),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.play_circle_fill, color: Color(0xFF00E5A8), size: 28),
+                          tooltip: 'Ejecutar Ahora',
+                          onPressed: () async {
+                            final id = int.tryParse(hubSkills[i]['id']?.toString() ?? '0') ?? 0;
+                            final ok = await context.read<AppState>().executeSkill(id);
+                            if (ok && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Skill "${hubSkills[i]['name']}" ejecutada.')),
+                              );
+                            }
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          tooltip: 'Eliminar Skill',
+                          onPressed: () async {
+                            final id = int.tryParse(hubSkills[i]['id']?.toString() ?? '0') ?? 0;
+                            final ok = await context.read<AppState>().deleteSkill(id);
+                            if (ok) _loadHubSkills();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ).animate().fadeIn(delay: Duration(milliseconds: i * 60)).slideX(begin: 0.04, end: 0),
+              ],
+              const SizedBox(height: 24),
+            ],
+
+            Text(
+              'Escenas Rápidas',
+              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Ejecuta comandos coordinados en todos tus dispositivos Wi-Fi y RF con un toque.',
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            for (var i = 0; i < scenes.length; i++) ...[
+              _SceneCard(
+                scene: scenes[i],
+                isRunning: runningScene == scenes[i]['id'],
+                onTap: () => _runScene(scenes[i]['id'] as String, scenes[i]['title'] as String),
+              ).animate().fadeIn(delay: Duration(milliseconds: i * 80)).slideX(begin: 0.05, end: 0),
+              const SizedBox(height: 16),
+            ],
+          ],
+        ),
       ),
     );
   }

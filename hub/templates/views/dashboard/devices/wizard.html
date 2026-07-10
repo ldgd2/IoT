@@ -39,6 +39,24 @@
                 <p>Escuchando red Mesh...</p>
             </div>
 
+            <!-- RECUADRO DE DIAGNÓSTICO EN TIEMPO REAL (RX / TX) -->
+            <div id="diag-box" style="background: var(--md-surface-container-high); border-radius: var(--radius-medium); padding: 16px; margin-bottom: 24px; font-family: monospace; font-size: 0.9rem; border-left: 4px solid var(--md-primary);">
+                <div style="font-weight: bold; margin-bottom: 8px; color: var(--md-primary); display: flex; align-items: center; justify-content: space-between;">
+                    <span>📡 INTERCEPTOR RF (PAQUETES EN VIVO)</span>
+                    <span id="diag-timer" style="font-size: 0.8rem; background: var(--md-primary-container); color: var(--md-on-primary-container); padding: 2px 8px; border-radius: 12px;">Ventana: 0s / 50s</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px; word-break: break-all;">
+                    <div style="display: flex; gap: 8px;">
+                        <span style="color: var(--md-tertiary); font-weight: bold; min-width: 50px;">[TX ➔]</span>
+                        <span id="live-tx" style="color: var(--md-text);">Iniciando búsqueda en ventana de 50s...</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <span style="color: #4CAF50; font-weight: bold; min-width: 50px;">[RX ⬅]</span>
+                        <span id="live-rx" style="color: var(--md-text);">Esperando anuncio del nodo...</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- RESULTADO DEL ESCANEO (Oculto al inicio) -->
             <div id="scan-result" style="display: none; padding: 24px; background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-medium); margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
                 <div class="icon" style="width: 32px; height: 32px;">
@@ -81,6 +99,7 @@
 
     let initialDeviceCount = null;
     let isPairingActive = false;
+    let pairedDeviceId = null;
 
     async function setGatewayPairingMode(action) {
         try {
@@ -98,32 +117,95 @@
     async function pollForNewDevices() {
         if (!isPairingActive && initialDeviceCount !== null) return;
         try {
+            // 1. Consultar estado y paquetes en vivo del Gateway
+            let pairData = null;
+            try {
+                const resPair = await fetch('/api/pairing/status');
+                pairData = await resPair.json();
+                if (pairData) {
+                    if (pairData.last_tx) document.getElementById('live-tx').innerText = pairData.last_tx;
+                    if (pairData.last_rx) document.getElementById('live-rx').innerText = pairData.last_rx;
+                    if (pairData.elapsed !== undefined) {
+                        document.getElementById('diag-timer').innerText = `Ventana: ${pairData.elapsed}s / 50s`;
+                    }
+                    if (pairData.status === 'timeout') {
+                        alert('⏱️ Tiempo de vinculación agotado (50s) sin respuesta de nuevos nodos. Volviendo atrás...');
+                        setGatewayPairingMode('stop');
+                        window.location.href = '/devices';
+                        return;
+                    }
+                    if (pairData.status === 'success' || (initialDeviceCount !== null && data && data.total > initialDeviceCount)) {
+                        let devInfo = pairData.last_device || null;
+                        if (!devInfo) {
+                            try {
+                                const resAll = await fetch('/api/devices');
+                                const allDevs = await resAll.json();
+                                if (allDevs && allDevs.length > 0) {
+                                    devInfo = allDevs[allDevs.length - 1];
+                                }
+                            } catch(e) {}
+                        }
+
+                        pairedDeviceId = devInfo ? (devInfo.id || devInfo.device_id) : 'dev_1';
+                        document.getElementById('scan-container').style.display = 'none';
+                        document.getElementById('diag-box').style.display = 'none';
+                        document.getElementById('scan-result').style.display = 'flex';
+                        document.getElementById('found-id').innerText = pairedDeviceId ? pairedDeviceId.toUpperCase() : 'NUEVO NODO';
+                        document.getElementById('found-type').innerText = devInfo ? (devInfo.type_name || 'Dispositivo Mesh') : 'Detectado vía RF';
+                        
+                        const nameInput = document.querySelector('#step-2 input[type="text"]');
+                        if (nameInput && !nameInput.value && devInfo && devInfo.name) {
+                            nameInput.value = devInfo.name;
+                        }
+
+                        setGatewayPairingMode('stop');
+                        setTimeout(() => nextStep(2), 1500);
+                        return;
+                    }
+                }
+            } catch (errPair) {
+                console.warn('No se pudo obtener estado de pairing:', errPair);
+            }
+
+            // 2. Consultar lista de dispositivos para ver si se unió uno nuevo por conteo
             const res = await fetch('/api/stats');
             const data = await res.json();
             
             if (initialDeviceCount === null) {
                 initialDeviceCount = data.total;
             } else if (data.total > initialDeviceCount) {
-                // Se encontró un nuevo dispositivo!
-                document.getElementById('scan-container').style.display = 'none';
-                document.getElementById('scan-result').style.display = 'flex';
-                document.getElementById('found-id').innerText = 'Nuevo Nodo Registrado';
-                document.getElementById('found-type').innerText = 'Detectado vía RF';
-                
-                // Detener modo vinculación en el Gateway
-                setGatewayPairingMode('stop');
+                let devInfo = null;
+                try {
+                    const resAll = await fetch('/api/devices');
+                    const allDevs = await resAll.json();
+                    if (allDevs && allDevs.length > 0) {
+                        devInfo = allDevs[allDevs.length - 1];
+                    }
+                } catch(e) {}
 
-                // Avanzar al paso 2 automáticamente después de 2 segundos
-                setTimeout(() => nextStep(2), 2000);
-                return; // Dejar de buscar
+                pairedDeviceId = devInfo ? (devInfo.id || devInfo.device_id) : 'dev_1';
+                document.getElementById('scan-container').style.display = 'none';
+                document.getElementById('diag-box').style.display = 'none';
+                document.getElementById('scan-result').style.display = 'flex';
+                document.getElementById('found-id').innerText = pairedDeviceId ? pairedDeviceId.toUpperCase() : 'NUEVO NODO';
+                document.getElementById('found-type').innerText = devInfo ? (devInfo.type_name || 'Dispositivo Mesh') : 'Detectado vía RF';
+                
+                const nameInput = document.querySelector('#step-2 input[type="text"]');
+                if (nameInput && !nameInput.value && devInfo && devInfo.name) {
+                    nameInput.value = devInfo.name;
+                }
+
+                setGatewayPairingMode('stop');
+                setTimeout(() => nextStep(2), 1500);
+                return;
             }
         } catch (e) {
             console.error('Error al hacer polling:', e);
         }
         
-        // Seguir buscando
+        // Seguir buscando cada 1 segundo para una animación fluida
         if (isPairingActive || initialDeviceCount === null) {
-            setTimeout(pollForNewDevices, 2000);
+            setTimeout(pollForNewDevices, 1000);
         }
     }
 
@@ -149,8 +231,20 @@
         }
     }
 
-    function finishWizard() {
+    async function finishWizard() {
         setGatewayPairingMode('stop');
+        const nameInput = document.querySelector('#step-2 input[type="text"]');
+        if (pairedDeviceId && nameInput && nameInput.value.trim()) {
+            try {
+                await fetch('/api/device/' + pairedDeviceId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: nameInput.value.trim() })
+                });
+            } catch (e) {
+                console.error('Error al guardar nombre del dispositivo:', e);
+            }
+        }
         window.location.href = "/devices";
     }
 

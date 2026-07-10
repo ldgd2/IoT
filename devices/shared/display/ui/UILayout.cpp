@@ -88,18 +88,22 @@ void UILayout::drawIntroAnimation() {
     }
 }
 
-void UILayout::drawPairingAnimation(const char* colmenaName, uint8_t step) {
+void UILayout::drawPairingAnimation(const char* colmenaName, uint8_t step, const char* lastRx, const char* lastTx) {
     _r.clear();
-    _r.textCentered(6, "Buscando Nodos...", 1);
-    _r.hRule(18);
+    _r.textCentered(0, "VINCULANDO NODOS...", 1);
+    _r.hRule(10);
 
-    int radius = 4 + (step % 4) * 5;
-    _r.circle(64, 38, radius);
-    if (radius > 8)  _r.circle(64, 38, radius - 6);
-    if (radius > 14) _r.circle(64, 38, radius - 12);
+    // Recuadro de paquetes de diagnóstico (RX/TX) en la pantalla del traductor
+    _r.rect(0, 13, 128, 23);
+    _r.text(3, 16, (lastRx && lastRx[0]) ? lastRx : "RX: Ninguno", 1);
+    _r.text(3, 26, (lastTx && lastTx[0]) ? lastTx : "TX: Buscando...", 1);
 
-    _r.textCentered(35, "(((.)))", 1);
-    _r.textCentered(52, colmenaName ? colmenaName : "colmena", 1);
+    int radius = 3 + (step % 4) * 4;
+    _r.circle(64, 47, radius);
+    if (radius > 6)  _r.circle(64, 47, radius - 5);
+
+    _r.textCentered(43, "(((.)))", 1);
+    _r.textCentered(54, colmenaName ? colmenaName : "colmena", 1);
     _r.flush();
 }
 
@@ -150,6 +154,33 @@ void UILayout::drawLiveStatusScreen(const char* status, uint8_t nodeCount,
 
     _r.hRule(42);
     _r.textWrapped(0, 45, 128, lastActivity ? lastActivity : "Escaneando...", 1);
+
+    _r.flush();
+}
+
+void UILayout::drawNetworkStatsScreen(const char* status, uint8_t channel, uint8_t dataRate,
+                                      const char* transportMode, uint8_t animFrame) {
+    _r.clear();
+
+    _r.text(0, 0, "Resumen de Red", 1);
+    const char* radarFrames[] = { "|", "/", "-", "\\" };
+    _r.text(118, 0, radarFrames[animFrame % 4], 1);
+    _r.hRule(9);
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Canal RF: CH %d", channel);
+    _r.text(0, 12, buf, 1);
+
+    const char* rateStr = (dataRate == 0) ? "250 kbps" : ((dataRate == 1) ? "1 Mbps" : "2 Mbps");
+    snprintf(buf, sizeof(buf), "Velocidad: %s", rateStr);
+    _r.text(0, 22, buf, 1);
+
+    snprintf(buf, sizeof(buf), "Modo: %s", transportMode ? transportMode : "HID");
+    _r.text(0, 32, buf, 1);
+
+    _r.hRule(42);
+    snprintf(buf, sizeof(buf), "Estado: %s", status);
+    _r.text(0, 46, buf, 1);
 
     _r.flush();
 }
