@@ -81,14 +81,14 @@ def _show_bridge_status():
     lan_ip = get_lan_ip()
     status_str = "[bold green]🟢 ACTIVO (Corriendo / Escuchando)[/bold green]" if running else "[bold red]🔴 DETENIDO / INACTIVO[/bold red]"
 
-    table = Table(title="🌉 Estado del Servidor Puente / Relay (Teléfono <-> Hub)", show_header=True, header_style="bold magenta")
+    table = Table(title="🌐 Estado del Servidor Nube / Relay (Arquitectura Multi-Hub)", show_header=True, header_style="bold magenta")
     table.add_column("Parámetro", style="dim", width=28)
     table.add_column("Valor / Dirección", style="bold")
 
     table.add_row("Estado del Servicio", status_str)
-    table.add_row("🌐 URL Puente (Esta PC)", f"http://127.0.0.1:{SERVER_PORT}")
-    table.add_row("🌐 URL en Red WiFi / LAN", f"http://{lan_ip}:{SERVER_PORT}")
-    table.add_row("🔗 Hub Destino (Central)", f"{HUB_URL}")
+    table.add_row("🌐 URL Local (Loopback)", f"http://127.0.0.1:{SERVER_PORT}")
+    table.add_row("🌐 URL Pública / LAN", f"http://{lan_ip}:{SERVER_PORT}")
+    table.add_row("🔗 Modo Multi-Hub", "Activado (Maneja múltiples Hubs)")
     if pid_val:
         table.add_row("⚙️ PID de Proceso", str(pid_val))
 
