@@ -1,0 +1,36 @@
+# ==============================================================================
+# REQUIREMENTS.TXT — HOGAR COLMENA (Ecosistema Integral de IoT & Móvil)
+# Contiene todas las dependencias para Hub, Servidor Relay, CLI, Scripts y GUI
+# ==============================================================================
+
+# 1. Servidor Web, REST APIs y Conectividad HTTP
+flask>=2.3.0
+flask-cors>=4.0.0
+requests>=2.31.0
+requests-toolbelt>=1.0.0
+urllib3>=2.0.0
+
+# 2. Configuración y Formatos (YAML, Env, Progreso)
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+tqdm>=4.66.0
+colorama>=0.4.6
+
+# 3. Base de Datos y ORM (Central Colmena Hub)
+SQLAlchemy>=2.0.0
+
+# 4. Comunicación con Hardware (Serial USB / RF24 / HID)
+pyserial>=3.5
+hidapi>=0.14.0
+
+# 5. CLI, Interfaces Gráficas de Consola y Cuestionarios
+rich>=13.7.0
+click>=8.1.7
+rich-click>=1.7.0
+questionary>=2.0.1
+
+# 6. Interfaz Gráfica de Pruebas Desktop (test_serial.py)
+PyQt6>=6.6.0
+
+# 7. Gestión de Microcontroladores y Compilación de Firmware (ESP32 / RP2040)
+platformio>=6.1.11
