@@ -359,6 +359,31 @@ def relay_api_register_device():
     payload = {"cmd": "register_device"}
     payload.update(data)
     res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    cached_devices.pop(target_hub, None)
+    return jsonify(res), status
+
+
+@app.route("/api/device/<device_id>", methods=["PUT", "POST", "PATCH"])
+@app.route("/api/devices/<device_id>", methods=["PUT", "POST", "PATCH"])
+@require_auth
+def relay_api_update_device(device_id):
+    target_hub = _get_target_hub_id()
+    data = request.get_json(silent=True) or {}
+    payload = {"cmd": "update_device", "device_id": device_id}
+    payload.update(data)
+    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    cached_devices.pop(target_hub, None)
+    return jsonify(res), status
+
+
+@app.route("/api/device/<device_id>", methods=["DELETE"])
+@app.route("/api/devices/<device_id>", methods=["DELETE"])
+@require_auth
+def relay_api_delete_device(device_id):
+    target_hub = _get_target_hub_id()
+    payload = {"cmd": "delete_device", "device_id": device_id}
+    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    cached_devices.pop(target_hub, None)
     return jsonify(res), status
 
 

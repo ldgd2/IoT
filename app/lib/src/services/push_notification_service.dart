@@ -177,4 +177,16 @@ class PushNotificationService {
       log("[WARN] No se pudo registrar el FCM token (puede que el servidor aún no responda): $e");
     }
   }
+
+  /// Sincroniza el FCM token en cuanto el usuario inicia sesión.
+  static Future<void> syncTokenWithBackend() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        await registerTokenWithBackend(token);
+      }
+    } catch (e) {
+      log("Error en syncTokenWithBackend: $e");
+    }
+  }
 }

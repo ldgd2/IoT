@@ -145,7 +145,7 @@ class CloudBridgeWorker:
             devices = [d.to_dict() for d in Device.all()]
             return {"ok": True, "devices": devices}
 
-        if cmd == "register_device":
+        if cmd in ("register_device", "update_device"):
             reg_id = payload.get("device_id") or payload.get("id")
             if not reg_id:
                 return {"ok": False, "error": "device_id requerido"}
@@ -153,13 +153,25 @@ class CloudBridgeWorker:
             if "name" in payload: dev.name = payload["name"]
             if "type_name" in payload: dev.type_name = payload["type_name"]
             if "category" in payload: dev.category = payload["category"]
+            if "room" in payload: dev.category = payload["room"]
             if "state" in payload and isinstance(payload["state"], dict):
                 dev.state = payload["state"]
             dev.status = "online"
             dev.save()
             self._sync_devices()
-            print(f"🏠 [CLOUD BRIDGE] Dispositivo registrado desde exterior: '{dev.name}' ({dev.device_id})")
+            print(f"🏠 [CLOUD BRIDGE] Dispositivo actualizado/registrado: '{dev.name}' ({dev.device_id})")
             return {"ok": True, "device": dev.to_dict()}
+
+        if cmd == "delete_device":
+            del_id = payload.get("device_id") or payload.get("id")
+            if not del_id:
+                return {"ok": False, "error": "device_id requerido para eliminar"}
+            dev = Device.get(del_id)
+            if dev:
+                dev.delete()
+                print(f"🗑️ [CLOUD BRIDGE] Dispositivo eliminado: '{del_id}'")
+            self._sync_devices()
+            return {"ok": True, "deleted": del_id}
 
         dev = Device.get(device_id)
         if not dev:

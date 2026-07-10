@@ -68,6 +68,8 @@ class Device {
     this.lastSeen,
   });
 
+  bool get isRf => commMode == 'rf' || hubIp != null || rfNodeId != null;
+
   /// Creador rápido para dispositivo Wi-Fi / mDNS.
   factory Device.fromHost({
     required String hostMdns,

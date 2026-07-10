@@ -161,18 +161,58 @@ class AppState extends ChangeNotifier {
     await _save();
     await _saveMeta();
     notifyListeners();
+
+    // Propagar edición o renombramiento de dispositivo al Hub en segundo plano
+    if (d.isRf || d.hubIp != null || _hubHost.isNotEmpty) {
+      final updated = i >= 0 ? _devices[i] : d;
+      registerDeviceOnHub(updated).catchError((_) => false);
+    }
+  }
+
+  Future<void> upsertDeviceFromSync(Device dev) async {
+    final idx = _devices.indexWhere((x) => x.id == dev.id);
+    if (idx >= 0) {
+      final old = _devices[idx];
+      _devices[idx] = old.copyWith(
+        rssi: dev.rssi ?? old.rssi,
+        state: dev.state,
+        online: dev.online,
+        lastSeen: DateTime.now(),
+      );
+    } else {
+      _devices.add(dev);
+      _ensureNamesList(dev.id, dev.relays.length);
+      _deviceKinds.putIfAbsent(dev.id, () => dev.kind ?? _defaultKind(dev.relays.length));
+    }
+    await _save();
+    await _saveMeta();
+    notifyListeners();
   }
 
   Future<void> upsertDevice(Device d) => addDevice(d);
   Future<void> addOrUpdateDevice(Device d) => addDevice(d);
 
   Future<void> removeDevice(String id) async {
+    final d = getById(id);
     _devices.removeWhere((x) => x.id == id);
     _switchNames.remove(id);
     _deviceKinds.remove(id);
     await _save();
     await _saveMeta();
     notifyListeners();
+
+    if (d != null && (d.isRf || d.hubIp != null || _hubHost.isNotEmpty)) {
+      final target = d.hubIp ?? _hubHost;
+      try {
+        final headers = await _getAuthHeaders();
+        final uri1 = Uri.parse('http://$target/api/device/$id');
+        await http.delete(uri1, headers: headers).timeout(const Duration(seconds: 4));
+        final uri2 = Uri.parse('http://$target/api/devices/$id');
+        await http.delete(uri2, headers: headers).timeout(const Duration(seconds: 4));
+      } catch (e) {
+        debugPrint('removeDevice en Hub/Server ($id): $e');
+      }
+    }
   }
 
   Device? getById(String id) {
@@ -217,6 +257,7 @@ class AppState extends ChangeNotifier {
         'name': d.alias ?? d.id,
         'type_name': d.kind ?? 'generic',
         'category': d.room ?? 'General',
+        'room': d.room ?? 'General',
         'rssi': d.rssi ?? -65,
         'state': d.state,
       });
@@ -257,7 +298,7 @@ class AppState extends ChangeNotifier {
             state: stateMap,
             online: item['status']?.toString().toLowerCase() == 'online',
           );
-          await upsertDevice(dev);
+          await upsertDeviceFromSync(dev);
           synced.add(dev);
         }
       }

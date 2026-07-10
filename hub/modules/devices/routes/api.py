@@ -41,9 +41,16 @@ def api_create_device():
     dev.status = "online"
     dev.save()
 
+    try:
+        from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+        cloud_bridge._sync_devices()
+    except Exception:
+        pass
+
     return jsonify({"ok": True, "device": dev.to_dict()}), 201
 
 @devices_bp.route("/device/<device_id>", methods=["GET"])
+@devices_bp.route("/devices/<device_id>", methods=["GET"])
 def api_device(device_id):
     dev = Device.get(device_id)
     if not dev:
@@ -51,6 +58,7 @@ def api_device(device_id):
     return jsonify(dev.to_dict())
 
 @devices_bp.route("/device/<device_id>", methods=["PUT", "POST", "PATCH"])
+@devices_bp.route("/devices/<device_id>", methods=["PUT", "POST", "PATCH"])
 def api_update_device(device_id):
     from flask import request
     data = request.get_json(silent=True) or {}
@@ -62,17 +70,34 @@ def api_update_device(device_id):
         dev.name = data["name"].strip()
     if "category" in data:
         dev.category = data["category"]
+    if "room" in data:
+        dev.category = data["room"]
     if "type_name" in data:
         dev.type_name = data["type_name"]
     if "state" in data and isinstance(data["state"], dict):
         dev.state = data["state"]
     dev.save()
+
+    try:
+        from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+        cloud_bridge._sync_devices()
+    except Exception:
+        pass
+
     return jsonify({"ok": True, "device": dev.to_dict()})
 
 @devices_bp.route("/device/<device_id>", methods=["DELETE"])
+@devices_bp.route("/devices/<device_id>", methods=["DELETE"])
 def api_delete_device(device_id):
     dev = Device.get(device_id)
     if not dev:
         return jsonify({"error": "not found"}), 404
     dev.delete()
+
+    try:
+        from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+        cloud_bridge._sync_devices()
+    except Exception:
+        pass
+
     return jsonify({"ok": True})

@@ -7,6 +7,7 @@ import '../models/user.dart';
 import '../models/room.dart';
 import '../models/hub.dart';
 import '../services/auth_service.dart';
+import '../services/push_notification_service.dart';
 import '../constants/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -48,6 +49,7 @@ class AuthState extends ChangeNotifier {
       final valid = await AuthService.validateSession();
       if (valid) {
         _status = AuthStatus.authenticated;
+        PushNotificationService.syncTokenWithBackend();
         await _loadHubs();
       } else {
         await AuthService.clearSession();
@@ -70,6 +72,7 @@ class AuthState extends ChangeNotifier {
       _token = result.token;
       _user = result.user;
       _status = AuthStatus.authenticated;
+      PushNotificationService.syncTokenWithBackend();
       await _loadHubs();
       notifyListeners();
       return true;
@@ -91,6 +94,7 @@ class AuthState extends ChangeNotifier {
       _token = result.token;
       _user = result.user;
       _status = AuthStatus.authenticated;
+      PushNotificationService.syncTokenWithBackend();
       notifyListeners();
       return true;
     } else {
