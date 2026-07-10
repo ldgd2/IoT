@@ -174,8 +174,13 @@ class CloudBridgeWorker:
             return {"ok": True, "deleted": del_id}
 
         dev = Device.get(device_id)
+        if not dev and not str(device_id).startswith("dev_"):
+            dev = Device.get(f"dev_{device_id}")
+        if not dev and str(device_id).startswith("dev_"):
+            dev = Device.get(str(device_id).split("_", 1)[1])
         if not dev:
-            return {"ok": False, "error": f"Dispositivo {device_id} no encontrado en la base de datos del Hub"}
+            dev = Device(device_id=str(device_id), name=f"Device {device_id}", status="online")
+            dev.save()
 
         # 1. Actualizar estado interno en BD
         if isinstance(dev.state, dict):

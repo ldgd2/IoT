@@ -193,8 +193,13 @@ def api_command():
 
     device_id = data.get("id")
     dev = Device.get(device_id)
+    if not dev and not str(device_id).startswith("dev_"):
+        dev = Device.get(f"dev_{device_id}")
+    if not dev and str(device_id).startswith("dev_"):
+        dev = Device.get(str(device_id).split("_", 1)[1])
     if not dev:
-        return jsonify({"error": "device not found"}), 404
+        dev = Device(device_id=str(device_id), name=f"Device {device_id}", status="online")
+        dev.save()
 
     cmd    = data.get("cmd", "set")
     params = data.get("params", {})
