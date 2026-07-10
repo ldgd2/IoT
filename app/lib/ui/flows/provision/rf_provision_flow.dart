@@ -54,6 +54,11 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     super.initState();
     final app = context.read<AppState>();
     hostCtrl.text = app.hubHost;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (app.hubHost.isNotEmpty) {
+        _verifyHubConnection(silent: true);
+      }
+    });
   }
 
   @override
@@ -67,29 +72,35 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     super.dispose();
   }
 
-  Future<void> _verifyHubConnection() async {
+  Future<void> _verifyHubConnection({bool silent = false}) async {
     final host = hostCtrl.text.trim();
     if (host.isEmpty) {
-      _snack('Ingresa la dirección web de tu Central Colmena');
+      if (!silent) _snack('Ingresa la dirección web de tu Central Colmena');
       return;
     }
 
-    setState(() {
-      progressMsg = 'Verificando conexión con tu Central Colmena ($host)...';
-    });
+    if (!silent) {
+      setState(() {
+        progressMsg = 'Verificando conexión con tu Central Colmena ($host)...';
+      });
+    }
 
     final app = context.read<AppState>();
     await app.setHubHost(host);
     final ok = await app.checkHubOnline();
 
     if (!ok) {
-      _snack('No se pudo conectar con la Central en http://$host. Verifica que esté encendida.');
+      if (!silent) {
+        _snack('No se pudo conectar con la Central en http://$host. Verifica que esté encendida.');
+      }
       return;
     }
 
-    setState(() {
-      step = _RfStep.chooseKind;
-    });
+    if (mounted) {
+      setState(() {
+        step = _RfStep.chooseKind;
+      });
+    }
   }
 
   Future<void> _startScanOnHub() async {

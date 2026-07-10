@@ -264,3 +264,32 @@ def api_create_notification():
 def api_mark_read(notif_id):
     db.execute("UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?", (notif_id, g.user["user_id"]))
     return jsonify({"ok": True}), 200
+
+
+@auth_bp.route("/user/notifications/read-all", methods=["PUT"])
+@require_auth
+def api_mark_all_read():
+    db.execute("UPDATE notifications SET read = 1 WHERE user_id = ?", (g.user["user_id"],))
+    return jsonify({"ok": True}), 200
+
+
+# ── FCM Token ─────────────────────────────────────────────────
+@auth_bp.route("/auth/fcm-token", methods=["POST"])
+@require_auth
+def api_register_fcm_token():
+    """
+    Guarda o actualiza el token FCM del dispositivo del usuario autenticado.
+    La app Flutter llama a este endpoint tras obtener el token de Firebase Messaging.
+    Body: { "fcm_token": "<token>" }
+    """
+    data = request.get_json(silent=True) or {}
+    token = (data.get("fcm_token") or data.get("token") or "").strip()
+    if not token:
+        return jsonify({"error": "fcm_token requerido"}), 400
+
+    db.execute(
+        "UPDATE users SET fcm_token = ? WHERE user_id = ?",
+        (token, g.user["user_id"])
+    )
+    print(f"[FCM] Token registrado para usuario '{g.user['username']}': {token[:20]}...")
+    return jsonify({"ok": True}), 200

@@ -180,6 +180,16 @@ class AppState extends ChangeNotifier {
     catch (_) { return null; }
   }
 
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final sp = await SharedPreferences.getInstance();
+    final token = sp.getString('auth_token_v1') ?? '';
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
   // -----------------------------------------------------------
   // GATEWAY HUB RF REAL API
   Future<bool> checkHubOnline({String? hostOverride}) async {
@@ -201,6 +211,7 @@ class AppState extends ChangeNotifier {
     final target = d.hubIp ?? _hubHost;
     try {
       final uri = Uri.parse('http://$target/api/devices');
+      final headers = await _getAuthHeaders();
       final body = jsonEncode({
         'device_id': d.rfNodeId ?? d.id,
         'name': d.alias ?? d.id,
@@ -211,7 +222,7 @@ class AppState extends ChangeNotifier {
       });
       final r = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: body,
       ).timeout(const Duration(seconds: 5));
       return r.statusCode >= 200 && r.statusCode < 300;
@@ -225,7 +236,8 @@ class AppState extends ChangeNotifier {
     final target = hostOverride ?? _hubHost;
     try {
       final uri = Uri.parse('http://$target/api/devices');
-      final r = await http.get(uri).timeout(const Duration(seconds: 5));
+      final headers = await _getAuthHeaders();
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 5));
       if (r.statusCode != 200) return [];
 
       final list = jsonDecode(r.body) as List;
@@ -265,9 +277,10 @@ class AppState extends ChangeNotifier {
     };
     try {
       final uri = Uri.parse('http://$target/api/command');
+      final headers = await _getAuthHeaders();
       final r = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 4));
 
@@ -522,9 +535,10 @@ class AppState extends ChangeNotifier {
   Future<bool> startRfPairing() async {
     try {
       final uri = Uri.parse('http://$_hubHost/api/pairing');
+      final headers = await _getAuthHeaders();
       final r = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({'action': 'start'}),
       ).timeout(const Duration(seconds: 4));
       return r.statusCode == 200;
@@ -537,9 +551,10 @@ class AppState extends ChangeNotifier {
   Future<bool> stopRfPairing() async {
     try {
       final uri = Uri.parse('http://$_hubHost/api/pairing');
+      final headers = await _getAuthHeaders();
       final r = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({'action': 'stop'}),
       ).timeout(const Duration(seconds: 4));
       return r.statusCode == 200;
@@ -552,7 +567,8 @@ class AppState extends ChangeNotifier {
   Future<Map<String, dynamic>?> checkRfPairingStatus() async {
     try {
       final uri = Uri.parse('http://$_hubHost/api/pairing/status');
-      final r = await http.get(uri).timeout(const Duration(seconds: 3));
+      final headers = await _getAuthHeaders();
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 3));
       if (r.statusCode == 200) {
         return jsonDecode(r.body) as Map<String, dynamic>;
       }

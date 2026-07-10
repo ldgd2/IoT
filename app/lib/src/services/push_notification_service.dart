@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
 
@@ -144,26 +145,36 @@ class PushNotificationService {
     }
   }
 
+  /// Registra (o actualiza) el FCM token en el servidor para recibir notificaciones push.
+  /// Se autentica con el JWT guardado en SharedPreferences (clave 'auth_token_v1').
   static Future<void> registerTokenWithBackend(String token) async {
     try {
-      final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/device-token/');
+      // Leer el JWT almacenado por auth_service.dart
+      final sp = await SharedPreferences.getInstance();
+      final jwtToken = sp.getString('auth_token_v1') ?? '';
+
+      if (jwtToken.isEmpty) {
+        log("[WARN] No hay JWT disponible para registrar FCM token. Se reintentará al iniciar sesión.");
+        return;
+      }
+
+      final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
       final res = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': token,
-          'platform': defaultTargetPlatform.name,
-          'timestamp': DateTime.now().toIso8601String(),
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $jwtToken',
+        },
+        body: jsonEncode({'fcm_token': token}),
       ).timeout(const Duration(seconds: 5));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        log("[OK] Token FCM registrado en el backend exitosamente: ${res.body}");
+        log("[OK] Token FCM registrado en el servidor exitosamente.");
       } else {
-        log("[WARN] Respuesta backend al registrar token: ${res.statusCode} ${res.body}");
+        log("[WARN] Respuesta servidor al registrar token FCM: ${res.statusCode} ${res.body}");
       }
     } catch (e) {
-      log("[WARN] No se pudo conectar al backend para registrar token (puede que el Hub aún no responda): $e");
+      log("[WARN] No se pudo registrar el FCM token (puede que el servidor aún no responda): $e");
     }
   }
 }

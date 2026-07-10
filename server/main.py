@@ -145,9 +145,52 @@ def hub_sync():
     data = request.get_json(silent=True) or {}
     devs = data.get("devices")
     if isinstance(devs, list):
+        _detect_and_notify_offline(hub_id, devs)
         cached_devices[hub_id] = devs
         return jsonify({"status": "ok"}), 200
     return jsonify({"status": "error"}), 400
+
+
+def _detect_and_notify_offline(hub_id: str, new_devices: list):
+    """
+    Compara el nuevo listado de dispositivos del Hub con el caché anterior.
+    Si algún dispositivo que estaba 'online' ahora está 'offline' (o desapareció),
+    dispara una notificación push al propietario del Hub.
+    """
+    try:
+        from server.modules.notifications.fcm import notify_device_offline
+
+        prev = cached_devices.get(hub_id, [])
+        # Construir mapas { device_id -> status } de la sincronización anterior
+        prev_status = {d.get("device_id", d.get("id", "")): d.get("status", "offline") for d in prev}
+        new_status  = {d.get("device_id", d.get("id", "")): d for d in new_devices}
+
+        for dev_id, old_st in prev_status.items():
+            new_dev = new_status.get(dev_id)
+            # Caso 1: dispositivo presente pero ahora offline
+            if new_dev is not None:
+                current_st = new_dev.get("status", "offline")
+                if old_st == "online" and current_st != "online":
+                    dev_name = new_dev.get("name", dev_id)
+                    print(f"📴 [SYNC] Dispositivo '{dev_name}' ({dev_id}) pasó a OFFLINE en Hub {hub_id}")
+                    import threading
+                    threading.Thread(
+                        target=notify_device_offline,
+                        args=(hub_id, dev_name, dev_id),
+                        daemon=True
+                    ).start()
+            # Caso 2: dispositivo desapareció del listado y antes estaba online
+            elif old_st == "online":
+                dev_name = dev_id  # sin info de nombre, usar ID
+                print(f"📴 [SYNC] Dispositivo '{dev_name}' desapareció del Hub {hub_id} (se asume offline)")
+                import threading
+                threading.Thread(
+                    target=notify_device_offline,
+                    args=(hub_id, dev_name, dev_id),
+                    daemon=True
+                ).start()
+    except Exception as e:
+        print(f"⚠️ [SYNC] Error al detectar dispositivos offline: {e}")
 
 
 # =============================================================
@@ -219,6 +262,104 @@ def _generic_proxy(hub_id, path, method="GET", json_data=None):
         return (r.content, r.status_code, r.headers.items())
     except Exception as e:
         return jsonify({"error": f"Fallo directo a {url}: {e}"}), 502
+
+
+def _get_target_hub_id(explicit_hub_id=None):
+    if explicit_hub_id:
+        return explicit_hub_id
+    header_hub = request.headers.get("X-Hub-Id")
+    if header_hub:
+        return header_hub
+    try:
+        from server.db import database as db
+        from flask import g
+        user = getattr(g, "user", None)
+        if user and "user_id" in user:
+            hub = db.execute("SELECT hub_id FROM hubs WHERE user_id = ?", (user["user_id"],)).fetchone()
+            if hub:
+                return hub["hub_id"]
+    except Exception:
+        pass
+    if cached_devices:
+        return list(cached_devices.keys())[0]
+    return None
+
+
+def _execute_relay_job(hub_id: str, payload: dict, timeout=6.0):
+    if not hub_id:
+        return {"error": "Hub ID no identificado ni proporcionado"}, 400
+    cmd_id = str(uuid.uuid4())[:8]
+    with condition_lock:
+        if hub_id not in pending_commands:
+            pending_commands[hub_id] = {}
+        pending_commands[hub_id][cmd_id] = {"data": payload, "timestamp": time.time()}
+        condition_lock.notify_all()
+        
+        start_wait = time.time()
+        while cmd_id not in completed_responses:
+            elapsed = time.time() - start_wait
+            if elapsed >= timeout:
+                if cmd_id in pending_commands.get(hub_id, {}):
+                    del pending_commands[hub_id][cmd_id]
+                return {"error": "El Hub no respondió a tiempo al comando remota."}, 504
+            condition_lock.wait(timeout=1.0)
+            
+        res = completed_responses.pop(cmd_id)
+        return res, 200
+
+
+@app.route("/api/command", methods=["POST"])
+@require_auth
+def relay_api_command():
+    target_hub = _get_target_hub_id()
+    if not target_hub:
+        return jsonify({"error": "Hub no encontrado"}), 404
+    return relay_command(target_hub)
+
+
+@app.route("/api/pairing", methods=["POST"])
+@app.route("/api/hubs/<hub_id>/pairing", methods=["POST"])
+@require_auth
+def relay_api_pairing(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    data = request.get_json(silent=True) or {}
+    action = data.get("action", "start")
+    res, status = _execute_relay_job(target_hub, {"cmd": "pairing", "action": action})
+    return jsonify(res), status
+
+
+@app.route("/api/pairing/status", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/pairing/status", methods=["GET"])
+@require_auth
+def relay_api_pairing_status(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    res, status = _execute_relay_job(target_hub, {"cmd": "pairing_status"}, timeout=3.5)
+    return jsonify(res), status
+
+
+@app.route("/api/devices", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/devices_sync", methods=["GET"])
+@require_auth
+def relay_api_get_devices(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    if target_hub and target_hub in cached_devices and len(cached_devices[target_hub]) > 0:
+        return jsonify(cached_devices[target_hub]), 200
+    res, status = _execute_relay_job(target_hub, {"cmd": "sync_devices"}, timeout=4.5)
+    if status == 200 and isinstance(res, dict) and "devices" in res:
+        cached_devices[target_hub] = res["devices"]
+        return jsonify(res["devices"]), 200
+    return jsonify(cached_devices.get(target_hub, [])), 200
+
+
+@app.route("/api/devices", methods=["POST"])
+@require_auth
+def relay_api_register_device():
+    target_hub = _get_target_hub_id()
+    data = request.get_json(silent=True) or {}
+    payload = {"cmd": "register_device"}
+    payload.update(data)
+    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    return jsonify(res), status
 
 
 if __name__ == "__main__":

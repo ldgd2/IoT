@@ -25,7 +25,7 @@ class CloudBridgeWorker:
         self.last_sync = 0
 
     def start(self, bridge_url=None):
-        url = bridge_url or os.environ.get("CLOUD_BRIDGE_URL", "http://127.0.0.1:8000")
+        url = bridge_url or os.environ.get("CLOUD_SERVER_URL") or os.environ.get("CLOUD_BRIDGE_URL", "http://127.0.0.1:8000")
         if not url:
             return
         
@@ -112,6 +112,54 @@ class CloudBridgeWorker:
         device_id = payload.get("id")
         cmd = payload.get("cmd", "set")
         params = payload.get("params", {})
+        action = payload.get("action", "")
+
+        # 1. Comandos de emparejamiento RF (Pairing Mode)
+        if cmd == "pairing" or cmd in ("pairing_start", "pairing_stop") or (cmd == "set" and action in ("start", "stop")):
+            if not gateway.is_connected:
+                return {"ok": False, "error": "Gateway no conectado"}
+            if action == "start" or cmd == "pairing_start":
+                gateway.last_paired_device = None
+                res = gateway.send_command(0x00, 0x0D)
+                print(f"📡 [CLOUD BRIDGE] Modo emparejamiento RF INICIADO por orden remota")
+                return {"ok": res, "mode": "pairing_started", "status": "active"}
+            elif action == "stop" or cmd == "pairing_stop":
+                gateway.pairing_start_time = 0
+                res = gateway.send_command(0x00, 0x0E)
+                print(f"📡 [CLOUD BRIDGE] Modo emparejamiento RF DETENIDO por orden remota")
+                return {"ok": res, "mode": "pairing_stopped", "status": "idle"}
+
+        if cmd == "pairing_status":
+            elapsed = int(time.time() - gateway.pairing_start_time) if gateway.pairing_start_time > 0 else 0
+            return {
+                "ok": True,
+                "status": gateway.pairing_status,
+                "last_tx": gateway.last_tx,
+                "last_rx": gateway.last_rx,
+                "elapsed": elapsed,
+                "last_device": gateway.last_paired_device
+            }
+
+        # 2. Sincronización y Registro de dispositivos vía Relay
+        if cmd in ("sync_devices", "get_devices"):
+            devices = [d.to_dict() for d in Device.all()]
+            return {"ok": True, "devices": devices}
+
+        if cmd == "register_device":
+            reg_id = payload.get("device_id") or payload.get("id")
+            if not reg_id:
+                return {"ok": False, "error": "device_id requerido"}
+            dev = Device.get(reg_id) or Device(device_id=reg_id)
+            if "name" in payload: dev.name = payload["name"]
+            if "type_name" in payload: dev.type_name = payload["type_name"]
+            if "category" in payload: dev.category = payload["category"]
+            if "state" in payload and isinstance(payload["state"], dict):
+                dev.state = payload["state"]
+            dev.status = "online"
+            dev.save()
+            self._sync_devices()
+            print(f"🏠 [CLOUD BRIDGE] Dispositivo registrado desde exterior: '{dev.name}' ({dev.device_id})")
+            return {"ok": True, "device": dev.to_dict()}
 
         dev = Device.get(device_id)
         if not dev:
