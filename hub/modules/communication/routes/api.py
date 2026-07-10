@@ -212,6 +212,27 @@ def api_command():
     )
     log.save()
 
+    try:
+        from hub.modules.communication.logic.gateway import gateway
+        if gateway.is_connected:
+            dest_id = 0
+            if str(device_id).startswith("dev_"):
+                dest_id = int(str(device_id).split("_")[1])
+            elif str(device_id).isdigit():
+                dest_id = int(str(device_id))
+            if dest_id > 0:
+                state_dict = dev.state if isinstance(dev.state, dict) else {}
+                ch1 = 1 if params.get("ch1", params.get("on", state_dict.get("ch1", state_dict.get("on", False)))) else 0
+                ch2 = 1 if params.get("ch2", state_dict.get("ch2", False)) else 0
+                ch3 = 1 if params.get("ch3", state_dict.get("ch3", False)) else 0
+                ch4 = 1 if params.get("ch4", state_dict.get("ch4", False)) else 0
+                gateway.send_command(dest_id=dest_id, command=0x06, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+                if "on" in params and not any(k in params for k in ("ch1", "ch2", "ch3", "ch4")):
+                    cmd_byte = 0x01 if params["on"] else 0x02
+                    gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+    except Exception as e:
+        print(f"⚠️ [GATEWAY TX] Error en api_command: {e}")
+
     return jsonify({"ok": True, "state": dev.state})
 
 

@@ -217,6 +217,11 @@ class IoTGateway:
                             if cmd == 5:
                                 self.pairing_status = "success"
                                 self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
+                                try:
+                                    # 0x07 = CMD_CONFIG_SYNC: [rfChannel=76, rfDataRate=0, heartbeat=15, 'C','o','l','m','e']
+                                    self.send_command(dest_id=origin, command=0x07, device_type=dev_type, data=[76, 0, 15, 67, 111, 108, 109, 101])
+                                except Exception:
+                                    pass
                             packet_dict = {
                                 "origin": origin,
                                 "dest": dest,
@@ -246,6 +251,10 @@ class IoTGateway:
                                                 "origin": node_id,
                                                 "name": event_dict.get("name", f"Nodo {node_id}")
                                             }
+                                            try:
+                                                self.send_command(dest_id=int(node_id), command=0x07, device_type=0, data=[76, 0, 15, 67, 111, 108, 109, 101])
+                                            except Exception:
+                                                pass
                             except Exception:
                                 pass
                 except Exception:

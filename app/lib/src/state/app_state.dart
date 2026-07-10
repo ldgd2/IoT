@@ -140,18 +140,27 @@ class AppState extends ChangeNotifier {
   // -----------------------------------------------------------
   // CRUD
   Future<void> addDevice(Device d) async {
-    final i = _devices.indexWhere((x) => x.id == d.id);
+    var i = _devices.indexWhere((x) => x.id == d.id);
+    if (i < 0 && d.rfNodeId != null) {
+      i = _devices.indexWhere((x) => x.rfNodeId == d.rfNodeId);
+    }
+    if (i < 0 && d.id != d.mdns && d.mdns.isNotEmpty) {
+      i = _devices.indexWhere((x) => x.mdns == d.mdns);
+    }
+
     if (i >= 0) {
-      _devices[i] = _devices[i].copyWith(
-        mdns: d.mdns,
-        ip: d.ip,
-        port: d.port,
-        alias: d.alias ?? _devices[i].alias,
-        kind: d.kind ?? _devices[i].kind,
-        room: d.room ?? _devices[i].room,
-        commMode: d.commMode,
-        hubIp: d.hubIp ?? _devices[i].hubIp,
-        rfNodeId: d.rfNodeId ?? _devices[i].rfNodeId,
+      // Encontrado => MERGE: preservamos alias/kind/room previos si el nuevo viene nulo o por defecto
+      final old = _devices[i];
+      _devices[i] = old.copyWith(
+        mdns: d.mdns.isNotEmpty ? d.mdns : old.mdns,
+        ip: d.ip.isNotEmpty ? d.ip : old.ip,
+        port: d.port != 80 ? d.port : old.port,
+        commMode: d.isRf ? 'rf' : d.commMode,
+        alias: d.alias ?? old.alias,
+        kind: d.kind ?? old.kind,
+        room: d.room ?? old.room,
+        hubIp: d.hubIp ?? old.hubIp,
+        rfNodeId: d.rfNodeId ?? old.rfNodeId,
       );
     } else {
       _devices.add(d);
@@ -351,7 +360,7 @@ class AppState extends ChangeNotifier {
   // REFRESH: ping + status
   Future<Device?> refreshDevice(Device d) async {
     try {
-      if (d.commMode == 'rf') {
+      if (d.isRf) {
         final target = d.hubIp ?? _hubHost;
         final uri = Uri.parse('http://$target/api/device/${d.rfNodeId ?? d.id}');
         final r = await http.get(uri).timeout(const Duration(seconds: 4));
@@ -410,7 +419,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       // Si tenemos dispositivos RF, intentamos sincronizar con el Hub primero
-      final hasRf = _devices.any((d) => d.commMode == 'rf');
+      final hasRf = _devices.any((d) => d.isRf || _hubHost.isNotEmpty);
       if (hasRf) {
         await syncRfDevicesFromHub();
       }
@@ -432,7 +441,7 @@ class AppState extends ChangeNotifier {
   // ACTIONS: relés y atributos
   Future<bool> setRelay(Device d, int relayIndex1, bool on) async {
     try {
-      if (d.commMode == 'rf') {
+      if (d.isRf) {
         final newRelays = List<bool>.from(d.relays);
         final idx0 = relayIndex1 - 1;
         if (idx0 >= 0 && idx0 < newRelays.length) newRelays[idx0] = on;
@@ -474,7 +483,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> setDeviceAttribute(Device d, Map<String, dynamic> params) async {
-    if (d.commMode == 'rf') {
+    if (d.isRf) {
       return await sendRfCommand(d, 'set', params);
     } else {
       // Para dispositivos Wi-Fi si tuvieran endpoint /set
