@@ -208,12 +208,16 @@ def service_stop():
                 else:
                     os.kill(pid, signal.SIGTERM)
                 stopped = True
+                for _ in range(25):
+                    time.sleep(0.2)
+                    if not is_process_running(pid) and not is_port_open(SERVER_PORT):
+                        break
         except Exception:
             pass
         BRIDGE_PID_FILE.unlink(missing_ok=True)
 
     if stopped:
-        console.print("[bold green]✔ Servidor Puente detenido correctamente.[/bold green]")
+        console.print("[bold green]Servidor Puente detenido correctamente.[/bold green]")
     else:
         console.print("[dim]No se encontró ningún proceso del puente activo en segundo plano.[/dim]")
     _show_bridge_status()
@@ -221,19 +225,47 @@ def service_stop():
 @bridge.command(name="service-restart")
 def service_restart():
     """Reinicia el servidor puente en segundo plano"""
-    service_stop.callback()
+    console.print("[yellow]Reiniciando Servidor Colmena...[/yellow]")
+    if sys.platform != "win32" and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+        _systemctl("restart")
+        console.print("[bold green]Servicio systemd reiniciado.[/bold green]")
+        _show_bridge_status()
+        return
+
+    if BRIDGE_PID_FILE.exists():
+        try:
+            pid = int(BRIDGE_PID_FILE.read_text().strip())
+            if is_process_running(pid):
+                if sys.platform == "win32":
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                else:
+                    os.kill(pid, signal.SIGTERM)
+                for _ in range(25):
+                    time.sleep(0.2)
+                    if not is_process_running(pid) and not is_port_open(SERVER_PORT):
+                        break
+        except Exception:
+            pass
+        BRIDGE_PID_FILE.unlink(missing_ok=True)
+
+    if is_port_open(SERVER_PORT):
+        for _ in range(15):
+            time.sleep(0.2)
+            if not is_port_open(SERVER_PORT):
+                break
+
     service_start.callback()
 
 @bridge.command(name="service-uninstall")
 def service_uninstall():
     """Elimina y desinstala el servicio del Servidor Puente"""
-    console.print("[yellow]🗑️ Eliminando y limpiando Servidor Puente...[/yellow]")
+    console.print("[yellow]Eliminando y limpiando Servidor Puente...[/yellow]")
     service_stop.callback()
 
     if sys.platform == "win32":
         try:
             subprocess.run(["schtasks", "/Delete", "/TN", WIN_TASK_NAME, "/F"], capture_output=True)
-            console.print(f"[green]✔ Tarea programada '{WIN_TASK_NAME}' de Windows eliminada.[/green]")
+            console.print(f"[green]Tarea programada '{WIN_TASK_NAME}' de Windows eliminada.[/green]")
         except Exception:
             pass
     elif Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
@@ -241,12 +273,12 @@ def service_uninstall():
             subprocess.run(["sudo", "systemctl", "disable", BRIDGE_SERVICE_NAME], capture_output=True)
             subprocess.run(["sudo", "rm", "-f", f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}"], check=True)
             subprocess.run(["sudo", "systemctl", "daemon-reload"])
-            console.print("[green]✔ Servicio systemd eliminado de /etc/systemd/system/.[/green]")
+            console.print("[green]Servicio systemd eliminado de /etc/systemd/system/.[/green]")
         except Exception as e:
             console.print(f"[red]Error eliminando archivo systemd: {e}[/red]")
 
     BRIDGE_PID_FILE.unlink(missing_ok=True)
-    console.print("[bold green]✔ ¡Servidor Puente eliminado y entorno limpio![/bold green]\n")
+    console.print("[bold green]Servidor Puente eliminado y entorno limpio![/bold green]\n")
 
 @bridge.command(name="service-install")
 def service_install():
@@ -266,10 +298,10 @@ def service_install():
         ]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
-            console.print(f"[bold green]✔ Tarea de inicio automático '{WIN_TASK_NAME}' creada con éxito en Windows.[/bold green]")
+            console.print(f"[bold green]Tarea de inicio automático '{WIN_TASK_NAME}' creada con éxito en Windows.[/bold green]")
             console.print("[dim]El Servidor Puente se iniciará automáticamente cada vez que inicies sesión en Windows.[/dim]")
         else:
-            console.print(f"[red]❌ No se pudo crear la tarea (puede requerir permisos de Administrador): {res.stderr}[/red]")
+            console.print(f"[red]No se pudo crear la tarea (puede requerir permisos de Administrador): {res.stderr}[/red]")
         return
 
     SERVICE_PATH = Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}")
@@ -300,9 +332,9 @@ WantedBy=multi-user.target
         subprocess.run(["sudo", "mv", "/tmp/iot-bridge.service", str(SERVICE_PATH)], check=True)
         subprocess.run(["sudo", "systemctl", "daemon-reload"])
         subprocess.run(["sudo", "systemctl", "enable", BRIDGE_SERVICE_NAME])
-        console.print(f"[green]✔ Servicio instalado en {SERVICE_PATH}[/green]")
+        console.print(f"[green]Servicio instalado en {SERVICE_PATH}[/green]")
     except Exception as e:
-        console.print(f"[red]❌ Error al instalar servicio: {e}[/red]")
+        console.print(f"[red]Error al instalar servicio: {e}[/red]")
 
 @bridge.command(name="service-logs")
 def service_logs():
@@ -311,12 +343,20 @@ def service_logs():
         console.print(f"[yellow]Mostrando journalctl para {BRIDGE_SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
         subprocess.run(["sudo", "journalctl", "-u", BRIDGE_SERVICE_NAME, "-f", "-n", "50"])
     elif BRIDGE_LOG_FILE.exists():
-        console.print(f"[yellow]📜 Mostrando últimas 40 líneas de registro ({BRIDGE_LOG_FILE}):[/yellow]\n")
+        console.print(f"[yellow]Mostrando registros en tiempo real de {BRIDGE_LOG_FILE} (Ctrl+C para salir)...[/yellow]\n")
         try:
-            lines = BRIDGE_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
-            for line in lines[-40:]:
-                console.print(line)
-        except Exception as e:
-            console.print(f"[red]Error leyendo logs: {e}[/red]")
+            with open(BRIDGE_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+                for line in lines[-40:]:
+                    console.print(line.rstrip())
+                f.seek(0, 2)
+                while True:
+                    line = f.readline()
+                    if not line:
+                        time.sleep(0.2)
+                        continue
+                    console.print(line.rstrip())
+        except KeyboardInterrupt:
+            console.print("\n[dim]Monitoreo de logs detenido.[/dim]")
     else:
         console.print("[dim]No hay archivo de registro bridge.log generado aún. Inicia el servidor para generar logs.[/dim]")

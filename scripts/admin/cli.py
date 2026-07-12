@@ -203,12 +203,16 @@ def service_stop():
                 else:
                     os.kill(pid, signal.SIGTERM)
                 stopped = True
+                for _ in range(25):
+                    time.sleep(0.2)
+                    if not is_process_running(pid) and not is_port_open(API_PORT):
+                        break
         except Exception:
             pass
         PID_FILE.unlink(missing_ok=True)
 
     if stopped:
-        console.print("[bold green]✔ Servidor detenido correctamente.[/bold green]")
+        console.print("[bold green]Servidor detenido correctamente.[/bold green]")
     else:
         console.print("[dim]No se encontró ningún proceso en segundo plano activo.[/dim]")
     _show_status()
@@ -216,13 +220,41 @@ def service_stop():
 @admin.command(name="service-restart")
 def service_restart():
     """Reinicia el servicio o servidor en segundo plano"""
-    service_stop.callback()
+    console.print("[yellow]Reiniciando Central Hub...[/yellow]")
+    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+        _systemctl("restart")
+        console.print("[bold green]Servicio systemd reiniciado.[/bold green]")
+        _show_status()
+        return
+
+    if PID_FILE.exists():
+        try:
+            pid = int(PID_FILE.read_text().strip())
+            if is_process_running(pid):
+                if sys.platform == "win32":
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                else:
+                    os.kill(pid, signal.SIGTERM)
+                for _ in range(25):
+                    time.sleep(0.2)
+                    if not is_process_running(pid) and not is_port_open(API_PORT):
+                        break
+        except Exception:
+            pass
+        PID_FILE.unlink(missing_ok=True)
+
+    if is_port_open(API_PORT):
+        for _ in range(15):
+            time.sleep(0.2)
+            if not is_port_open(API_PORT):
+                break
+
     service_start.callback()
 
 @admin.command(name="service-uninstall")
 def service_uninstall():
     """Elimina y desinstala el servicio actualmente configurado"""
-    console.print("[yellow]🗑️ Eliminando y limpiando servicio actual...[/yellow]")
+    console.print("[yellow]Eliminando y limpiando servicio actual...[/yellow]")
     # 1. Detener procesos
     service_stop.callback()
 
@@ -232,19 +264,19 @@ def service_uninstall():
             subprocess.run(["sudo", "systemctl", "disable", SERVICE_NAME], capture_output=True)
             subprocess.run(["sudo", "rm", "-f", f"/etc/systemd/system/{SERVICE_NAME}"], check=True)
             subprocess.run(["sudo", "systemctl", "daemon-reload"])
-            console.print("[green]✔ Servicio systemd eliminado de /etc/systemd/system/.[/green]")
+            console.print("[green]Servicio systemd eliminado de /etc/systemd/system/.[/green]")
         except Exception as e:
             console.print(f"[red]Error eliminando archivo systemd: {e}[/red]")
 
     # 3. Limpiar PID y temporales
     PID_FILE.unlink(missing_ok=True)
-    console.print("[bold green]✔ ¡Servicio eliminado por completo y entorno limpio![/bold green]\n")
+    console.print("[bold green]Servicio eliminado por completo y entorno limpio![/bold green]\n")
 
 @admin.command(name="service-install")
 def service_install():
     """Instala el servicio systemd (Solo Linux / Raspberry Pi)"""
     if sys.platform == "win32":
-        console.print("[yellow]ℹ️ En Windows no es necesario instalar un servicio de systemd. Puedes arrancar y gestionar el servidor en segundo plano usando '▶️ Iniciar Servicio / Servidor'.[/yellow]")
+        console.print("[yellow]En Windows no es necesario instalar un servicio de systemd. Puedes arrancar y gestionar el servidor en segundo plano usando 'Iniciar Servicio / Servidor'.[/yellow]")
         return
 
     SERVICE_PATH = Path(f"/etc/systemd/system/{SERVICE_NAME}")
@@ -279,9 +311,9 @@ WantedBy=multi-user.target
         subprocess.run(["sudo", "mv", "/tmp/iot.service", str(SERVICE_PATH)], check=True)
         subprocess.run(["sudo", "systemctl", "daemon-reload"])
         subprocess.run(["sudo", "systemctl", "enable", SERVICE_NAME])
-        console.print(f"[green]✔ Servicio instalado en {SERVICE_PATH}[/green]")
+        console.print(f"[green]Servicio instalado en {SERVICE_PATH}[/green]")
     except Exception as e:
-        console.print(f"[red]❌ Error al instalar servicio: {e}[/red]")
+        console.print(f"[red]Error al instalar servicio: {e}[/red]")
 
 @admin.command(name="service-logs")
 def service_logs():
@@ -291,13 +323,21 @@ def service_logs():
         console.print(f"[yellow]Mostrando journalctl para {SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
         subprocess.run(["sudo", "journalctl", "-u", SERVICE_NAME, "-f", "-n", "50"])
     elif log_path.exists():
-        console.print(f"[yellow]📜 Mostrando últimas 40 líneas de registro ({log_path}):[/yellow]\n")
+        console.print(f"[yellow]Mostrando registros en tiempo real de {log_path} (Ctrl+C para salir)...[/yellow]\n")
         try:
-            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
-            for line in lines[-40:]:
-                console.print(line)
-        except Exception as e:
-            console.print(f"[red]Error leyendo logs: {e}[/red]")
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+                for line in lines[-40:]:
+                    console.print(line.rstrip())
+                f.seek(0, 2)
+                while True:
+                    line = f.readline()
+                    if not line:
+                        time.sleep(0.2)
+                        continue
+                    console.print(line.rstrip())
+        except KeyboardInterrupt:
+            console.print("\n[dim]Monitoreo de logs detenido.[/dim]")
     else:
         console.print("[dim]No hay archivo de registro hub.log generado aún. Inicia el servidor para generar logs.[/dim]")
 

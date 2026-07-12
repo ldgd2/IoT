@@ -36,6 +36,15 @@ except ImportError:
 # Registrar endpoints de Auth, Usuarios, Salas y Notificaciones
 app.register_blueprint(auth_bp, url_prefix="/api")
 
+@app.after_request
+def log_http_request(response):
+    if not request.path.startswith("/static"):
+        now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        status = response.status_code
+        tag = "OK" if status < 400 else ("WARN" if status < 500 else "ERR")
+        print(f"[{now}] [SERVER API - {tag}] {request.method} {request.path} -> {status} ({request.remote_addr})", flush=True)
+    return response
+
 # Crear tablas en la BD del servidor al arrancar
 ensure_tables()
 

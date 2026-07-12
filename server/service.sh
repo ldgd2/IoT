@@ -185,10 +185,9 @@ start_service() {
 
 restart_service() {
     check_root
-    print_msg "${YELLOW}🔄 Reiniciando ${SERVICE_NAME}.service...${NC}"
-    free_port 8000
+    print_msg "${YELLOW}Reiniciando ${SERVICE_NAME}.service...${NC}"
     systemctl restart ${SERVICE_NAME}.service
-    print_msg "${GREEN}✔️ Reinicio completado.${NC}"
+    print_msg "${GREEN}Reinicio completado.${NC}"
 }
 
 remove_service() {

@@ -58,6 +58,15 @@ def require_login():
     if not session.get("logged_in"):
         return redirect("/login")
 
+@app.after_request
+def log_http_request(response):
+    if not request.path.startswith("/static"):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = response.status_code
+        tag = "OK" if status < 400 else ("WARN" if status < 500 else "ERR")
+        print(f"[{now}] [HUB API - {tag}] {request.method} {request.path} -> {status} ({request.remote_addr})", flush=True)
+    return response
+
 # Ping liviano para que la app verifique que el Hub responde en LAN
 @app.route("/api/ping", methods=["GET"])
 def hub_ping():
