@@ -4,6 +4,7 @@ import sys
 import os
 import signal
 import socket
+import shutil
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -13,6 +14,14 @@ console = Console()
 from hub.core.config import HUB_DIR, VENV_DIR, LOG_DIR, PID_FILE, API_PORT, RF_PORT, RF_BAUD
 
 SERVICE_NAME = "iot-rf-gateway.service"
+
+def is_windows() -> bool:
+    return os.name == "nt" or sys.platform in ("win32", "cygwin", "msys")
+
+def is_linux_systemd() -> bool:
+    if is_windows():
+        return False
+    return shutil.which("systemctl") is not None and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists()
 
 def _systemctl(cmd: str):
     subprocess.run(["sudo", "systemctl", cmd, SERVICE_NAME])
@@ -38,7 +47,7 @@ def is_port_open(port: int) -> bool:
         return False
 
 def is_process_running(pid: int) -> bool:
-    if sys.platform == "win32":
+    if is_windows():
         try:
             res = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True)
             return str(pid) in res.stdout
@@ -102,7 +111,7 @@ def start():
     """Arranca el servidor en primer plano (Foreground)"""
     console.print(Panel("[bold green]Iniciando Servidor IoT (Primer Plano)[/bold green]"))
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
-    if sys.platform == "win32":
+    if is_windows():
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
     try:
         subprocess.run([py_exec, str(HUB_DIR / "main.py")])
@@ -117,39 +126,40 @@ def service_status():
 @admin.command(name="service-start")
 def service_start():
     """Inicia el servicio / servidor en segundo plano (Background)"""
-    # En Linux, si existe el servicio systemd, usar systemctl
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print("[yellow]Iniciando servicio systemd en Linux...[/yellow]")
         _systemctl("start")
         _show_status()
         return
 
-    # Si ya está corriendo, avisar
     if PID_FILE.exists():
         try:
             pid = int(PID_FILE.read_text().strip())
             if is_process_running(pid):
-                console.print(f"[yellow] El servidor ya está ejecutándose en segundo plano (PID: {pid}).[/yellow]")
+                console.print(f"[yellow]El servidor ya está ejecutándose en segundo plano (PID: {pid}).[/yellow]")
                 _show_status()
                 return
         except Exception:
             pass
 
-    console.print("[green] Arrancando Servidor IoT en segundo plano...[/green]")
+    console.print("[green]Arrancando Servidor IoT en segundo plano...[/green]")
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
-    if sys.platform == "win32":
+    if is_windows():
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
 
     log_path = LOG_DIR / "hub.log"
+    LOG_DIR.mkdir(exist_ok=True)
     env_vars = os.environ.copy()
     env_vars["HUB_BACKGROUND"] = "1"
 
     try:
-        if sys.platform == "win32":
-            # DETACHED_PROCESS = 0x00000008, CREATE_NEW_PROCESS_GROUP = 0x00000200
+        log_handle = open(log_path, "a", encoding="utf-8")
+        if is_windows():
             flags = 0x00000008 | 0x00000200
             proc = subprocess.Popen(
                 [py_exec, str(HUB_DIR / "main.py")],
+                stdout=log_handle,
+                stderr=log_handle,
                 creationflags=flags,
                 env=env_vars,
                 cwd=str(HUB_DIR.parent)
@@ -157,6 +167,8 @@ def service_start():
         else:
             proc = subprocess.Popen(
                 [py_exec, str(HUB_DIR / "main.py")],
+                stdout=log_handle,
+                stderr=log_handle,
                 env=env_vars,
                 cwd=str(HUB_DIR.parent),
                 start_new_session=True
@@ -188,7 +200,7 @@ def service_start():
 def service_stop():
     """Detiene el servicio o servidor en segundo plano"""
     stopped = False
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print("[yellow]Deteniendo servicio systemd...[/yellow]")
         _systemctl("stop")
         stopped = True
@@ -198,7 +210,7 @@ def service_stop():
             pid = int(PID_FILE.read_text().strip())
             if is_process_running(pid):
                 console.print(f"[yellow]Terminando proceso en segundo plano (PID: {pid})...[/yellow]")
-                if sys.platform == "win32":
+                if is_windows():
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 else:
                     os.kill(pid, signal.SIGTERM)
@@ -221,7 +233,7 @@ def service_stop():
 def service_restart():
     """Reinicia el servicio o servidor en segundo plano"""
     console.print("[yellow]Reiniciando Central Hub...[/yellow]")
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+    if is_linux_systemd():
         _systemctl("restart")
         console.print("[bold green]Servicio systemd reiniciado.[/bold green]")
         _show_status()
@@ -231,7 +243,7 @@ def service_restart():
         try:
             pid = int(PID_FILE.read_text().strip())
             if is_process_running(pid):
-                if sys.platform == "win32":
+                if is_windows():
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 else:
                     os.kill(pid, signal.SIGTERM)
@@ -259,7 +271,7 @@ def service_uninstall():
     service_stop.callback()
 
     # 2. Si es Linux y existe systemd, desinstalar
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+    if is_linux_systemd():
         try:
             subprocess.run(["sudo", "systemctl", "disable", SERVICE_NAME], capture_output=True)
             subprocess.run(["sudo", "rm", "-f", f"/etc/systemd/system/{SERVICE_NAME}"], check=True)
@@ -275,7 +287,7 @@ def service_uninstall():
 @admin.command(name="service-install")
 def service_install():
     """Instala el servicio systemd (Solo Linux / Raspberry Pi)"""
-    if sys.platform == "win32":
+    if is_windows():
         console.print("[yellow]En Windows no es necesario instalar un servicio de systemd. Puedes arrancar y gestionar el servidor en segundo plano usando 'Iniciar Servicio / Servidor'.[/yellow]")
         return
 
@@ -319,7 +331,7 @@ WantedBy=multi-user.target
 def service_logs():
     """Muestra los logs en vivo del servidor o servicio"""
     log_path = LOG_DIR / "hub.log"
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print(f"[yellow]Mostrando journalctl para {SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
         subprocess.run(["sudo", "journalctl", "-u", SERVICE_NAME, "-f", "-n", "50"])
     elif log_path.exists():

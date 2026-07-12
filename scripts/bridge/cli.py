@@ -5,6 +5,7 @@ import os
 import signal
 import socket
 import time
+import shutil
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -22,6 +23,14 @@ WIN_TASK_NAME = "IoT_Bridge_Relay"
 # Opciones por defecto para el Servidor Puente
 SERVER_PORT = int(os.environ.get("SERVER_PORT", 8000))
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:5000")
+
+def is_windows() -> bool:
+    return os.name == "nt" or sys.platform in ("win32", "cygwin", "msys")
+
+def is_linux_systemd() -> bool:
+    if is_windows():
+        return False
+    return shutil.which("systemctl") is not None and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists()
 
 def _systemctl(cmd: str):
     subprocess.run(["sudo", "systemctl", cmd, BRIDGE_SERVICE_NAME])
@@ -47,7 +56,7 @@ def is_port_open(port: int) -> bool:
         return False
 
 def is_process_running(pid: int) -> bool:
-    if sys.platform == "win32":
+    if is_windows():
         try:
             res = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True)
             return str(pid) in res.stdout
@@ -108,7 +117,7 @@ def start():
     """Arranca el servidor puente en primer plano (Foreground)"""
     console.print(Panel("[bold magenta]Iniciando Servidor Puente / Relay (Primer Plano)[/bold magenta]"))
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
-    if sys.platform == "win32":
+    if is_windows():
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
     try:
         subprocess.run([py_exec, str(SERVER_DIR / "main.py")])
@@ -123,7 +132,7 @@ def service_status():
 @bridge.command(name="service-start")
 def service_start():
     """Inicia el servidor puente en segundo plano (Background)"""
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print("[yellow]Iniciando servicio systemd del Puente en Linux...[/yellow]")
         _systemctl("start")
         _show_bridge_status()
@@ -141,7 +150,7 @@ def service_start():
 
     console.print("[green]Arrancando Servidor Puente en segundo plano...[/green]")
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
-    if sys.platform == "win32":
+    if is_windows():
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
 
     LOG_DIR.mkdir(exist_ok=True)
@@ -149,27 +158,26 @@ def service_start():
     env_vars["BRIDGE_BACKGROUND"] = "1"
 
     try:
-        if sys.platform == "win32":
+        log_handle = open(BRIDGE_LOG_FILE, "a", encoding="utf-8")
+        if is_windows():
             flags = 0x00000008 | 0x00000200
-            with open(BRIDGE_LOG_FILE, "a", encoding="utf-8") as f:
-                proc = subprocess.Popen(
-                    [py_exec, str(SERVER_DIR / "main.py")],
-                    stdout=f,
-                    stderr=f,
-                    creationflags=flags,
-                    cwd=str(ROOT_DIR),
-                    env=env_vars
-                )
+            proc = subprocess.Popen(
+                [py_exec, str(SERVER_DIR / "main.py")],
+                stdout=log_handle,
+                stderr=log_handle,
+                creationflags=flags,
+                cwd=str(ROOT_DIR),
+                env=env_vars
+            )
         else:
-            with open(BRIDGE_LOG_FILE, "a", encoding="utf-8") as f:
-                proc = subprocess.Popen(
-                    [py_exec, str(SERVER_DIR / "main.py")],
-                    stdout=f,
-                    stderr=f,
-                    start_new_session=True,
-                    cwd=str(ROOT_DIR),
-                    env=env_vars
-                )
+            proc = subprocess.Popen(
+                [py_exec, str(SERVER_DIR / "main.py")],
+                stdout=log_handle,
+                stderr=log_handle,
+                start_new_session=True,
+                cwd=str(ROOT_DIR),
+                env=env_vars
+            )
 
         time.sleep(1.5)
         if proc.poll() is None:
@@ -193,7 +201,7 @@ def service_start():
 def service_stop():
     """Detiene el servidor puente en segundo plano"""
     stopped = False
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print("[yellow]Deteniendo servicio systemd del puente...[/yellow]")
         _systemctl("stop")
         stopped = True
@@ -203,7 +211,7 @@ def service_stop():
             pid = int(BRIDGE_PID_FILE.read_text().strip())
             if is_process_running(pid):
                 console.print(f"[yellow]Terminando proceso del Servidor Puente (PID: {pid})...[/yellow]")
-                if sys.platform == "win32":
+                if is_windows():
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 else:
                     os.kill(pid, signal.SIGTERM)
@@ -226,7 +234,7 @@ def service_stop():
 def service_restart():
     """Reinicia el servidor puente en segundo plano"""
     console.print("[yellow]Reiniciando Servidor Colmena...[/yellow]")
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+    if is_linux_systemd():
         _systemctl("restart")
         console.print("[bold green]Servicio systemd reiniciado.[/bold green]")
         _show_bridge_status()
@@ -236,7 +244,7 @@ def service_restart():
         try:
             pid = int(BRIDGE_PID_FILE.read_text().strip())
             if is_process_running(pid):
-                if sys.platform == "win32":
+                if is_windows():
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 else:
                     os.kill(pid, signal.SIGTERM)
@@ -262,13 +270,13 @@ def service_uninstall():
     console.print("[yellow]Eliminando y limpiando Servidor Puente...[/yellow]")
     service_stop.callback()
 
-    if sys.platform == "win32":
+    if is_windows():
         try:
             subprocess.run(["schtasks", "/Delete", "/TN", WIN_TASK_NAME, "/F"], capture_output=True)
             console.print(f"[green]Tarea programada '{WIN_TASK_NAME}' de Windows eliminada.[/green]")
         except Exception:
             pass
-    elif Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+    elif is_linux_systemd():
         try:
             subprocess.run(["sudo", "systemctl", "disable", BRIDGE_SERVICE_NAME], capture_output=True)
             subprocess.run(["sudo", "rm", "-f", f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}"], check=True)
@@ -284,12 +292,12 @@ def service_uninstall():
 def service_install():
     """Instala el servidor puente como servicio (Linux Systemd / Windows Task)"""
     py_exec = str(VENV_DIR / "bin" / "python") if (VENV_DIR / "bin" / "python").exists() else sys.executable
-    if sys.platform == "win32":
+    if is_windows():
         py_exec = str(VENV_DIR / "Scripts" / "python.exe") if (VENV_DIR / "Scripts" / "python.exe").exists() else sys.executable
 
     main_path = str(SERVER_DIR / "main.py")
 
-    if sys.platform == "win32":
+    if is_windows():
         console.print(f"[yellow]Instalando Tarea Automática en Windows ('{WIN_TASK_NAME}')...[/yellow]")
         cmd = [
             "schtasks", "/Create", "/TN", WIN_TASK_NAME,
@@ -339,7 +347,7 @@ WantedBy=multi-user.target
 @bridge.command(name="service-logs")
 def service_logs():
     """Muestra los logs en vivo del servidor puente"""
-    if sys.platform != "win32" and Path(f"/etc/systemd/system/{BRIDGE_SERVICE_NAME}").exists():
+    if is_linux_systemd():
         console.print(f"[yellow]Mostrando journalctl para {BRIDGE_SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
         subprocess.run(["sudo", "journalctl", "-u", BRIDGE_SERVICE_NAME, "-f", "-n", "50"])
     elif BRIDGE_LOG_FILE.exists():

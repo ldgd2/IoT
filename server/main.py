@@ -12,12 +12,15 @@ import threading
 from flask import Flask, request, jsonify
 import requests
 
-from config import SERVER_HOST, SERVER_PORT, HUB_URL, HUB_TIMEOUT
-
-# Base de datos y auth del servidor
 import sys as _sys
 from pathlib import Path as _Path
 _sys.path.insert(0, str(_Path(__file__).parent.parent.resolve()))
+
+try:
+    from server.config import SERVER_HOST, SERVER_PORT, HUB_URL, HUB_TIMEOUT
+except ImportError:
+    from config import SERVER_HOST, SERVER_PORT, HUB_URL, HUB_TIMEOUT
+
 from server.db.database import ensure_tables
 from server.modules.auth.routes.api import auth_bp
 
@@ -394,27 +397,6 @@ def relay_api_delete_device(device_id, hub_id=None):
     payload = {"cmd": "delete_device", "device_id": device_id}
     res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
     cached_devices.pop(target_hub, None)
-    return jsonify(res), status
-
-
-@app.route("/api/pairing", methods=["POST"])
-@app.route("/api/hubs/<hub_id>/pairing", methods=["POST"])
-@require_auth
-def relay_api_pairing(hub_id=None):
-    target_hub = _get_target_hub_id(hub_id)
-    data = request.get_json(silent=True) or {}
-    payload = {"cmd": "pairing"}
-    payload.update(data)
-    res, status = _execute_relay_job(target_hub, payload, timeout=6.0)
-    return jsonify(res), status
-
-
-@app.route("/api/pairing/status", methods=["GET"])
-@app.route("/api/hubs/<hub_id>/pairing/status", methods=["GET"])
-@require_auth
-def relay_api_pairing_status(hub_id=None):
-    target_hub = _get_target_hub_id(hub_id)
-    res, status = _execute_relay_job(target_hub, {"cmd": "pairing_status"}, timeout=4.0)
     return jsonify(res), status
 
 
