@@ -1,22 +1,25 @@
 /* Paletas de Colores Material 3 */
 /* Por defecto: Warm Light (Basado en la imagen original) */
 :root {
-    --md-bg: #F5EBE1;
-    --md-surface: #F5EBE1;
-    --md-surface-container: #EBDDCE;
-    --md-primary: #6B4C12;
-    --md-on-primary: #FFFFFF;
-    --md-secondary: #F3B556;
-    --md-on-secondary: #3D2905;
-    --md-tertiary: #A2B159;
-    --md-on-tertiary: #FFFFFF;
-    --md-surface-variant: #F4D3A1;
-    --md-on-surface-variant: #4B330B;
-    --md-text: #251D14;
-    --md-text-variant: #5B4E42;
-    --md-outline: #897B6B;
-    --md-outline-variant: #D9C8B8;
-    --md-elevated: #FDF8F5;
+    /* --- TEMA OSCURO COLMENA (POR DEFECTO) --- */
+    --md-bg: #121212;
+    --md-surface: #1E1E1E;
+    --md-surface-container: #282828;
+    --md-surface-container-highest: #333333;
+    --md-primary: #00E5A8;
+    --md-on-primary: #003828;
+    --md-secondary: #00A67A;
+    --md-on-secondary: #FFFFFF;
+    --md-tertiary: #52D1B2;
+    --md-on-tertiary: #00382D;
+    --md-surface-variant: #3A403E;
+    --md-on-surface-variant: #C4C8C5;
+    --md-text: #E3E3E3;
+    --md-text-variant: #A0A3A0;
+    --md-outline: #89938F;
+    --md-outline-variant: #3F4945;
+    --md-elevated: #2C302E;
+    --md-error: #FF5449;
     
     /* Radios de Material 3 */
     --radius-full: 100px;
@@ -27,24 +30,21 @@
     --md-easing: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* --- TEMA OSCURO WARM --- */
-body.theme-dark {
-    --md-bg: #201A15;
-    --md-surface: #201A15;
-    --md-surface-container: #2A231C;
-    --md-primary: #DAB981;
-    --md-on-primary: #3B2800;
-    --md-secondary: #E3C18E;
-    --md-on-secondary: #402D05;
-    --md-tertiary: #BDCD72;
-    --md-on-tertiary: #273500;
-    --md-surface-variant: #4F4539;
-    --md-on-surface-variant: #D3C4B4;
-    --md-text: #EAE1D9;
-    --md-text-variant: #CDC4B8;
-    --md-outline: #968E82;
-    --md-outline-variant: #4A433A;
-    --md-elevated: #28221D;
+/* --- TEMA CLARO COLMENA (OPCIONAL) --- */
+body.theme-light {
+    --md-bg: #F8F9FA;
+    --md-surface: #FFFFFF;
+    --md-surface-container: #F1F3F4;
+    --md-surface-container-highest: #E8EAED;
+    --md-primary: #00C691;
+    --md-on-primary: #FFFFFF;
+    --md-secondary: #008964;
+    --md-on-secondary: #FFFFFF;
+    --md-text: #202124;
+    --md-text-variant: #5F6368;
+    --md-outline: #9AA0A6;
+    --md-outline-variant: #DADCE0;
+    --md-elevated: #FFFFFF;
 }
 
 /* --- TEMA CLARO AZUL --- */
@@ -134,29 +134,9 @@ body {
     color: var(--md-text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow: hidden; /* Evita scroll global, el scroll estará por secciones */
+    overflow: hidden;
     display: flex;
     height: 100vh;
-}
-
-/* --- MATERIAL 3 ICON SYSTEM & SVG SCALING --- */
-.icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    line-height: 1;
-}
-.icon svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    fill: currentColor;
-    object-fit: contain;
-}
-/* Corregir escalado interno 0.5 o transformaciones desalineadas en paths SVG */
-.icon svg path[transform*="scale(0.5)"] {
-    transform: none !important;
 }
 
 /* --- LAYOUT PRINCIPAL (Flexbox Hardware Accelerated) --- */
@@ -293,7 +273,118 @@ details[open] > summary .chevron {
 .main-content {
     flex: 1;
     overflow-y: auto;
-    padding: 32px 48px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- APP BAR GLOBAL --- */
+.app-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background-color: var(--md-surface);
+    border-bottom: 1px solid var(--md-outline-variant);
+    z-index: 5;
+    position: sticky;
+    top: 0;
+}
+
+.app-bar-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--md-text);
+}
+
+.app-bar-title .icon {
+    color: var(--md-primary);
+    width: 24px;
+    height: 24px;
+}
+
+.app-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hub-selector {
+    background: transparent;
+    color: var(--md-text);
+    border: none;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+}
+.hub-selector:hover {
+    background-color: var(--md-surface-variant);
+}
+
+.page-container {
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* --- STRUCTURE CLASSES --- */
+.filter-bar {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0 16px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+
+.devices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 16px;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    text-align: center;
+    gap: 16px;
+    max-width: 450px;
+    margin: 0 auto;
+}
+.empty-state-icon {
+    width: 110px;
+    height: 110px;
+    background-color: rgba(0, 229, 168, 0.12); /* md-primary with opacity */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--md-primary);
+    margin-bottom: 8px;
+}
+.empty-state-icon svg { width: 56px; height: 56px; }
+.empty-state h2 { font-weight: 600; font-size: 1.5rem; margin: 0; }
+.empty-state p { color: var(--md-text-variant); margin: 0; line-height: 1.5; }
+
+.divider {
+    height: 1px;
+    background-color: var(--md-outline-variant);
+    width: 100%;
+    margin: 0;
 }
 
 /* --- ESTILOS DEL CONTENIDO (Hero) --- */
@@ -471,7 +562,16 @@ details[open] > summary .chevron {
 .m3-chip {
     padding: 0 16px; height: 32px; border-radius: 8px;
     display: inline-flex; align-items: center; gap: 8px; font-size: 0.875rem; font-weight: 500;
-    cursor: pointer; transition: 0.2s; border: 1px solid var(--md-outline); color: var(--md-text);
+    cursor: pointer; transition: 0.2s; border: 1px solid var(--md-outline-variant); color: var(--md-text);
+    background: transparent;
+}
+.m3-chip:hover {
+    background: var(--md-surface-variant);
+}
+.m3-chip.selected {
+    background: rgba(0, 229, 168, 0.15); /* md-primary with opacity */
+    color: var(--md-primary);
+    border-color: transparent;
 }
 .m3-chip.tonal { background: var(--md-surface-variant); border-color: transparent; }
 .m3-chip.input-chip { background: var(--md-elevated); border: 1px solid var(--md-outline-variant); border-radius: 8px; }

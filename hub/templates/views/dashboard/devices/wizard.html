@@ -129,9 +129,10 @@
                         document.getElementById('diag-timer').innerText = `Ventana: ${pairData.elapsed}s / 50s`;
                     }
                     if (pairData.status === 'timeout') {
-                        alert('⏱️ Tiempo de vinculación agotado (50s) sin respuesta de nuevos nodos. Volviendo atrás...');
+                        document.getElementById('live-rx').innerText = 'Tiempo agotado sin respuesta.';
+                        document.getElementById('live-rx').style.color = '#f44336';
                         setGatewayPairingMode('stop');
-                        window.location.href = '/devices';
+                        setTimeout(() => { window.location.href = '/devices'; }, 2000);
                         return;
                     }
                     if (pairData.status === 'success' || (initialDeviceCount !== null && data && data.total > initialDeviceCount)) {

@@ -1,0 +1,132 @@
+/* 
+  Widgets System - Material 3
+  Interactive IoT control cards and metrics.
+*/
+
+.widget-card {
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-large, 24px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.widget-card:hover {
+    background: var(--md-surface-container-high);
+}
+
+.widget-card.active {
+    background: var(--md-secondary-container);
+    border-color: transparent;
+}
+
+.widget-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.widget-icon-bg {
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: var(--md-surface-variant);
+    color: var(--md-on-surface-variant);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.widget-card.active .widget-icon-bg {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+}
+
+.widget-icon-bg .icon {
+    width: 24px;
+    height: 24px;
+}
+
+.widget-info {
+    flex: 1;
+    min-width: 0;
+    margin-right: 12px;
+}
+
+.widget-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.widget-subtitle {
+    font-size: 0.85rem;
+    color: var(--md-on-surface-variant);
+}
+
+/* Specific Widgets */
+/* Climate Widget */
+.climate-temp-display {
+    font-size: 2.5rem;
+    font-weight: 400;
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.climate-temp-unit {
+    font-size: 1.2rem;
+    color: var(--md-on-surface-variant);
+}
+
+/* Light Widget */
+.light-color-picker {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s;
+}
+
+.color-dot:hover {
+    transform: scale(1.1);
+}
+
+.color-dot.selected {
+    border-color: var(--md-on-surface);
+}
+
+/* Sensor Metric Widget */
+.metric-value-large {
+    font-size: 2rem;
+    font-weight: 500;
+    color: var(--md-primary);
+}
+
+.metric-trend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.metric-trend.up { color: #4CAF50; }
+.metric-trend.down { color: #F44336; }

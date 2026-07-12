@@ -86,7 +86,6 @@ def index():
 
 
 @app.route("/api/health", methods=["GET"])
-@app.route("/api/stats", methods=["GET"])
 def health_check():
     return jsonify({
         "status": "ok",
@@ -382,9 +381,107 @@ def relay_api_update_device(device_id):
 def relay_api_delete_device(device_id):
     target_hub = _get_target_hub_id()
     payload = {"cmd": "delete_device", "device_id": device_id}
-    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
-    cached_devices.pop(target_hub, None)
     return jsonify(res), status
+
+
+@app.route("/api/stats", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/stats", methods=["GET"])
+@require_auth
+def relay_api_stats(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    if target_hub:
+        res, status = _execute_relay_job(target_hub, {"cmd": "stats"}, timeout=3.0)
+        if status == 200 and isinstance(res, dict):
+            return jsonify(res), 200
+    return jsonify({"status": "ok", "server": "online", "mode": SERVER_MODE}), 200
+
+
+@app.route("/api/skills", methods=["GET", "POST"])
+@app.route("/api/hubs/<hub_id>/skills", methods=["GET", "POST"])
+@require_auth
+def relay_api_skills(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    if request.method == "GET":
+        res, status = _execute_relay_job(target_hub, {"cmd": "skills"}, timeout=4.0)
+        if status == 200 and isinstance(res, dict) and "skills" in res:
+            return jsonify(res["skills"]), 200
+        return jsonify([]), 200
+    else:
+        data = request.get_json(silent=True) or {}
+        payload = {"cmd": "save_skill"}
+        payload.update(data)
+        res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+        return jsonify(res), status
+
+
+@app.route("/api/skills/<int:skill_id>/toggle", methods=["POST"])
+@app.route("/api/hubs/<hub_id>/skills/<int:skill_id>/toggle", methods=["POST"])
+@require_auth
+def relay_api_toggle_skill(skill_id, hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    data = request.get_json(silent=True) or {}
+    payload = {"cmd": "toggle_skill", "skill_id": skill_id}
+    payload.update(data)
+    res, status = _execute_relay_job(target_hub, payload, timeout=4.0)
+    return jsonify(res), status
+
+
+@app.route("/api/skills/<int:skill_id>/execute", methods=["POST"])
+@app.route("/api/hubs/<hub_id>/skills/<int:skill_id>/execute", methods=["POST"])
+@require_auth
+def relay_api_execute_skill(skill_id, hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    payload = {"cmd": "execute_skill", "skill_id": skill_id}
+    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    return jsonify(res), status
+
+
+@app.route("/api/skills/<int:skill_id>", methods=["DELETE"])
+@app.route("/api/hubs/<hub_id>/skills/<int:skill_id>", methods=["DELETE"])
+@require_auth
+def relay_api_delete_skill(skill_id, hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    payload = {"cmd": "delete_skill", "skill_id": skill_id}
+    res, status = _execute_relay_job(target_hub, payload, timeout=4.0)
+    return jsonify(res), status
+
+
+@app.route("/api/notifications", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/notifications", methods=["GET"])
+@require_auth
+def relay_api_notifications(hub_id=None):
+    limit = int(request.args.get("limit", 50))
+    from server.db import database as db
+    from flask import g
+    rows = db.execute(
+        "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+        (g.user["user_id"], limit)
+    ).fetchall()
+    if rows:
+        return jsonify([dict(r) for r in rows]), 200
+    target_hub = _get_target_hub_id(hub_id)
+    if target_hub:
+        res, status = _execute_relay_job(target_hub, {"cmd": "notifications"}, timeout=3.5)
+        if status == 200 and isinstance(res, dict) and "notifications" in res:
+            return jsonify(res["notifications"]), 200
+    return jsonify([]), 200
+
+
+@app.route("/api/notifications/test", methods=["POST"])
+@require_auth
+def relay_api_test_notification():
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "Colmena")
+    body = data.get("body", "Prueba de notificación")
+    from server.db import database as db
+    from flask import g
+    from datetime import datetime
+    db.execute(
+        "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (g.user["user_id"], _get_target_hub_id() or "", "", title, body, "info", datetime.now().isoformat())
+    )
+    return jsonify({"ok": True}), 200
+
 
 
 # =============================================================

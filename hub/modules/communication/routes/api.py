@@ -87,6 +87,11 @@ def process_incoming_packet(data):
                             PushNotifier.notify_device_connected(dev)
                         except Exception:
                             pass
+                    try:
+                        from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                        cloud_bridge._sync_devices()
+                    except Exception:
+                        pass
                 
                 return {"ok": True, "action": "discovered", "registry": reg_info}, 200
 

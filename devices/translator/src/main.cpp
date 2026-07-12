@@ -134,23 +134,8 @@ void setup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    // 0. Si el radio falló al iniciar, reintentar cada 3 segundos en segundo plano sin bloquear el USB/HID
-    if (!isRadioOk) {
-        static unsigned long lastRadioRetry = 0;
-        if (millis() - lastRadioRetry > 3000) {
-            lastRadioRetry = millis();
-            if (connection.begin()) {
-                isRadioOk = true;
-                ColmenaError::clear();
-                pTransport->sendStatus("{\"status\":\"radio_recovered\"}");
-                colmena.broadcastSync();
-                delay(80);
-                colmena.broadcastPing();
-                snprintf(lastActivityStr, sizeof(lastActivityStr), "Radio RF recuperado");
-            }
-        }
-    } else {
-        // 1. Mantener red (update + DHCP) solo si el radio funciona
+    // 1. Mantener red Mesh y procesar paquetes RF entrantes SOLAMENTE si el radio funciona (evita cuelgues de bus)
+    if (isRadioOk) {
         connection.update();
 
         // 2. RF → HUB
@@ -194,7 +179,7 @@ void loop() {
         }
     }
 
-    // 3. HUB → RF o comandos de control desde el frontend (Se ejecuta SIEMPRE para no desconectar al Hub)
+    // 3. HUB → RF o comandos de control desde el frontend (Se ejecuta SIEMPRE para no desconectar ni bloquear el Hub)
     if (pTransport->available()) {
         RFPacket pkt;
         if (pTransport->readPacket(pkt)) {
@@ -226,6 +211,14 @@ void loop() {
                 bool ok = false;
                 if (isRadioOk) {
                     ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                    // Si el envío falló, verificamos de forma reactiva si el chip se desconectó físicamente
+                    if (!ok && !connection.getRadio().isChipConnected()) {
+                        // Avisa y se olvida (quedó desactivado)
+                        isRadioOk = false;
+                        ColmenaError::raise(ERR_RADIO_INIT_FAIL, "NRF24 Desconectado");
+                        pTransport->sendStatus("{\"error\":\"radio_lost\",\"code\":101}");
+                        snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Radio NRF24 Desconectado");
+                    }
                 }
                 snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: ID %u CMD 0x%02X", pkt.destId, pkt.command);
                 pTransport->sendAck(ok, pkt.destId);
@@ -237,8 +230,23 @@ void loop() {
     // 4. Timeouts de heartbeat
     colmena.checkHeartbeatTimeouts(HEARTBEAT_TIMEOUT_MS);
 
-    // Mantenimiento de red frecuente para no perder paquetes DHCP ni CMD_DISCOVER antes de refrescar display
-    connection.update();
+    // Mantenimiento de red frecuente SOLO si el radio está operativo para no perder paquetes ni gastar CPU en error
+    if (isRadioOk) {
+        connection.update();
+    } else {
+        // Si el radio estaba desactivado por error, intentamos recuperar ÚNICAMENTE al llegar una orden por USB/Serial o en eventos largos
+        static unsigned long lastReactiveEvent = 0;
+        if (millis() - lastReactiveEvent > 30000UL) { // Evento espaciado largo natural (30s) sin chequear cada foking rato
+            lastReactiveEvent = millis();
+            if (connection.begin() && connection.getRadio().isChipConnected()) {
+                // Al tiro todo nice y se olvida el error
+                isRadioOk = true;
+                ColmenaError::clear();
+                pTransport->sendStatus("{\"status\":\"radio_recovered\",\"code\":0}");
+                snprintf(lastActivityStr, sizeof(lastActivityStr), "Radio RF recuperado OK");
+            }
+        }
+    }
 
     // 5. Refrescar display a tiempo real (~12.5 FPS)
     if (millis() - lastDisplayRefresh > DISPLAY_REFRESH_MS) {

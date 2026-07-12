@@ -4,16 +4,16 @@ Backend ultra-liviano para Raspberry Pi
 Comunicación por radiofrecuencia (RF433/nRF24/LoRa)
 Solo controla dispositivos — Auth y usuarios viven en el Servidor.
 """
-from flask import Flask
+from flask import Flask, request, session, redirect, render_template
 from datetime import datetime
 import os
 import sys
 from pathlib import Path
+import io
 
 # Agregar ruta raíz al path para importar modulos
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-import io
 if os.getenv("HUB_BACKGROUND") == "1":
     log_dir = Path(__file__).parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
@@ -35,17 +35,28 @@ from hub.modules.automation.routes.api import automation_bp
 from hub.modules.automation.routes.views import automation_view_bp
 from hub.modules.communication.routes.api import communication_bp, process_incoming_packet
 from hub.modules.communication.routes.views import communication_view_bp
+from hub.modules.auth.routes.views import auth_view_bp
 from hub.modules.communication.logic.watchdog import start_watchdog
 from hub.modules.communication.logic.gateway import gateway
 from hub.modules.communication.logic.cloud_bridge import cloud_bridge
 
 app = Flask(__name__)
+app.secret_key = os.getenv("HUB_SECRET", "super-secret-colmena-key")
+
 app.register_blueprint(devices_bp, url_prefix="/api")
 app.register_blueprint(devices_view_bp)
 app.register_blueprint(automation_bp, url_prefix="/api")
 app.register_blueprint(automation_view_bp)
 app.register_blueprint(communication_bp, url_prefix="/api")
 app.register_blueprint(communication_view_bp)
+app.register_blueprint(auth_view_bp)
+
+@app.before_request
+def require_login():
+    if request.path.startswith("/static") or request.path.startswith("/api") or request.path in ["/login", "/register", "/device-token", "/device-token/"]:
+        return
+    if not session.get("logged_in"):
+        return redirect("/login")
 
 # Ping liviano para que la app verifique que el Hub responde en LAN
 @app.route("/api/ping", methods=["GET"])
@@ -65,9 +76,13 @@ else:
     print("⚠️ Gateway RF No conectado. Revisa tu puerto USB/COM.")
 
 # Aseguramos de que las tablas existan al inicio
+# IMPORTANTE: importar TODOS los modelos antes de migrate_all()
+# para que __subclasses__() los detecte correctamente.
 from hub.modules.communication.models.notification import DeviceToken, NotificationLog
+from hub.modules.automation.models.skill import Skill
+from hub.modules.auth.models.room import Room
+from hub.modules.auth.models.user import User as HubUser
 BaseModel.migrate_all()
-Device.migrate()
 
 @app.route("/device-token/", methods=["POST", "PUT"])
 @app.route("/device-token", methods=["POST", "PUT"])

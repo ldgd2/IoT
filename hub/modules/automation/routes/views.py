@@ -6,6 +6,7 @@ import json
 automation_view_bp = Blueprint('automation_view', __name__)
 
 @automation_view_bp.route("/skills")
+@automation_view_bp.route("/scenes")
 def skills_view():
     return render_template("views/dashboard/skills/index.html", skills=Skill.all())
 

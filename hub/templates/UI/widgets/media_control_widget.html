@@ -1,0 +1,42 @@
+{# Macros para widgets de Multimedia #}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/inputs.html' as inp %}
+
+{% macro m3_media_widget(id, name, state='playing', track='Desconocido', artist='', volume=50) %}
+<div class="widget-card" id="{{ id }}">
+    <div class="widget-header" style="margin-bottom: 24px;">
+        <div class="widget-icon-bg active" style="background: var(--md-tertiary-container); color: var(--md-on-tertiary-container);">
+            <div class="icon">{% include 'UI/icons/svg/speaker.svg' ignore missing %}</div>
+        </div>
+        <div class="widget-info">
+            <div class="widget-title">{{ track }}</div>
+            <div class="widget-subtitle">{{ artist or name }}</div>
+        </div>
+        <div class="widget-actions">
+            {{ btn.m3_icon_btn('UI/icons/svg/power.svg', 'standard', style_attr='width: 32px; height: 32px;') }}
+        </div>
+    </div>
+    
+    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px;">
+        {{ btn.m3_icon_btn('UI/icons/svg/skip-previous.svg', 'tonal', style_attr='width: 48px; height: 48px;') }}
+        
+        <button class="fab-normal" style="background: var(--md-primary); color: var(--md-on-primary); width: 56px; height: 56px; border-radius: 28px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            <div class="icon" style="width: 32px; height: 32px;">
+                {% if state == 'playing' %}
+                    {% include 'UI/icons/svg/pause.svg' ignore missing %}
+                {% else %}
+                    {% include 'UI/icons/svg/play.svg' ignore missing %}
+                {% endif %}
+            </div>
+        </button>
+        
+        {{ btn.m3_icon_btn('UI/icons/svg/skip-next.svg', 'tonal', style_attr='width: 48px; height: 48px;') }}
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; margin-top: auto;">
+        <div class="icon" style="width: 20px; height: 20px; color: var(--md-on-surface-variant);">{% include 'UI/icons/svg/volume-low.svg' ignore missing %}</div>
+        {{ inp.m3_range_slider(id=id~'-vol', min='0', max='100', value=volume) }}
+        <div class="icon" style="width: 20px; height: 20px; color: var(--md-on-surface-variant);">{% include 'UI/icons/svg/volume-high.svg' ignore missing %}</div>
+    </div>
+</div>
+{% endmacro %}

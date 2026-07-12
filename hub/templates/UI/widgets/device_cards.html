@@ -5,73 +5,90 @@
 {% macro dashboard_device_card(dev) %}
 {% set state = dev.state if dev.state else {} %}
 {% set is_switching = ('on' in state) or ('relay' in (dev.feature_keys or '')) or (dev.category in ['switching', 'security', 'light', 'actuator']) or ((dev.type_code|int) in [1, 2, 3, 5, 7, 8, 9, 48, 0x30]) or ('luz' in dev.name|lower) or ('foco' in dev.name|lower) or ('relay' in dev.name|lower) or ('enchufe' in dev.name|lower) or ('switch' in dev.name|lower) or ('lámpara' in dev.name|lower) or ('lampara' in dev.name|lower) or ('bombilla' in dev.name|lower) or ('afuera' in dev.name|lower) or ('sala' in dev.name|lower) or ('patio' in dev.name|lower) or (dev.modifiable_params | selectattr('key', 'equalto', 'on') | list | length > 0) %}
-<div class="m3-card dev-card {% if state.get('on') %}active-device{% endif %}" onclick="window.location.href='/devices/{{ dev.device_id }}'" style="cursor: pointer; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-large); background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); transition: transform 0.2s, box-shadow 0.2s;">
-    <div>
-        <!-- CABECERA TARJETA -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <div style="width: 48px; height: 48px; border-radius: 16px; background: var(--md-surface); display: flex; align-items: center; justify-content: center; color: var(--md-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-                <div class="icon" style="width: 26px; height: 26px;">
-                    {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
-                    {% include svg_path ignore missing %}
-                </div>
+<div class="m3-card dev-card {% if state.get('on') %}active-device{% endif %}" onclick="window.location.href='/device/{{ dev.device_id }}'" style="cursor: pointer; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-large); background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); transition: transform 0.2s, box-shadow 0.2s; gap: 16px;">
+    
+    <!-- CABECERA TARJETA (Flutter SmartDeviceCard Header) -->
+    <div style="display: flex; gap: 12px;">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--md-surface-container-highest); display: flex; align-items: center; justify-content: center; color: var(--md-primary); flex-shrink: 0;">
+            <div class="icon" style="width: 24px; height: 24px;">
+                {% set svg_path = 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'help-circle.svg') %}
+                {% include svg_path ignore missing %}
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 500; color: var(--md-text); letter-spacing: -0.3px;">
+                    {{ dev.name }}
+                </h3>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 8px;" onclick="event.stopPropagation()">
-                {% if dev.status == 'online' %}
-                <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; color: var(--md-tertiary); background: rgba(162, 177, 89, 0.15); padding: 4px 10px; border-radius: 12px;">
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--md-tertiary);"></span> Online
+            <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                <!-- Connection Badge -->
+                <span style="font-size: 0.75rem; background: var(--md-surface-variant); padding: 2px 8px; border-radius: 6px; color: var(--md-on-surface-variant); display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: {% if dev.status == 'online' %}var(--md-primary){% else %}var(--md-error){% endif %};"></span>
+                    {% if dev.type_code and dev.type_code|int < 100 %}RF Hub{% else %}Wi-Fi{% endif %}
                 </span>
-                {% else %}
-                <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; color: var(--md-error); background: rgba(229, 115, 115, 0.15); padding: 4px 10px; border-radius: 12px;">
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--md-error);"></span> Offline
+                
+                <!-- Relays/Sensors Badge -->
+                {% if is_switching %}
+                <span style="font-size: 0.75rem; background: rgba(0, 229, 168, 0.15); color: var(--md-primary); padding: 2px 8px; border-radius: 6px; font-weight: 500;">
+                    1 Relevador
+                </span>
+                {% elif 'temperature' in state or 'motion' in state %}
+                <span style="font-size: 0.75rem; background: rgba(100, 181, 246, 0.15); color: #64B5F6; padding: 2px 8px; border-radius: 6px; font-weight: 500;">
+                    Sensores
                 </span>
                 {% endif %}
             </div>
         </div>
-
-        <!-- NOMBRE Y CATEGORÍA -->
-        <h3 style="margin: 0 0 4px 0; font-size: 1.25rem; font-weight: 500; color: var(--md-text); letter-spacing: -0.3px;">
-            {{ dev.name }}
-        </h3>
-        <p style="margin: 0 0 16px 0; font-size: 0.85rem; color: var(--md-text-variant);">
-            {{ dev.type_name | title }} • <span style="text-transform: capitalize;">{{ dev.category }}</span>
-        </p>
     </div>
     
-    <!-- CONTROLES RÁPIDOS Y SENSORES EN TARJETA -->
-    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;" onclick="event.stopPropagation()">
+    <!-- CUERPO DE CONTROLES/SENSORES -->
+    <div style="background: var(--md-surface); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;" onclick="event.stopPropagation()">
+        
         {% if is_switching %}
-        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(107, 76, 18, 0.12); padding: 4px 12px; border-radius: 20px;">
-            <span style="font-size: 0.82rem; font-weight: 600; color: var(--md-primary);">Relevador:</span>
-            <label class="m3-switch-label" style="transform: scale(0.85); margin: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.9rem; font-weight: 500; color: var(--md-text);">Control</span>
+            <label class="m3-switch-label" style="margin: 0; transform: scale(0.9);">
                 <input type="checkbox" {% if state.get('on') %}checked{% endif %} onchange="sendQuickToggle('{{ dev.device_id }}', this.checked)">
                 <span class="m3-switch"></span>
             </label>
         </div>
         {% endif %}
         
-        {% if 'temperature' in state or 'temp' in state %}
-        {{ chip.m3_telemetry_pill('UI/icons/svg/thermometer.svg', state.get('temperature', state.get('temp')) ~ ' °C', 'rgba(229, 115, 115, 0.15)', '#E57373') }}
-        {% endif %}
-        {% if 'humidity' in state %}
-        {{ chip.m3_telemetry_pill('UI/icons/svg/water-percent.svg', state.get('humidity') ~ ' %', 'rgba(100, 181, 246, 0.15)', '#64B5F6') }}
-        {% endif %}
-        {% if 'power' in state %}
-        {{ chip.m3_telemetry_pill('UI/icons/svg/lightning-bolt.svg', state.get('power') ~ ' W', 'rgba(255, 241, 118, 0.18)', '#FFF176') }}
-        {% endif %}
-        {% if 'motion' in state %}
-            {% if state.get('motion') %}
-            {{ chip.m3_telemetry_pill('UI/icons/svg/motion-sensor.svg', 'Movimiento', 'rgba(229, 115, 115, 0.22)', '#E57373') }}
-            {% else %}
-            {{ chip.m3_telemetry_pill('UI/icons/svg/motion-sensor.svg', 'Despejado', 'rgba(129, 199, 132, 0.18)', '#81C784') }}
+        {% if 'temperature' in state or 'temp' in state or 'humidity' in state or 'power' in state or 'motion' in state %}
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            {% if 'temperature' in state or 'temp' in state %}
+            <span style="font-size: 0.8rem; font-weight: 500; background: var(--md-surface-variant); padding: 6px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; color: var(--md-text);">
+                <div class="icon" style="width: 16px; height: 16px; color: #E57373;">{% include 'UI/icons/svg/thermometer.svg' ignore missing %}</div>
+                {{ state.get('temperature', state.get('temp')) }} °C
+            </span>
             {% endif %}
+            
+            {% if 'humidity' in state %}
+            <span style="font-size: 0.8rem; font-weight: 500; background: var(--md-surface-variant); padding: 6px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; color: var(--md-text);">
+                <div class="icon" style="width: 16px; height: 16px; color: #64B5F6;">{% include 'UI/icons/svg/water-percent.svg' ignore missing %}</div>
+                {{ state.get('humidity') }} %
+            </span>
+            {% endif %}
+            
+            {% if 'power' in state %}
+            <span style="font-size: 0.8rem; font-weight: 500; background: var(--md-surface-variant); padding: 6px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; color: var(--md-text);">
+                <div class="icon" style="width: 16px; height: 16px; color: #FFF176;">{% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}</div>
+                {{ state.get('power') }} W
+            </span>
+            {% endif %}
+            
+            {% if 'motion' in state %}
+            <span style="font-size: 0.8rem; font-weight: 500; background: var(--md-surface-variant); padding: 6px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; color: var(--md-text);">
+                <div class="icon" style="width: 16px; height: 16px; color: {% if state.get('motion') %}#E57373{% else %}#81C784{% endif %};">{% include 'UI/icons/svg/motion-sensor.svg' ignore missing %}</div>
+                {% if state.get('motion') %}Movimiento{% else %}Despejado{% endif %}
+            </span>
+            {% endif %}
+        </div>
         {% endif %}
-    </div>
-    
-    <!-- PIE TARJETA -->
-    <div style="font-size: 0.82rem; color: var(--md-text-variant); display: flex; justify-content: space-between; border-top: 1px dashed var(--md-outline-variant); padding-top: 12px;">
-        <span>Señal: <strong style="color: var(--md-primary);">{{ dev.rssi }} dBm</strong></span>
-        <span>Activo: <strong>{{ dev.last_seen.split('T')[1][:8] if 'T' in dev.last_seen else (dev.last_seen if dev.last_seen else 'Reciente') }}</strong></span>
+        
     </div>
 </div>
 {% endmacro %}

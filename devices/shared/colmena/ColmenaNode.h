@@ -56,6 +56,12 @@
   #define PAIR_BUTTON_COOLDOWN_MS  3000
 #endif
 
+enum ButtonEvent {
+    BTN_NONE = 0,
+    BTN_SHORT_PRESS = 1,      // < 7s al soltar (para encender/apagar o alternar relays)
+    BTN_PAIR_LONG_PRESS = 2   // >= 7s continuo (para modo vinculación por 50s)
+};
+
 class ColmenaNode : public ColmenaBase {
 public:
     ColmenaNode(IConnection& conn, IParamStore& store);
@@ -84,6 +90,16 @@ public:
      */
     void tickHeartbeat(uint16_t relayMask = 0, uint8_t brightness = 0);
 
+    /** @brief Verifica si ha transcurrido el tiempo configurado para el próximo Heartbeat sin enviarlo. */
+    bool isHeartbeatDue() const {
+        return (millis() - _lastHeartbeatMs >= (unsigned long)_p.heartbeatInterval * 1000UL);
+    }
+
+    /** @brief Reinicia el contador del temporizador de Heartbeat al instante actual. */
+    void resetHeartbeatTimer() {
+        _lastHeartbeatMs = millis();
+    }
+
     /**
      * @brief Procesa un paquete CMD_CONFIG_SYNC recibido del master.
      * Actualiza y persiste los nuevos parámetros de red de la colmena.
@@ -92,7 +108,7 @@ public:
     void applySync(const RFPacket& pkt);
     void unpair();
 
-    // ── Botón de vinculación ────────────────────────────────────────────
+    // ── Botón de vinculación y control de Relays ──────────────────────
 
     /**
      * @brief Configura el pin del botón de vinculación.
@@ -105,14 +121,20 @@ public:
     void initPairButton(uint8_t pin, bool activeLow = true);
 
     /**
-     * @brief Revisa el estado del botón de vinculación. Llamar en cada loop().
+     * @brief Evalúa el botón táctil o físico distinguiendo toque corto vs toque largo.
      *
-     * Si el botón se presiona (o se toca si es botón táctil), llama a announce()
-     * con el nombre del nodo configurado. Incluye debounce (PAIR_BUTTON_DEBOUNCE_MS)
-     * y cooldown (PAIR_BUTTON_COOLDOWN_MS) para evitar ráfagas de anuncios.
+     * - Si se suelta el botón tras mantenerlo entre 50ms y < 7000ms: retorna BTN_SHORT_PRESS.
+     * - Si se mantiene presionado continuamente durante >= 7000ms (7 segundos): activa modo vinculación
+     *   (startPairingWindow) y retorna BTN_PAIR_LONG_PRESS.
      *
-     * @param nodeName  Nombre a usar en el announce (ej. NODE_NAME de PinConfig.h)
-     * @return true si se acaba de activar el botón y se envió el paquete de vinculación.
+     * @param nodeName  Nombre a usar en el announce en caso de vinculación.
+     * @return BTN_NONE, BTN_SHORT_PRESS o BTN_PAIR_LONG_PRESS.
+     */
+    ButtonEvent checkButtonEvent(const char* nodeName);
+
+    /**
+     * @brief Revisa el estado del botón de vinculación (compatibilidad).
+     * Retorna true únicamente cuando se activa el modo vinculación (>= 7 segundos).
      */
     bool tickPairButton(const char* nodeName);
 
@@ -128,13 +150,17 @@ public:
      */
     void tickPairing();
 
+    /** @brief Devuelve true si el nodo está activamente en la ventana de vinculación. */
+    bool isPairingWindowActive() const { return _isPairingMode; }
+
 private:
     unsigned long _lastHeartbeatMs;
 
-    // Botón de vinculación
+    // Botón de vinculación / control
     uint8_t       _pairPin;           // 255 = no configurado
     bool          _pairActiveLow;
     bool          _pairLastState;     // Estado anterior (para detección de flanco)
+    bool          _pairLongPressTriggered; // True una vez disparada la vinculación de 7s
     unsigned long _pairDebounceMs;    // Timestamp del último cambio detectado
     unsigned long _pairLastAnnounce;  // Timestamp del último announce por botón
 

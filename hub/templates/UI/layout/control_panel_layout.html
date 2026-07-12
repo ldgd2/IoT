@@ -1,0 +1,24 @@
+{% extends "UI/layout/base.html" %}
+
+{% block content %}
+<div class="room-control-layout">
+    <div class="room-header-sticky">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <a href="javascript:history.back()" class="icon-btn standard">
+                <div class="icon">{% include 'UI/icons/svg/arrow-left.svg' ignore missing %}</div>
+            </a>
+            <div>
+                <h1 style="margin: 0; font-size: 1.5rem;">{% block room_name %}Room Name{% endblock %}</h1>
+                <p style="margin: 0; color: var(--md-on-surface-variant); font-size: 0.9rem;">{% block room_subtitle %}Subtitle{% endblock %}</p>
+            </div>
+        </div>
+        <div class="room-actions">
+            {% block room_actions %}{% endblock %}
+        </div>
+    </div>
+    
+    <div class="room-content">
+        {% block room_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

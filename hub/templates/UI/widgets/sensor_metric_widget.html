@@ -1,0 +1,32 @@
+{# Macros para widgets de Sensores (Lectura) #}
+
+{% macro m3_sensor_widget(id, name, value, unit, icon_path, trend='stable') %}
+<div class="widget-card" id="{{ id }}" style="min-height: 120px;">
+    <div class="widget-header" style="margin-bottom: 8px;">
+        <div class="widget-title" style="flex:1;">{{ name }}</div>
+        <div class="icon" style="width: 24px; height: 24px; color: var(--md-on-surface-variant);">
+            {% include icon_path ignore missing %}
+        </div>
+    </div>
+    
+    <div style="margin-top: auto;">
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+            <span class="metric-value-large">{{ value }}</span>
+            <span style="color: var(--md-on-surface-variant); font-weight: 500;">{{ unit }}</span>
+        </div>
+        
+        <div class="metric-trend {% if trend == 'up' %}up{% elif trend == 'down' %}down{% endif %}" style="margin-top: 4px;">
+            {% if trend == 'up' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+                <span>Subiendo</span>
+            {% elif trend == 'down' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg>
+                <span>Bajando</span>
+            {% else %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12l-4-4v3H3v2h15v3z"/></svg>
+                <span style="color: var(--md-on-surface-variant);">Estable</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}

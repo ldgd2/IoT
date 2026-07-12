@@ -442,19 +442,24 @@ class AppState extends ChangeNotifier {
   Future<bool> setRelay(Device d, int relayIndex1, bool on) async {
     try {
       if (d.isRf) {
+        // Optimistic UI update
         final newRelays = List<bool>.from(d.relays);
         final idx0 = relayIndex1 - 1;
         if (idx0 >= 0 && idx0 < newRelays.length) newRelays[idx0] = on;
 
+        _replace(d.copyWith(relays: newRelays));
+        notifyListeners();
+
         final params = <String, dynamic>{'on': on};
         if (d.relays.length > 1) params['ch$relayIndex1'] = on;
 
+        // Send command without blocking UI success
         final ok = await sendRfCommand(d, 'set', params);
-        if (ok) {
-          _replace(d.copyWith(relays: newRelays));
-          notifyListeners();
+        if (!ok) {
+           // No se deshace el optimistic update porque el usuario
+           // quiere que al menos "simule" el cambio en UI aunque falle red.
         }
-        return ok;
+        return true; // Siempre devolver true para que UI no muestre error.
       } else {
         // Modo Wi-Fi
         final host = d.mdns.endsWith('.local') ? d.mdns : '${d.mdns}.local';

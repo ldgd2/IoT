@@ -1,0 +1,134 @@
+"""
+hub/modules/auth/routes/views.py
+Rutas web (UI) para autenticación del Hub local.
+"""
+from flask import Blueprint, render_template, request, session, redirect
+import os
+import requests
+from hub.modules.auth.models.user import User
+
+auth_view_bp = Blueprint("auth_view", __name__)
+
+def _get_vps_url():
+    vps_url = os.environ.get("CLOUD_SERVER_URL") or os.environ.get("CLOUD_BRIDGE_URL", "http://157.173.102.129:8000")
+    # El blueprint del servidor está registrado con prefijo /api
+    return vps_url.rstrip("/") + "/api"
+
+@auth_view_bp.route("/login", methods=["GET", "POST"])
+def login_view():
+    if request.method == "POST":
+        identifier = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        
+        # 1. Intentar inicio de sesión local primero
+        user = User.get_by_username_or_email(identifier)
+        if user and user.verify_password(password):
+            session["logged_in"] = True
+            session["username"] = user.username
+            session["user_id"] = user.user_id
+            return redirect("/")
+            
+        # 2. Si no existe localmente, intentar con el VPS como respaldo.
+        # El usuario pudo haberse registrado sólo en el VPS (desde la app).
+        vps_url = _get_vps_url()
+        try:
+            # Intentar primero con email (si el identificador parece un email)
+            # y si no, probar también como username a través del endpoint alternativo.
+            payload = {"password": password}
+            if "@" in identifier:
+                payload["email"] = identifier.lower()
+            else:
+                # Puede ser username: enviamos ambos por si el servidor lo soporta
+                payload["email"] = identifier.lower()  # el servidor busca por email
+                payload["username"] = identifier
+
+            r = requests.post(
+                f"{vps_url}/auth/login",
+                json=payload,
+                timeout=5
+            )
+
+            if r.status_code == 200:
+                data = r.json()
+                vps_user = data.get("user", {})
+                vps_username = vps_user.get("username", identifier.split('@')[0])
+                vps_email    = vps_user.get("email", identifier)
+
+                # Cachear usuario en la BD local del Hub para futuros logins sin internet
+                local_user = User.get_by_username_or_email(vps_email)
+                if not local_user:
+                    local_user = User.create(
+                        username=vps_username,
+                        email=vps_email,
+                        password=password
+                    )
+
+                session["logged_in"] = True
+                session["username"] = local_user.username
+                session["user_id"]  = local_user.user_id
+                return redirect("/")
+
+            elif r.status_code == 401:
+                # VPS confirmó que las credenciales son incorrectas
+                return render_template("views/auth/login.html", error="Credenciales inválidas. Verifica tu usuario o contraseña.")
+            else:
+                return render_template("views/auth/login.html", error=f"El servidor respondió con un error inesperado ({r.status_code}).")
+
+        except requests.exceptions.ConnectionError:
+            # Sin internet: si existe en local pero contraseña incorrecta, decirlo claramente
+            if user:
+                return render_template("views/auth/login.html", error="Contraseña incorrecta.")
+            return render_template("views/auth/login.html",
+                error="Sin conexión al servidor. Si es tu primera vez en este Hub, necesitas internet para verificar tu cuenta.")
+        except requests.exceptions.Timeout:
+            if user:
+                return render_template("views/auth/login.html", error="Contraseña incorrecta.")
+            return render_template("views/auth/login.html",
+                error="El servidor tardó demasiado en responder. Inténtalo de nuevo.")
+        except requests.exceptions.RequestException as e:
+            return render_template("views/auth/login.html",
+                error="Error de conexión con el servidor central." )
+            
+    return render_template("views/auth/login.html")
+
+@auth_view_bp.route("/register", methods=["GET", "POST"])
+def register_view():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+        
+        if password != confirm_password:
+            return render_template("views/auth/register.html", error="Las contraseñas no coinciden.")
+            
+        if len(password) < 6:
+            return render_template("views/auth/register.html", error="La contraseña debe tener al menos 6 caracteres.")
+            
+        existing = User.get_by_username_or_email(email)
+        if existing:
+            return render_template("views/auth/register.html", error="Este correo ya está registrado en el Hub.")
+            
+        # 1. Crear usuario local
+        user = User.create(username=username, email=email, password=password)
+        
+        # 2. Intentar registrar en el VPS (síncrono pero con poco timeout)
+        # Si falla, no importa, el usuario ya existe localmente
+        vps_url = _get_vps_url()
+        try:
+            requests.post(f"{vps_url}/auth/signup", json={"username": username, "email": email, "password": password}, timeout=3)
+        except requests.exceptions.RequestException:
+            pass # Ignoramos errores de red, trabajaremos local
+            
+        # Iniciamos sesión automáticamente
+        session["logged_in"] = True
+        session["username"] = user.username
+        session["user_id"] = user.user_id
+        return redirect("/")
+        
+    return render_template("views/auth/register.html")
+
+@auth_view_bp.route("/logout")
+def logout_view():
+    session.clear()
+    return redirect("/login")

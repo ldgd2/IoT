@@ -70,10 +70,19 @@ def api_signup():
 @auth_bp.route("/auth/login", methods=["POST"])
 def api_login():
     data = request.get_json(silent=True) or {}
-    email    = (data.get("email") or "").strip().lower()
-    password = (data.get("password") or "").strip()
+    # Aceptar 'email', 'username' o 'identifier' como campo de búsqueda
+    identifier = (data.get("email") or data.get("username") or data.get("identifier") or "").strip()
+    password   = (data.get("password") or "").strip()
 
-    row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if not identifier or not password:
+        return jsonify({"error": "Faltan credenciales"}), 400
+
+    # Buscar por email O username
+    row = db.execute(
+        "SELECT * FROM users WHERE email = ? OR username = ?",
+        (identifier.lower(), identifier)
+    ).fetchone()
+
     if not row or not _verify_pw(password, row["password_hash"]):
         return jsonify({"error": "Credenciales inválidas"}), 401
 

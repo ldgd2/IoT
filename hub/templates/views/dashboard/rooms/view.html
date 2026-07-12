@@ -1,0 +1,170 @@
+{% extends "UI/layout/control_panel_layout.html" %}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+{% import 'UI/widgets/climate_widget.html' as w_climate %}
+{% import 'UI/widgets/light_control_widget.html' as w_light %}
+{% import 'UI/widgets/sensor_metric_widget.html' as w_sensor %}
+{% import 'UI/widgets/media_control_widget.html' as w_media %}
+
+{% block title %}{{ room.name }} - Panel de Control{% endblock %}
+
+{% block room_name %}{{ room.name }}{% endblock %}
+{% block room_subtitle %}ID de Zona: {{ room.room_id[:8] }} &bull; Creado el {{ room.created_at[:10] if room.created_at else 'Recientemente' }}{% endblock %}
+
+{% block room_actions %}
+<div style="display: flex; gap: 8px;">
+    {{ btn.m3_button('Asignar Dispositivo', 'tonal', icon_path='UI/icons/svg/plus.svg', onclick='openAssignDeviceModal()') }}
+    {{ btn.m3_icon_btn('UI/icons/svg/dots-vertical.svg', 'standard') }}
+</div>
+{% endblock %}
+
+{% block room_content %}
+<div class="room-section">
+    <div class="room-section-title">
+        <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/devices.svg' ignore missing %}</div>
+        <span>Dispositivos en {{ room.name }}</span>
+    </div>
+    
+    {% if devices and devices|length > 0 %}
+    <div class="room-section-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+        {% for dev in devices %}
+            {% set state = dev.state if dev.state else {} %}
+            {% set cat_lower = (dev.category or '')|lower %}
+            {% set name_lower = dev.name|lower %}
+            
+            {% if 'clima' in cat_lower or 'termo' in name_lower or 'ac' in name_lower or 'aire' in name_lower %}
+                {% set temp_cur = state.get('temp', 24) %}
+                {% set temp_tar = state.get('target', 22) %}
+                {% set mode = state.get('mode', 'cool') %}
+                {{ w_climate.m3_climate_widget(dev.device_id, dev.name, temp_cur, temp_tar, mode, "sendQuickCommand('" ~ dev.device_id ~ "', {target: parseInt(this.value)})") }}
+            
+            {% elif 'luz' in cat_lower or 'lighting' in cat_lower or 'foco' in name_lower or 'lámpara' in name_lower or 'lampara' in name_lower or 'bombilla' in name_lower %}
+                {% set is_on = state.get('on', false) %}
+                {% set bright = state.get('brightness', 100) %}
+                {{ w_light.m3_light_widget(dev.device_id, dev.name, is_on, bright, "sendQuickToggle('" ~ dev.device_id ~ "', this.checked)", "sendQuickCommand('" ~ dev.device_id ~ "', {brightness: parseInt(this.value)})") }}
+                
+            {% elif 'media' in cat_lower or 'audio' in cat_lower or 'bocina' in name_lower or 'tv' in name_lower or 'tele' in name_lower %}
+                {% set vol = state.get('volume', 50) %}
+                {% set track = state.get('track', dev.name) %}
+                {{ w_media.m3_media_widget(dev.device_id, dev.name, state.get('status', 'playing'), track, state.get('artist', 'Colmena Audio'), vol) }}
+                
+            {% elif 'sensor' in cat_lower or 'humedad' in name_lower or 'temperatura' in name_lower or 'bateria' in name_lower or 'batería' in name_lower %}
+                {% set val = state.get('value', state.get('temp', state.get('humidity', '24.5'))) %}
+                {% set unit = state.get('unit', '°C' if 'temp' in name_lower else ('%' if 'hum' in name_lower else '')) %}
+                {% set trend = state.get('trend', 'stable') %}
+                {{ w_sensor.m3_sensor_widget(dev.device_id, dev.name, val, unit, 'UI/icons/svg/' ~ (dev.type_icon or 'thermometer.svg'), trend) }}
+                
+            {% else %}
+                <!-- Tarjeta Estándar para Relays u Enchufes -->
+                <div class="widget-card {% if state.get('on') %}active{% endif %}" style="height: 100%; justify-content: space-between;">
+                    <div class="widget-header">
+                        <div class="widget-icon-bg">
+                            <div class="icon">{% include 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'router-wireless.svg') ignore missing %}</div>
+                        </div>
+                        <div class="widget-info">
+                            <div class="widget-title">{{ dev.name }}</div>
+                            <div class="widget-subtitle">{{ dev.category|title or 'General' }} &bull; {{ dev.rssi }} dBm</div>
+                        </div>
+                        <div class="widget-actions">
+                            {% set is_switching = ('on' in state) or ('relay' in (dev.feature_keys or '')) or (dev.category in ['switching', 'security']) or ('relay' in name_lower) or ('enchufe' in name_lower) or ('switch' in name_lower) or (dev.modifiable_params | selectattr('key', 'equalto', 'on') | list | length > 0) %}
+                            {% if is_switching %}
+                            <label class="m3-switch-label" onclick="event.stopPropagation();" title="Encender / Apagar">
+                                <input type="checkbox" {% if state.get('on') %}checked{% endif %} onchange="sendQuickToggle('{{ dev.device_id }}', this.checked)">
+                                <span class="m3-switch"></span>
+                            </label>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--md-outline-variant);">
+                        <span style="font-size: 0.8rem; color: var(--md-text-variant);">ID: <code>{{ dev.device_id }}</code></span>
+                        <a href="/devices/{{ dev.device_id }}" style="text-decoration: none;">
+                            {{ btn.m3_button('Configurar →', 'tonal', style_attr='height: 32px; padding: 0 12px; font-size: 0.8rem;') }}
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); padding: 48px; text-align: center;">
+        <div class="empty-state-icon" style="width: 64px; height: 64px; border-radius: 32px; background: var(--md-surface); color: var(--md-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; border: 1px solid var(--md-outline-variant);">
+            <div class="icon" style="width: 32px; height: 32px;">{% include 'UI/icons/svg/devices.svg' ignore missing %}</div>
+        </div>
+        <h3 style="font-size: 1.4rem; font-weight: 500; margin-bottom: 8px;">Habitación Vacía</h3>
+        <p style="color: var(--md-text-variant); max-width: 450px; margin: 0 auto 20px auto;">Aún no has asignado ningún nodo RF o sensor a {{ room.name }}.</p>
+        <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="openAssignDeviceModal()">Asignar Primer Dispositivo</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- MODAL SIMULADO DE ASIGNAR DISPOSITIVO -->
+<div id="assignDeviceModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--md-surface); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); width: 90%; max-width: 480px; padding: 28px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+        <h3 style="font-size: 1.3rem; font-weight: 500; margin: 0 0 8px 0;">Asignar a {{ room.name }}</h3>
+        <p style="color: var(--md-text-variant); font-size: 0.9rem; margin: 0 0 20px 0;">Selecciona un dispositivo de tu lista general para ubicarlo en este espacio.</p>
+        
+        <div style="max-height: 240px; overflow-y: auto; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px;">
+            {% if devices and devices|length > 0 %}
+                {% for dev in devices %}
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--md-surface-container); border-radius: 12px; cursor: pointer; border: 1px solid var(--md-outline-variant);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="checkbox" checked>
+                        <div>
+                            <strong style="display: block; font-size: 0.95rem;">{{ dev.name }}</strong>
+                            <span style="font-size: 0.8rem; color: var(--md-text-variant);">ID: {{ dev.device_id }} &bull; {{ dev.category|title }}</span>
+                        </div>
+                    </div>
+                </label>
+                {% endfor %}
+            {% else %}
+                <div style="padding: 20px; text-align: center; color: var(--md-text-variant);">No tienes dispositivos registrados en la Central.</div>
+            {% endif %}
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="closeAssignDeviceModal()">Cerrar</button>
+            <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="closeAssignDeviceModal()">Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAssignDeviceModal() {
+    const m = document.getElementById('assignDeviceModal');
+    if (m) m.style.display = 'flex';
+}
+
+function closeAssignDeviceModal() {
+    const m = document.getElementById('assignDeviceModal');
+    if (m) m.style.display = 'none';
+}
+
+async function sendQuickToggle(deviceId, statusBool) {
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: deviceId, on: statusBool })
+        });
+        const data = await res.json();
+        if (data.status !== 'success' && !res.ok) {
+            console.warn('Error backend:', data.error);
+        }
+    } catch (err) {
+        console.error('Error al conmutar dispositivo:', err);
+    }
+}
+
+async function sendQuickCommand(deviceId, params) {
+    try {
+        await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: deviceId, ...params })
+        });
+    } catch (err) {
+        console.error('Error al enviar comando:', err);
+    }
+}
+</script>
+{% endblock %}

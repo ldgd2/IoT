@@ -62,6 +62,15 @@ class User(BaseModel):
             return None
         return cls(**dict(rows[0]))
 
+    @classmethod
+    def get_by_username_or_email(cls, identifier: str):
+        rows = Database.execute(
+            f"SELECT * FROM {cls.__table__} WHERE email = ? OR username = ?", (identifier, identifier)
+        ).fetchall()
+        if not rows:
+            return None
+        return cls(**dict(rows[0]))
+
     def verify_password(self, password: str) -> bool:
         return self._verify_pw(password, self.password_hash)
 

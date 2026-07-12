@@ -7,6 +7,7 @@ ColmenaNode::ColmenaNode(IConnection& conn, IParamStore& store)
       _pairPin(255),
       _pairActiveLow(true),
       _pairLastState(false),
+      _pairLongPressTriggered(false),
       _pairDebounceMs(0),
       _pairLastAnnounce(0),
       _isPairingMode(false),
@@ -130,6 +131,7 @@ void ColmenaNode::initPairButton(uint8_t pin, bool activeLow) {
     _pairActiveLow  = activeLow;
     _pairLastAnnounce = 0;
     _pairDebounceMs   = 0;
+    _pairLongPressTriggered = false;
     // Configurar pull-up interno si es active-low (botón a GND).
     // Si es active-high (botón táctil TTP223 a VCC), usar INPUT_PULLDOWN donde exista o INPUT.
 #if defined(IS_RP2040) || defined(ARDUINO_ARCH_RP2040)
@@ -143,44 +145,60 @@ void ColmenaNode::initPairButton(uint8_t pin, bool activeLow) {
     _pairLastState = false;
 }
 
-bool ColmenaNode::tickPairButton(const char* nodeName) {
-    unsigned long now       = millis();
-    bool rawPressed         = false;
+ButtonEvent ColmenaNode::checkButtonEvent(const char* nodeName) {
+    unsigned long now = millis();
+    bool rawPressed = false;
 
     if (_pairPin != 255) {
         rawPressed = (digitalRead(_pairPin) == LOW) == _pairActiveLow;
     }
 
+    // 1. Botón no está presionado
     if (!rawPressed) {
-        _pairLastState  = false;
+        if (_pairLastState) {
+            // Flanco de bajada (botón acaba de soltarse)
+            unsigned long heldMs = now - _pairDebounceMs;
+            _pairLastState = false;
+
+            // Si se mantuvo entre 50ms (antibounce) y < 7000ms (7 segundos) y aún no disparó vinculación larga -> ¡Pulsación corta!
+            if (heldMs >= 50UL && heldMs < 7000UL && !_pairLongPressTriggered) {
+                _pairDebounceMs = 0;
+                Serial.printf("\n🔘 [BOTÓN] Pulsación corta detectada (%lu ms) -> Alternar estado del relay/luz\r\n", heldMs);
+                return BTN_SHORT_PRESS;
+            }
+        }
+        _pairLastState = false;
         _pairDebounceMs = 0;
-        return false;
+        _pairLongPressTriggered = false;
+        return BTN_NONE;
     }
 
-    // Si acaba de presionar el botón, registrar el instante inicial
+    // 2. Botón presionado. Si acaba de bajar, registrar inicio de tiempo
     if (!_pairLastState) {
-        _pairLastState  = true;
+        _pairLastState = true;
         _pairDebounceMs = now;
-        Serial.println("\n[BOTÓN] ¡Contacto detectado! Mantén presionado ~1 segundo para entrar en modo vinculación...");
-        return false;
+        _pairLongPressTriggered = false;
+        Serial.println("\n[BOTÓN] ¡Contacto detectado! Mantén presionado ~7 segundos para entrar en modo vinculación...");
+        return BTN_NONE;
     }
 
-    // Calcular cuánto tiempo continuo lleva presionado el botón
+    // 3. Botón sostenido continuamente
     unsigned long heldMs = now - _pairDebounceMs;
 
-    // Requisito: mantener presionado mínimo 1.2 segundos (1200 ms) para evitar rebotes o toques accidentales
-    if (heldMs < 1200UL) {
-        return false;
+    // Si ya llegamos a 7 segundos continuos (7000 ms) y no se había disparado aún -> ¡Vinculación!
+    if (heldMs >= 7000UL && !_pairLongPressTriggered) {
+        if ((now - _pairLastAnnounce) >= 2000UL) {
+            _pairLongPressTriggered = true;
+            _pairLastAnnounce = now;
+            Serial.printf("\n🔥 [BOTÓN] ¡Sostenido por 7 segundos (%lu ms)! Activando modo vinculación...\r\n", heldMs);
+            startPairingWindow(nodeName);
+            return BTN_PAIR_LONG_PRESS;
+        }
     }
 
-    // Cooldown de 2 segundos entre pulsaciones exitosas de vinculación
-    if ((now - _pairLastAnnounce) < 2000UL) {
-        return false;
-    }
+    return BTN_NONE;
+}
 
-    // ✔ ¡Botón mantenido por 1.2 segundos! Disparar modo vinculación
-    _pairLastAnnounce = now;
-    Serial.println("\n[BOTÓN] ¡Modo vinculación activado! Disparando ventana de búsqueda por 50s...");
-    startPairingWindow(nodeName);
-    return true;
+bool ColmenaNode::tickPairButton(const char* nodeName) {
+    return checkButtonEvent(nodeName) == BTN_PAIR_LONG_PRESS;
 }

@@ -5,16 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gerlex IoT OS{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/m3-theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/widgets.css') }}">
     <!-- Estilos especificos de componentes insertados desde la vista -->
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-
     <!-- Incluir Navigation Rail -->
     {% include 'UI/layout/nav_rail.html' %}
 
     <!-- CONTENIDO DINAMICO DE LA VISTA -->
     <main class="main-content">
+        <!-- TOP APP BAR GLOBAL -->
+        <header class="app-bar">
+            <div class="app-bar-title">
+                <div class="icon" style="color: var(--md-primary);">{% include 'UI/icons/svg/home.svg' ignore missing %}</div>
+                <span style="font-size: 1.1rem;">Mi Hogar Colmena</span>
+            </div>
+            <div class="app-bar-actions">
+                <a href="/notifications" class="icon-btn standard" title="Notificaciones">
+                    <div class="icon">{% include 'UI/icons/svg/bell.svg' ignore missing %}</div>
+                </a>
+                <a href="/devices/new" class="icon-btn standard" title="Añadir Dispositivo">
+                    <div class="icon">{% include 'UI/icons/svg/plus.svg' ignore missing %}</div>
+                </a>
+                <a href="/settings" class="icon-btn standard" title="Configuración RF">
+                    <div class="icon">{% include 'UI/icons/svg/cog.svg' ignore missing %}</div>
+                </a>
+                <a href="/login" class="icon-btn standard" title="Perfil / Login">
+                    <div class="icon">{% include 'UI/icons/svg/account.svg' ignore missing %}</div>
+                </a>
+            </div>
+        </header>
+
         {% block content %}{% endblock %}
     </main>
 

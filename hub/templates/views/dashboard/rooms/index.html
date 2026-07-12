@@ -1,0 +1,131 @@
+{% extends "UI/layout/dashboard_layout.html" %}
+{% import 'UI/components/buttons.html' as btn %}
+{% import 'UI/components/chips.html' as chip %}
+{% import 'UI/components/inputs.html' as inp %}
+
+{% block title %}Espacios y Habitaciones - Mi Hogar Colmena{% endblock %}
+
+{% block dashboard_content %}
+<div style="width: 100%; grid-column: 1 / -1; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h1 style="font-size: 2.2rem; font-weight: 500; margin-bottom: 8px;">Espacios y Habitaciones</h1>
+        <p style="color: var(--md-text-variant); margin: 0; font-size: 1.05rem;">Agrupa, organiza y controla los dispositivos vinculados por zonas físicas de tu hogar.</p>
+    </div>
+    <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="openNewRoomModal()" style="display: flex; align-items: center; gap: 8px;">
+        <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/plus.svg' ignore missing %}</div>
+        <span>Nuevo Espacio</span>
+    </button>
+</div>
+
+<!-- ROOMS GRID -->
+{% if rooms and rooms|length > 0 %}
+<div style="width: 100%; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+    {% for room in rooms %}
+    <a href="/rooms/{{ room.room_id }}" style="text-decoration: none; color: inherit;">
+        <div class="widget-card" style="height: 100%; justify-content: space-between; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.transform='translateY(-3px)'; this.style.borderColor='var(--md-primary)'" onmouseout="this.style.transform='none'; this.style.borderColor='var(--md-outline-variant)'">
+            <div class="widget-header">
+                <div class="widget-icon-bg active" style="width: 56px; height: 56px; border-radius: 28px;">
+                    <div class="icon" style="width: 28px; height: 28px;">{% include 'UI/icons/svg/' ~ (room.icon if room.icon else 'home.svg') ignore missing %}</div>
+                </div>
+                <div class="widget-actions">
+                    {{ chip.m3_chip('Activo', style='tonal') }}
+                </div>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <h3 style="font-size: 1.3rem; font-weight: 500; margin: 0 0 4px 0; color: var(--md-on-surface);">{{ room.name }}</h3>
+                <span style="font-size: 0.85rem; color: var(--md-on-surface-variant);">ID: <code>{{ room.room_id[:8] }}...</code></span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--md-outline-variant); font-size: 0.9rem; font-weight: 500; color: var(--md-primary);">
+                <span>Entrar al panel de control</span>
+                <div class="icon" style="width: 18px; height: 18px;">{% include 'UI/icons/svg/arrow-right.svg' ignore missing %}</div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<!-- EMPTY STATE -->
+<div class="empty-state" style="grid-column: 1 / -1; background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); padding: 56px 24px; text-align: center;">
+    <div class="empty-state-icon" style="width: 72px; height: 72px; border-radius: 36px; background: var(--md-surface); color: var(--md-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; border: 1px solid var(--md-outline-variant);">
+        <div class="icon" style="width: 40px; height: 40px;">{% include 'UI/icons/svg/home.svg' ignore missing %}</div>
+    </div>
+    <h2 style="font-size: 1.6rem; font-weight: 500; margin-bottom: 12px;">Aún no tienes habitaciones creadas</h2>
+    <p style="color: var(--md-text-variant); max-width: 520px; margin: 0 auto 24px auto;">Crea espacios como "Sala de Estar", "Dormitorio Principal" o "Jardín" para agrupar tus luces, termostatos y enchufes.</p>
+    <button type="button" class="btn-m3 btn-filled ripple-btn" onclick="openNewRoomModal()" style="display: inline-flex; align-items: center; gap: 8px;">
+        <div class="icon" style="width: 20px; height: 20px;">{% include 'UI/icons/svg/plus.svg' ignore missing %}</div>
+        <span>Crear Primer Espacio</span>
+    </button>
+</div>
+{% endif %}
+
+<!-- MODAL PARA CREAR NUEVA HABITACIÓN -->
+<div id="newRoomModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--md-surface); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); width: 90%; max-width: 460px; padding: 28px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+        <h3 style="font-size: 1.3rem; font-weight: 500; margin: 0 0 8px 0;">Crear Nuevo Espacio</h3>
+        <p style="color: var(--md-text-variant); font-size: 0.9rem; margin: 0 0 20px 0;">Asigna un nombre descriptivo e icono para identificar esta zona del hogar.</p>
+        
+        <form id="createRoomForm" onsubmit="createRoom(event)">
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 0.82rem; color: var(--md-text-variant); display: block; margin-bottom: 6px; font-weight: 600;">Nombre de la habitación</label>
+                <input type="text" id="roomNameInput" required placeholder="Ej. Sala de Estar, Dormitorio..." style="width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--md-outline); background: var(--md-surface-container); color: var(--md-text); font-family: inherit;">
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="font-size: 0.82rem; color: var(--md-text-variant); display: block; margin-bottom: 6px; font-weight: 600;">Icono representativo</label>
+                <select id="roomIconSelect" style="width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--md-outline); background: var(--md-surface-container); color: var(--md-text); font-family: inherit;">
+                    <option value="home.svg">Casa / General</option>
+                    <option value="couch.svg">Sala / Lounge</option>
+                    <option value="bed.svg">Dormitorio</option>
+                    <option value="silverware-fork-knife.svg">Cocina / Comedor</option>
+                    <option value="shower.svg">Baño</option>
+                    <option value="tree.svg">Jardín / Exterior</option>
+                    <option value="garage.svg">Garaje</option>
+                    <option value="desk.svg">Oficina / Estudio</option>
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn-m3 btn-tonal ripple-btn" onclick="closeNewRoomModal()">Cancelar</button>
+                <button type="submit" class="btn-m3 btn-filled ripple-btn">Guardar Espacio</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openNewRoomModal() {
+    const m = document.getElementById('newRoomModal');
+    if (m) m.style.display = 'flex';
+}
+
+function closeNewRoomModal() {
+    const m = document.getElementById('newRoomModal');
+    if (m) m.style.display = 'none';
+}
+
+async function createRoom(e) {
+    e.preventDefault();
+    const name = document.getElementById('roomNameInput').value.trim();
+    const icon = document.getElementById('roomIconSelect').value;
+    if (!name) return;
+
+    try {
+        const res = await fetch('/api/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, icon: icon })
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            console.error('Error al crear cuarto:', data);
+        }
+    } catch (err) {
+        console.error('Network error:', err);
+    }
+}
+</script>
+{% endblock %}

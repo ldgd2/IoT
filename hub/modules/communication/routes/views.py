@@ -25,3 +25,11 @@ def settings_view():
     return render_template("views/dashboard/settings/index.html",
                            rf_port=rf_port,
                            port_type=port_type)
+
+@communication_view_bp.route("/health")
+def health_view():
+    return render_template("views/dashboard/health/index.html")
+
+@communication_view_bp.route("/rf-config")
+def rf_config_view():
+    return render_template("views/dashboard/rf_config/index.html")

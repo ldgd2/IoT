@@ -1,79 +1,139 @@
-{% extends "UI/layout/base.html" %}
+{% extends "UI/layout/dashboard_layout.html" %}
 {% import 'UI/components/buttons.html' as btn %}
 {% import 'UI/components/chips.html' as chip %}
+{% import 'UI/widgets/climate_widget.html' as w_climate %}
+{% import 'UI/widgets/light_control_widget.html' as w_light %}
+{% import 'UI/widgets/sensor_metric_widget.html' as w_sensor %}
+{% import 'UI/widgets/media_control_widget.html' as w_media %}
 {% import 'UI/widgets/device_cards.html' as dev_card %}
-{% import 'UI/widgets/device_modals.html' as mod %}
 
-{% block title %}Dashboard - Gerlex IoT OS{% endblock %}
+{% block title %}Dashboard - Mi Hogar Colmena{% endblock %}
 
-{% block content %}
-<div style="padding: 32px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px;">
-    
-    <!-- HEADER -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
-        <div>
-            <h1 style="margin: 0 0 8px 0; font-size: 2.5rem; letter-spacing: -1px; font-weight: 500;">Vista General del Sistema</h1>
-            <p style="color: var(--md-text-variant); margin: 0; font-size: 1.1rem;">Monitoreo y control en tiempo real de tu red IoT RF.</p>
-        </div>
-        <div style="display: flex; gap: 16px;">
-            <a href="/devices/new" style="text-decoration: none;">
-                {{ btn.m3_button('Añadir Nodo', 'filled', icon_path='UI/icons/svg/plus.svg') }}
-            </a>
-            <a href="/skills" style="text-decoration: none;">
-                {{ btn.m3_button('Reglas de Automatización', 'tonal', icon_path='UI/icons/svg/lightning-bolt.svg') }}
-            </a>
-        </div>
-    </div>
-
-    <!-- STATS WIDGETS -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px;">
-        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--md-outline-variant);">
-            <span style="color: var(--md-text-variant); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Dispositivos Totales</span>
-            <span id="stat-total" style="font-size: 3rem; font-weight: 300;">-</span>
-        </div>
-        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--md-outline-variant);">
-            <span style="color: var(--md-primary); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Nodos Online</span>
-            <span id="stat-online" style="font-size: 3rem; font-weight: 300; color: var(--md-primary);">-</span>
-        </div>
-        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--md-outline-variant);">
-            <span style="color: var(--md-error); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Nodos Offline</span>
-            <span id="stat-offline" style="font-size: 3rem; font-weight: 300; color: var(--md-error);">-</span>
-        </div>
-        <div style="background: var(--md-surface-container); padding: 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--md-outline-variant);">
-            <span style="color: var(--md-tertiary); font-weight: 500; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">Tráfico (Mensajes)</span>
-            <span id="stat-traffic" style="font-size: 3rem; font-weight: 300; color: var(--md-tertiary);">-</span>
-        </div>
-    </div>
-
-    <!-- DEVICES GRID (ARMAR TODO FORMATO LEGO) -->
+{% block dashboard_content %}
+<div style="width: 100%; grid-column: 1 / -1; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
     <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <h2 style="margin: 0; font-weight: 500; font-size: 1.6rem;">Nodos y Actuadores Conectados</h2>
-            <a href="/devices/" style="text-decoration: none; color: var(--md-primary); font-weight: 500; font-size: 0.95rem;">Ver tabla completa →</a>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px;">
-            {% if devices and devices|length > 0 %}
-                {% for dev in devices %}
-                    {{ dev_card.dashboard_device_card(dev) }}
-                {% endfor %}
-            {% else %}
-                <div style="grid-column: 1 / -1; background: var(--md-surface-container); border-radius: 24px; padding: 64px 24px; text-align: center; border: 2px dashed var(--md-outline-variant);">
-                    <div class="icon" style="width: 48px; height: 48px; margin: 0 auto 16px auto; color: var(--md-outline);">
-                        {% include 'UI/icons/svg/router-wireless.svg' ignore missing %}
-                    </div>
-                    <h2 style="margin: 0 0 8px 0; font-weight: 500;">La red está vacía</h2>
-                    <p style="color: var(--md-text-variant); margin: 0 0 24px 0; max-width: 400px; margin-inline: auto;">Todavía no hemos recibido ningún paquete de descubrimiento. Enciende tus nodos para comenzar.</p>
-                    <a href="/devices/new" style="text-decoration: none;">
-                        {{ btn.m3_button('Configuración Manual', 'tonal') }}
-                    </a>
-                </div>
-            {% endif %}
-        </div>
+        <h1 style="font-size: 2.2rem; font-weight: 500; margin-bottom: 8px;">Bienvenido a casa</h1>
+        <p style="color: var(--md-text-variant); margin: 0; font-size: 1.05rem;">Un vistazo rápido al estado en tiempo real de tu ecosistema RF e IoT.</p>
+    </div>
+    <div style="display: flex; gap: 12px;">
+        <a href="/rooms" style="text-decoration: none;">
+            {{ btn.m3_button('Ver por Espacios', 'tonal', icon_path='UI/icons/svg/home.svg') }}
+        </a>
+        <a href="/devices/new" style="text-decoration: none;">
+            {{ btn.m3_button('Vincular Nuevo', 'filled', icon_path='UI/icons/svg/plus.svg') }}
+        </a>
     </div>
 </div>
 
+<!-- BARRA DE FILTROS M3 -->
+<div style="width: 100%; grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+    <button class="m3-chip selected" onclick="filterDevices('all', this)">Todos</button>
+    <button class="m3-chip" onclick="filterDevices('climate', this)">Clima</button>
+    <button class="m3-chip" onclick="filterDevices('lighting', this)">Luces</button>
+    <button class="m3-chip" onclick="filterDevices('switching', this)">Enchufes / Relays</button>
+    <button class="m3-chip" onclick="filterDevices('sensor', this)">Sensores</button>
+</div>
+
+<!-- DEVICES GRID -->
+{% if devices and devices|length > 0 %}
+<div id="devices-grid-container" style="width: 100%; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+    {% for dev in devices %}
+        {% set state = dev.state if dev.state else {} %}
+        {% set cat_lower = (dev.category or '')|lower %}
+        {% set name_lower = dev.name|lower %}
+        
+        <div class="device-grid-item" data-category="{{ cat_lower }}">
+        {% if 'clima' in cat_lower or 'termo' in name_lower or 'ac' in name_lower or 'aire' in name_lower %}
+            {% set temp_cur = state.get('temp', 24) %}
+            {% set temp_tar = state.get('target', 22) %}
+            {% set mode = state.get('mode', 'cool') %}
+            {{ w_climate.m3_climate_widget(dev.device_id, dev.name, temp_cur, temp_tar, mode, "sendQuickCommand('" ~ dev.device_id ~ "', {target: parseInt(this.value)})") }}
+        
+        {% elif 'luz' in cat_lower or 'lighting' in cat_lower or 'foco' in name_lower or 'lámpara' in name_lower or 'lampara' in name_lower or 'bombilla' in name_lower %}
+            {% set is_on = state.get('on', false) %}
+            {% set bright = state.get('brightness', 100) %}
+            {{ w_light.m3_light_widget(dev.device_id, dev.name, is_on, bright, "sendQuickToggle('" ~ dev.device_id ~ "', this.checked)", "sendQuickCommand('" ~ dev.device_id ~ "', {brightness: parseInt(this.value)})") }}
+            
+        {% elif 'media' in cat_lower or 'audio' in cat_lower or 'bocina' in name_lower or 'tv' in name_lower or 'tele' in name_lower %}
+            {% set vol = state.get('volume', 50) %}
+            {% set track = state.get('track', dev.name) %}
+            {{ w_media.m3_media_widget(dev.device_id, dev.name, state.get('status', 'playing'), track, state.get('artist', 'Colmena Audio'), vol) }}
+            
+        {% elif 'sensor' in cat_lower or 'humedad' in name_lower or 'temperatura' in name_lower or 'bateria' in name_lower or 'batería' in name_lower %}
+            {% set val = state.get('value', state.get('temp', state.get('humidity', '24.5'))) %}
+            {% set unit = state.get('unit', '°C' if 'temp' in name_lower else ('%' if 'hum' in name_lower else '')) %}
+            {% set trend = state.get('trend', 'stable') %}
+            {{ w_sensor.m3_sensor_widget(dev.device_id, dev.name, val, unit, 'UI/icons/svg/' ~ (dev.type_icon or 'thermometer.svg'), trend) }}
+            
+        {% else %}
+            <!-- Fallback a tarjeta M3 rápida con control directo -->
+            <div class="widget-card {% if state.get('on') %}active{% endif %}" style="height: 100%; justify-content: space-between;">
+                <div class="widget-header">
+                    <div class="widget-icon-bg">
+                        <div class="icon">{% include 'UI/icons/svg/' ~ (dev.type_icon if dev.type_icon else 'router-wireless.svg') ignore missing %}</div>
+                    </div>
+                    <div class="widget-info">
+                        <div class="widget-title">{{ dev.name }}</div>
+                        <div class="widget-subtitle">{{ dev.category|title or 'General' }} &bull; {{ dev.rssi }} dBm</div>
+                    </div>
+                    <div class="widget-actions">
+                        {% set is_switching = ('on' in state) or ('relay' in (dev.feature_keys or '')) or (dev.category in ['switching', 'security']) or ('relay' in name_lower) or ('enchufe' in name_lower) or ('switch' in name_lower) or (dev.modifiable_params | selectattr('key', 'equalto', 'on') | list | length > 0) %}
+                        {% if is_switching %}
+                        <label class="m3-switch-label" onclick="event.stopPropagation();" title="Encender / Apagar">
+                            <input type="checkbox" {% if state.get('on') %}checked{% endif %} onchange="sendQuickToggle('{{ dev.device_id }}', this.checked)">
+                            <span class="m3-switch"></span>
+                        </label>
+                        {% endif %}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--md-outline-variant);">
+                    <span style="font-size: 0.8rem; color: var(--md-text-variant);">ID: <code>{{ dev.device_id }}</code></span>
+                    <a href="/devices/{{ dev.device_id }}" style="text-decoration: none;">
+                        {{ btn.m3_button('Configurar →', 'tonal', style_attr='height: 32px; padding: 0 12px; font-size: 0.8rem;') }}
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+        </div>
+    {% endfor %}
+</div>
+
+<!-- FLOATING ACTION BUTTON (FAB) -->
+<a href="/devices/new" class="fab-extended" style="position: fixed; bottom: 32px; right: 32px; background: var(--md-primary); color: var(--md-on-primary); border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-weight: 600; z-index: 50;">
+    <div class="icon" style="width: 24px; height: 24px;">{% include 'UI/icons/svg/plus.svg' ignore missing %}</div>
+    Vincular
+</a>
+
+{% else %}
+<div class="empty-state" style="grid-column: 1 / -1; background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); padding: 48px; text-align: center;">
+    <div class="empty-state-icon" style="width: 64px; height: 64px; border-radius: 32px; background: var(--md-surface); color: var(--md-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; border: 1px solid var(--md-outline-variant);">
+        <div class="icon" style="width: 36px; height: 36px;">{% include 'UI/icons/svg/home.svg' ignore missing %}</div>
+    </div>
+    <h2 style="font-size: 1.5rem; font-weight: 500; margin-bottom: 12px;">No hay dispositivos registrados</h2>
+    <p style="color: var(--md-text-variant); max-width: 500px; margin: 0 auto 24px auto;">Añade luces, cámaras, enchufes o sensores de forma sencilla por Wi-Fi o a través de tu Gateway RF433/nRF24.</p>
+    <a href="/devices/new" style="text-decoration: none;">
+        {{ btn.m3_button('Vincular Nuevo Dispositivo', 'filled', icon_path='UI/icons/svg/plus.svg') }}
+    </a>
+</div>
+{% endif %}
+
 <script>
+function filterDevices(category, chipBtn) {
+    // Actualizar UI del chip
+    document.querySelectorAll('.m3-chip').forEach(c => c.classList.remove('selected'));
+    if (chipBtn) chipBtn.classList.add('selected');
+
+    const items = document.querySelectorAll('.device-grid-item');
+    items.forEach(item => {
+        const itemCat = item.getAttribute('data-category') || '';
+        if (category === 'all' || itemCat.includes(category) || (category === 'switching' && (itemCat.includes('switching') || itemCat.includes('relay')))) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
 async function sendQuickToggle(deviceId, statusBool) {
     try {
         const res = await fetch('/api/command', {
@@ -86,30 +146,26 @@ async function sendQuickToggle(deviceId, statusBool) {
         });
         const data = await res.json();
         if (data.status !== 'success' && !res.ok) {
-            alert('Error al enviar comando: ' + (data.error || 'Desconocido'));
+            console.warn('Error backend:', data.error);
         }
     } catch (err) {
         console.error('Error al conmutar dispositivo:', err);
     }
 }
 
-async function loadStats() {
+async function sendQuickCommand(deviceId, params) {
     try {
-        const res = await fetch('/api/stats');
-        const data = await res.json();
-        const tot = document.getElementById('stat-total');
-        if (tot) tot.innerText = data.total;
-        const onl = document.getElementById('stat-online');
-        if (onl) onl.innerText = data.online;
-        const off = document.getElementById('stat-offline');
-        if (off) off.innerText = data.offline;
-        const trf = document.getElementById('stat-traffic');
-        if (trf) trf.innerText = data.log_len;
-    } catch(e) {
-        console.error('Failed to load stats:', e);
+        await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                device_id: deviceId,
+                ...params
+            })
+        });
+    } catch (err) {
+        console.error('Error al enviar comando:', err);
     }
 }
-loadStats();
-setInterval(loadStats, 5000);
 </script>
 {% endblock %}

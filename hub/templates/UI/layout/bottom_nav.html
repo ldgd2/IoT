@@ -1,0 +1,32 @@
+<nav class="bottom-nav">
+    <a href="/devices" class="nav-item {% if request.path == '/devices' or request.path == '/' %}active{% endif %}">
+        <div class="nav-icon">
+            <div class="icon">{% include 'UI/icons/svg/devices.svg' ignore missing %}</div>
+        </div>
+        <span>Dispositivos</span>
+    </a>
+    <a href="/rooms" class="nav-item {% if request.path == '/rooms' %}active{% endif %}">
+        <div class="nav-icon">
+            <div class="icon">{% include 'UI/icons/svg/home.svg' ignore missing %}</div>
+        </div>
+        <span>Espacios</span>
+    </a>
+    <a href="/scenes" class="nav-item {% if request.path == '/scenes' or request.path == '/skills' %}active{% endif %}">
+        <div class="nav-icon">
+            <div class="icon">{% include 'UI/icons/svg/star-outline.svg' ignore missing %}</div>
+        </div>
+        <span>Escenas</span>
+    </a>
+    <a href="/health" class="nav-item {% if request.path == '/health' %}active{% endif %}">
+        <div class="nav-icon">
+            <div class="icon">{% include 'UI/icons/svg/pulse.svg' ignore missing %}</div>
+        </div>
+        <span>Salud Red</span>
+    </a>
+    <a href="/guide" class="nav-item {% if request.path == '/guide' %}active{% endif %}">
+        <div class="nav-icon">
+            <div class="icon">{% include 'UI/icons/svg/notebook-outline.svg' ignore missing %}</div>
+        </div>
+        <span>Guía RF</span>
+    </a>
+</nav>

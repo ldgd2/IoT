@@ -49,6 +49,14 @@ public:
         }
     }
 
+    void clearRfError() {
+        if (_state == STATE_RF_ERROR) {
+            _state = STATE_IDLE;
+            _strip.clear();
+            _strip.show();
+        }
+    }
+
     void startPairing() {
         _state = STATE_PAIRING;
         _startMs = millis();
@@ -163,6 +171,7 @@ public:
     void startPairing() {}
     void onPacketReceived() {}
     void showRfError() {}
+    void clearRfError() {}
     void update() {}
 };
 #endif

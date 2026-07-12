@@ -1,0 +1,61 @@
+{% extends "UI/layout/base.html" %}
+{% block title %}Configuración RF - Colmena{% endblock %}
+{% block content %}
+<div class="page-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h1 style="margin: 0 0 8px 0; font-size: 2rem; font-weight: 500;">Configuración de Dispositivos RF</h1>
+            <p style="color: var(--md-text-variant); margin: 0;">Gestiona los módulos receptores, protocolos y parámetros técnicos de tus nodos RF.</p>
+        </div>
+        <button class="btn-m3 btn-filled">
+            <div class="icon">{% include 'UI/icons/svg/plus.svg' ignore missing %}</div>
+            Forzar Vinculación Manual
+        </button>
+    </div>
+
+    <div class="devices-grid">
+        <!-- Configuraciones Generales -->
+        <div class="m3-card control-card">
+            <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--md-surface-container-highest); display: flex; justify-content: center; align-items: center; color: var(--md-primary);">
+                    <div class="icon" style="width: 28px; height: 28px;">{% include 'UI/icons/svg/router-wireless.svg' ignore missing %}</div>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 500;">Gateway Hub RF433</h3>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--md-primary);">Estado: Conectado (COM3)</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.95rem;">Modo de Escucha Continua</span>
+                    <label class="m3-switch-label">
+                        <input type="checkbox" checked>
+                        <span class="m3-switch"></span>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.95rem;">Auto-descubrimiento</span>
+                    <label class="m3-switch-label">
+                        <input type="checkbox" checked>
+                        <span class="m3-switch"></span>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.95rem;">Frecuencia Base</span>
+                    <span style="font-weight: 600; color: var(--md-text-variant);">433.92 MHz</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="empty-state" style="grid-column: span 1;">
+            <div class="empty-state-icon" style="width: 80px; height: 80px;">
+                <div class="icon" style="width: 40px; height: 40px;">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</div>
+            </div>
+            <h2>Filtro y Sniffer</h2>
+            <p style="font-size: 0.9rem;">No hay tramas desconocidas detectadas recientemente. Si un nodo no empareja, activa el modo debug.</p>
+            <button class="btn-m3 btn-tonal" style="margin-top: 8px;">Activar Debug</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

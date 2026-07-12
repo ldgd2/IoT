@@ -1,0 +1,109 @@
+/* 
+  Layouts System - Material 3
+  Define grid systems, containers, and page structures.
+*/
+
+/* Dashboard Layout */
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 16px;
+    align-items: start;
+}
+
+@media (min-width: 1200px) {
+    .dashboard-layout {
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 24px;
+        padding: 24px;
+    }
+}
+
+/* Room Control Panel Layout */
+.room-control-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+.room-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--md-surface);
+    padding: 16px 0;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.room-section {
+    margin-bottom: 40px;
+}
+
+.room-section-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--md-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.room-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* Nav Rail Enhancements for M3 */
+.m3-nav-rail {
+    background: var(--md-surface);
+    border-right: 1px solid var(--md-outline-variant);
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0;
+    height: 100vh;
+    position: fixed;
+    top: 0; left: 0;
+}
+
+.m3-nav-rail-item {
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--md-on-surface-variant);
+    text-decoration: none;
+    margin-bottom: 8px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.m3-nav-rail-item:hover {
+    background: var(--md-surface-container-high);
+}
+
+.m3-nav-rail-item.active {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+}
+
+.m3-nav-rail-item .icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 4px;
+}
+
+.m3-nav-rail-item span {
+    font-size: 0.75rem;
+    font-weight: 500;
+}

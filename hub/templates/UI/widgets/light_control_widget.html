@@ -1,0 +1,32 @@
+{# Macros para widgets de Luces Avanzadas #}
+{% import 'UI/components/inputs.html' as inp %}
+
+{% macro m3_light_widget(id, name, is_on=False, brightness=100, on_toggle='', on_brightness='') %}
+<div class="widget-card {% if is_on %}active{% endif %}" id="{{ id }}">
+    <div class="widget-header">
+        <div class="widget-icon-bg">
+            <div class="icon">{% include 'UI/icons/svg/lightbulb.svg' ignore missing %}</div>
+        </div>
+        <div class="widget-info">
+            <div class="widget-title">{{ name }}</div>
+            <div class="widget-subtitle">{% if is_on %}Encendido ({{ brightness }}%){% else %}Apagado{% endif %}</div>
+        </div>
+        <div class="widget-actions">
+            {{ inp.m3_switch(id=id~'-toggle', checked=is_on, onchange=on_toggle) }}
+        </div>
+    </div>
+    
+    <div style="margin-top: auto; padding-top: 16px;">
+        <label style="font-size: 0.8rem; font-weight: 500; color: var(--md-on-surface-variant); margin-bottom: 8px; display: block;">Brillo</label>
+        {{ inp.m3_range_slider(id=id~'-dimmer', min='0', max='100', value=brightness, onchange=on_brightness) }}
+    </div>
+
+    <div class="light-color-picker">
+        <div class="color-dot selected" style="background: #FFF1E0;" title="Blanco Cálido"></div>
+        <div class="color-dot" style="background: #F5F7FA;" title="Blanco Frío"></div>
+        <div class="color-dot" style="background: #FF5252;" title="Rojo"></div>
+        <div class="color-dot" style="background: #448AFF;" title="Azul"></div>
+        <div class="color-dot" style="background: #69F0AE;" title="Verde"></div>
+    </div>
+</div>
+{% endmacro %}

@@ -34,6 +34,7 @@
 
 #include "../IActuator.h"
 #include "Relay.h"
+#include "RelayState.h"
 #include <stdint.h>
 
 class RelayBank {
@@ -65,7 +66,7 @@ public:
     void setState(uint8_t index, bool on);
 
     /**
-     * @brief Retorna el estado de un relay específico.
+     * @brief Retorna el estado de un relay específico (desde almacenamiento bitwise).
      * @param index  Índice del relay (0-based)
      * @return true si el relay está encendido; false si index inválido
      */
@@ -98,13 +99,17 @@ public:
     void setMask(uint16_t mask);
 
     /**
-     * @brief Retorna el bitmask actual de estados de todos los relays.
+     * @brief Retorna el bitmask actual de estados desde el almacenamiento bitwise O(1).
      * Bit 0 = relay 0, bit N-1 = relay N-1.
      * @return uint16_t con los estados actuales
      */
     uint16_t getMask() const;
 
-    // ── Info ─────────────────────────────────────────────────────────────────
+    // ── Info y Acceso Bitwise ───────────────────────────────────────────────
+
+    /** @brief Acceso al almacén bitwise ultra-rápido de estados de los relays. */
+    const RelayState<MAX_RELAYS>& getBitwiseState() const { return _stateBits; }
+    RelayState<MAX_RELAYS>& getBitwiseState() { return _stateBits; }
 
     /** @brief Número de relays inicializados. */
     uint8_t getCount() const { return _count; }
@@ -120,8 +125,9 @@ public:
     IActuator* get(uint8_t index);
 
 private:
-    uint8_t _count;
-    Relay   _relays[MAX_RELAYS];
+    uint8_t                 _count;
+    RelayState<MAX_RELAYS>  _stateBits;
+    Relay                   _relays[MAX_RELAYS];
 };
 
 #endif // RELAY_BANK_H

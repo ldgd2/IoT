@@ -11,6 +11,8 @@ from datetime import datetime
 from hub.modules.devices.models.device import Device
 from hub.modules.communication.models.rflog import RFLog
 from hub.modules.communication.logic.gateway import gateway
+from hub.modules.automation.models.skill import Skill
+from hub.modules.communication.models.notification import NotificationLog
 
 class CloudBridgeWorker:
     """
@@ -79,9 +81,9 @@ class CloudBridgeWorker:
                         # Retornar el resultado saliendo hacia el exterior
                         requests.post(
                             f"{self.bridge_url}/api/hub/response",
-                            json={"cmd_id": cmd_id, "result": result},
                             headers=self._get_headers(),
-                            timeout=3
+                            json={"cmd_id": cmd_id, "result": result},
+                            timeout=5
                         )
                         if cmd_name != "pairing_status":
                             print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
@@ -143,7 +145,84 @@ class CloudBridgeWorker:
                 "last_device": gateway.last_paired_device
             }
 
-        # 2. Sincronización y Registro de dispositivos vía Relay
+        # 2. Comandos de Skills / Escenas vía Relay
+        if cmd in ("skills", "get_skills"):
+            try:
+                skills = [s.to_dict() for s in Skill.all()]
+                return {"ok": True, "skills": skills}
+            except Exception as e:
+                return {"ok": False, "error": str(e), "skills": []}
+
+        if cmd in ("save_skill", "create_skill"):
+            try:
+                s_id = payload.get("id") or payload.get("skill_id")
+                skill = Skill.get(s_id) if s_id else Skill()
+                if "name" in payload: skill.name = payload["name"]
+                if "ast_json" in payload: skill.ast_json = payload["ast_json"]
+                if "is_active" in payload: skill.is_active = int(payload["is_active"])
+                if not skill.created_at: skill.created_at = datetime.now().isoformat()
+                skill.save()
+                return {"ok": True, "skill": skill.to_dict()}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        if cmd == "toggle_skill":
+            try:
+                s_id = payload.get("skill_id") or payload.get("id")
+                if not s_id: return {"ok": False, "error": "skill_id requerido"}
+                skill = Skill.get(s_id)
+                if not skill: return {"ok": False, "error": "Skill no encontrada"}
+                if "is_active" in payload:
+                    skill.is_active = 1 if payload["is_active"] else 0
+                else:
+                    skill.is_active = 0 if skill.is_active else 1
+                skill.save()
+                return {"ok": True, "skill": skill.to_dict()}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        if cmd == "delete_skill":
+            try:
+                s_id = payload.get("skill_id") or payload.get("id")
+                if not s_id: return {"ok": False, "error": "skill_id requerido"}
+                skill = Skill.get(s_id)
+                if skill: skill.delete()
+                return {"ok": True, "deleted": s_id}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        if cmd == "execute_skill":
+            try:
+                s_id = payload.get("skill_id") or payload.get("id")
+                if not s_id: return {"ok": False, "error": "skill_id requerido"}
+                skill = Skill.get(s_id)
+                if not skill: return {"ok": False, "error": "Skill no encontrada"}
+                from hub.modules.automation.evaluator import SkillEvaluator
+                actions = skill.ast_json.get("actions", []) if isinstance(skill.ast_json, dict) else []
+                SkillEvaluator.execute_actions(actions)
+                return {"ok": True, "executed": s_id}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        # 3. Comandos de Estado del Hub (Stats) y Notificaciones
+        if cmd == "stats":
+            return {
+                "status": "ok",
+                "hub": "Colmena Hub",
+                "online": True,
+                "gateway_connected": gateway.is_connected,
+                "pairing_status": gateway.pairing_status,
+                "rssi": getattr(gateway, "rssi", -65)
+            }
+
+        if cmd in ("notifications", "get_notifications"):
+            try:
+                logs = [l.to_dict() for l in NotificationLog.all()]
+                return {"ok": True, "notifications": logs}
+            except Exception as e:
+                return {"ok": True, "notifications": []}
+
+        # 4. Sincronización y Registro de dispositivos vía Relay
         if cmd in ("sync_devices", "get_devices"):
             devices = [d.to_dict() for d in Device.all()]
             return {"ok": True, "devices": devices}
@@ -174,7 +253,6 @@ class CloudBridgeWorker:
                 dev.delete()
                 print(f"🗑️ [CLOUD BRIDGE] Dispositivo eliminado: '{del_id}'")
             try:
-                from hub.modules.communication.logic.gateway import gateway
                 node_num = int(str(del_id).replace("dev_", ""))
                 gateway.send_command(dest_id=node_num, command=0x0F, device_type=0, data=[0]*8)
                 print(f"📡 [CLOUD BRIDGE] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
@@ -182,6 +260,9 @@ class CloudBridgeWorker:
                 print(f"⚠️ [CLOUD BRIDGE] No se pudo enviar CMD_UNPAIR al Gateway: {e}")
             self._sync_devices()
             return {"ok": True, "deleted": del_id}
+
+        if not device_id:
+            return {"ok": False, "error": f"Comando sin id de dispositivo no reconocido: '{cmd}'"}
 
         dev = Device.get(device_id)
         if not dev and not str(device_id).startswith("dev_"):

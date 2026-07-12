@@ -1,232 +1,599 @@
 {% extends "UI/layout/base.html" %}
 {% import 'UI/components/buttons.html' as btn %}
-{% import 'UI/components/chips.html' as chip %}
 
-{% block title %}Skills y Automatizaciones - Gerlex IoT{% endblock %}
+{% block title %}Escenas y Automatizaciones - Colmena IoT{% endblock %}
 
 {% block content %}
-<div style="padding: 24px 32px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px;">
-    
-    <!-- ENCABEZADO -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
-        <div>
-            <h1 style="margin-bottom: 8px; font-size: 2.3rem; font-weight: 500; letter-spacing: -0.5px;">Motor de Automatizaciones (Skills)</h1>
-            <p style="color: var(--md-text-variant); margin: 0; font-size: 1.05rem;">Crea reglas inteligentes y secuencias condicionales (AST) que se ejecutan automaticamente en tiempo real en la Colmena.</p>
+<style>
+  /* ── Variables de página ── */
+  .scenes-page { padding: 20px 16px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .scenes-header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 32px;
+  }
+  .scenes-header h1 {
+    margin: 0 0 6px 0; font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 600; letter-spacing: -0.5px; line-height: 1.2;
+  }
+  .scenes-header p { margin: 0; color: var(--md-text-variant); font-size: 0.95rem; max-width: 540px; }
+
+  /* ── Filtros / búsqueda ── */
+  .scenes-toolbar {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 24px;
+  }
+  .search-input-wrap {
+    flex: 1; min-width: 200px; max-width: 380px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--md-surface-container); border: 1.5px solid var(--md-outline-variant);
+    border-radius: 50px; padding: 0 16px; height: 44px; transition: border-color 0.2s;
+  }
+  .search-input-wrap:focus-within { border-color: var(--md-primary); }
+  .search-input-wrap .icon { width: 18px; height: 18px; color: var(--md-text-variant); flex-shrink: 0; }
+  .search-input-wrap input {
+    border: none; background: transparent; outline: none; width: 100%;
+    color: var(--md-text); font-size: 0.95rem; font-family: inherit;
+  }
+  .filter-chip {
+    display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+    border-radius: 50px; border: 1.5px solid var(--md-outline-variant);
+    background: var(--md-surface-container); font-size: 0.85rem; cursor: pointer;
+    transition: all 0.2s; color: var(--md-text); user-select: none; font-family: inherit;
+  }
+  .filter-chip.active, .filter-chip:hover {
+    border-color: var(--md-primary); background: rgba(var(--md-primary-rgb, 107,76,18), 0.1);
+    color: var(--md-primary);
+  }
+  .count-badge {
+    background: var(--md-primary); color: #fff; font-size: 0.7rem; font-weight: 700;
+    border-radius: 50px; padding: 1px 7px; line-height: 1.6;
+  }
+
+  /* ── Grid de cards ── */
+  .scenes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: 20px;
+  }
+
+  /* ── Skill Card ── */
+  .skill-card {
+    background: var(--md-surface-container);
+    border: 1.5px solid var(--md-outline-variant);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .skill-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.14);
+    border-color: var(--md-primary);
+  }
+  .skill-card.inactive { opacity: 0.6; }
+  .skill-card.inactive:hover { opacity: 1; }
+
+  /* Barra de color superior */
+  .skill-card-accent {
+    height: 5px;
+    background: linear-gradient(90deg, var(--md-primary), var(--md-tertiary, #6d9eeb));
+  }
+  .skill-card.inactive .skill-card-accent {
+    background: var(--md-outline-variant);
+  }
+
+  .skill-card-body { padding: 20px; flex: 1; }
+
+  .skill-card-top {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .skill-icon-wrap {
+    width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
+    background: rgba(107,76,18, 0.12);
+    border: 1.5px solid rgba(107,76,18, 0.25);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-primary);
+  }
+  .skill-icon-wrap .icon { width: 26px; height: 26px; }
+
+  .skill-info { flex: 1; min-width: 0; }
+  .skill-name {
+    font-size: 1.05rem; font-weight: 600; color: var(--md-text);
+    margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .skill-id { font-size: 0.75rem; color: var(--md-text-variant); font-family: monospace; }
+
+  /* Toggle switch compacto */
+  .m3-toggle { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+  .m3-toggle input { opacity: 0; width: 0; height: 0; }
+  .m3-toggle-track {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: var(--md-outline-variant); transition: background 0.25s;
+    cursor: pointer;
+  }
+  .m3-toggle-track::after {
+    content: ''; position: absolute; top: 4px; left: 4px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; transition: transform 0.25s, background 0.25s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .m3-toggle input:checked + .m3-toggle-track { background: var(--md-primary); }
+  .m3-toggle input:checked + .m3-toggle-track::after { transform: translateX(20px); }
+
+  /* Secciones de condición/acción */
+  .skill-section { margin-bottom: 14px; }
+  .skill-section-label {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--md-text-variant);
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .skill-section-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-trigger { background: var(--md-tertiary, #6d9eeb); }
+  .dot-action  { background: #4caf50; }
+
+  .skill-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 6px; border-radius: 50px;
+    font-size: 0.8rem; margin: 0 4px 4px 0;
+    border: 1px solid; white-space: nowrap; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .skill-pill.trigger {
+    background: rgba(109, 158, 235, 0.1); border-color: rgba(109,158,235,0.3);
+    color: var(--md-text);
+  }
+  .skill-pill.action {
+    background: rgba(76, 175, 80, 0.1); border-color: rgba(76,175,80,0.3);
+    color: var(--md-text);
+  }
+  .skill-pill .icon { width: 13px; height: 13px; flex-shrink: 0; }
+  .skill-pill-empty { font-size: 0.82rem; color: var(--md-text-variant); font-style: italic; }
+
+  /* Footer de la card */
+  .skill-card-footer {
+    border-top: 1px solid var(--md-outline-variant);
+    padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .footer-actions { display: flex; gap: 6px; }
+  .icon-btn-sm {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-text-variant); transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn-sm:hover { background: var(--md-surface-container-high); color: var(--md-text); }
+  .icon-btn-sm.danger:hover { background: rgba(211,47,47,0.1); color: #d32f2f; }
+  .icon-btn-sm .icon { width: 17px; height: 17px; }
+
+  .btn-edit-sm {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 50px; font-size: 0.82rem; font-weight: 500;
+    background: var(--md-primary); color: #fff; border: none; cursor: pointer;
+    text-decoration: none; transition: opacity 0.15s;
+  }
+  .btn-edit-sm:hover { opacity: 0.88; }
+  .btn-edit-sm .icon { width: 14px; height: 14px; }
+
+  /* ── Empty state ── */
+  .empty-state {
+    grid-column: 1 / -1; text-align: center; padding: 72px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .empty-icon-bg {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: var(--md-surface-container-high);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--md-outline); margin-bottom: 8px;
+  }
+  .empty-icon-bg .icon { width: 44px; height: 44px; }
+  .empty-state h3 { margin: 0; font-size: 1.4rem; font-weight: 600; }
+  .empty-state p { margin: 0; color: var(--md-text-variant); max-width: 420px; line-height: 1.6; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #323232; color: #fff; padding: 12px 24px; border-radius: 50px;
+    font-size: 0.9rem; font-weight: 500; z-index: 9999; white-space: nowrap;
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s;
+    opacity: 0; pointer-events: none; box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast .toast-icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+  /* ── Confirm dialog ── */
+  .confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 8000;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .confirm-overlay.open { opacity: 1; pointer-events: all; }
+  .confirm-dialog {
+    background: var(--md-surface); border-radius: 24px; padding: 28px;
+    max-width: 360px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+    transform: scale(0.92); transition: transform 0.2s;
+  }
+  .confirm-overlay.open .confirm-dialog { transform: scale(1); }
+  .confirm-dialog h3 { margin: 0 0 10px 0; font-size: 1.15rem; font-weight: 600; }
+  .confirm-dialog p { margin: 0 0 24px 0; color: var(--md-text-variant); line-height: 1.6; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .btn-cancel {
+    padding: 10px 20px; border-radius: 50px; border: none; background: transparent;
+    cursor: pointer; font-size: 0.9rem; font-weight: 500; color: var(--md-text-variant);
+    transition: background 0.15s; font-family: inherit;
+  }
+  .btn-cancel:hover { background: var(--md-surface-container); }
+  .btn-danger {
+    padding: 10px 20px; border-radius: 50px; border: none;
+    background: #d32f2f; color: #fff; cursor: pointer;
+    font-size: 0.9rem; font-weight: 600; transition: opacity 0.15s; font-family: inherit;
+  }
+  .btn-danger:hover { opacity: 0.85; }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .scenes-page { padding: 12px 10px; }
+    .scenes-header { flex-direction: column; align-items: flex-start; margin-bottom: 20px; }
+    .scenes-toolbar { flex-direction: column; align-items: stretch; }
+    .search-input-wrap { max-width: 100%; }
+    .skill-card-footer { flex-direction: column; align-items: stretch; gap: 10px; }
+    .footer-actions { justify-content: center; }
+    .btn-edit-sm { justify-content: center; }
+  }
+</style>
+
+<div class="scenes-page">
+
+  <!-- HEADER -->
+  <div class="scenes-header">
+    <div>
+      <h1>Escenas y Automatizaciones</h1>
+      <p>Crea reglas inteligentes que se ejecutan automáticamente según sensores, horarios o condiciones de tus dispositivos.</p>
+    </div>
+    <a href="/skills/builder" style="text-decoration:none;">
+      <button class="btn-edit-sm" style="padding: 12px 22px; font-size: 0.95rem; border-radius: 50px;">
+        <span class="icon">{% include 'UI/icons/svg/plus.svg' ignore missing %}</span>
+        Nueva Escena
+      </button>
+    </a>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="scenes-toolbar">
+    <div class="search-input-wrap">
+      <span class="icon">{% include 'UI/icons/svg/magnify.svg' ignore missing %}</span>
+      <input type="text" id="scene-search" placeholder="Buscar escena…" oninput="filterScenes()" autocomplete="off">
+    </div>
+    <button class="filter-chip active" id="filter-all" onclick="setFilter('all', this)">
+      Todas
+      <span class="count-badge" id="count-all">{{ skills|length }}</span>
+    </button>
+    <button class="filter-chip" id="filter-active" onclick="setFilter('active', this)">
+      Activas
+      <span class="count-badge" id="count-active" style="background: #4caf50;">0</span>
+    </button>
+    <button class="filter-chip" id="filter-inactive" onclick="setFilter('inactive', this)">
+      Inactivas
+      <span class="count-badge" id="count-inactive" style="background: var(--md-outline);">0</span>
+    </button>
+  </div>
+
+  <!-- GRID -->
+  <div class="scenes-grid" id="scenes-grid">
+
+    {% if skills and skills|length > 0 %}
+      {% for skill in skills %}
+      <div
+        class="skill-card {% if skill.is_active != 1 %}inactive{% endif %}"
+        id="skill-card-{{ skill.id }}"
+        data-name="{{ skill.name|lower }}"
+        data-active="{{ skill.is_active }}"
+        onclick="window.location.href='/skills/builder?id={{ skill.id }}'"
+      >
+        <div class="skill-card-accent"></div>
+        <div class="skill-card-body">
+
+          <!-- Top: icono + nombre + toggle -->
+          <div class="skill-card-top">
+            <div class="skill-icon-wrap">
+              <div class="icon">{% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}</div>
+            </div>
+            <div class="skill-info">
+              <div class="skill-name" title="{{ skill.name }}">{{ skill.name }}</div>
+              <div class="skill-id">ID #{{ skill.id }}</div>
+            </div>
+            <label class="m3-toggle" onclick="event.stopPropagation()" title="Activar o desactivar esta escena">
+              <input type="checkbox" {% if skill.is_active == 1 %}checked{% endif %}
+                     onchange="toggleSkill({{ skill.id }}, this)">
+              <div class="m3-toggle-track"></div>
+            </label>
+          </div>
+
+          <!-- Condiciones / Disparadores -->
+          <div class="skill-section">
+            <div class="skill-section-label">
+              <span class="dot dot-trigger"></span> CUANDO…
+            </div>
+            {% set ast = skill.ast_json if skill.ast_json else {} %}
+            {% if ast and ast.conditions and ast.conditions|length > 0 %}
+              {% for cond in ast.conditions[:3] %}
+                <span class="skill-pill trigger">
+                  <span class="icon">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</span>
+                  {% if cond.type == 'time' %}
+                    Reloj: {{ cond.time or (cond.config.time if cond.config else '?') }} h
+                  {% elif cond.type == 'date' %}
+                    Fecha: {{ cond.date or (cond.config.date if cond.config else '?') }}
+                  {% elif cond.type == 'weather' %}
+                    Clima: {{ cond.weather or (cond.config.weather if cond.config else '?') }}
+                  {% elif cond.type in ['device_state','dev_sensor','dev_motion','dev_plug'] %}
+                    Sensor: {{ cond.device or (cond.config.device if cond.config else '?') }}
+                  {% elif cond.type == 'dev_button' %}
+                    Botón: {{ cond.device or (cond.config.device if cond.config else '?') }}
+                  {% else %}{{ cond.type }}{% endif %}
+                </span>
+              {% endfor %}
+              {% if ast.conditions|length > 3 %}
+                <span class="skill-pill trigger">+{{ ast.conditions|length - 3 }} más</span>
+              {% endif %}
+            {% else %}
+              <span class="skill-pill-empty">Manual / Sin disparadores</span>
+            {% endif %}
+          </div>
+
+          <!-- Acciones -->
+          <div class="skill-section" style="margin-bottom: 0;">
+            <div class="skill-section-label">
+              <span class="dot dot-action"></span> ENTONCES…
+            </div>
+            {% if ast and ast.actions and ast.actions|length > 0 %}
+              {% for act in ast.actions[:3] %}
+                <span class="skill-pill action">
+                  <span class="icon">{% include 'UI/icons/svg/check.svg' ignore missing %}</span>
+                  {% if act.type in ['action_device','action_light','action_plug'] %}
+                    {{ act.cmd or (act.config.cmd if act.config else '?') }} → {{ act.device or (act.config.device if act.config else '?') }}
+                  {% elif act.type == 'action_dimmer' %}
+                    Dimmer {{ act.brightness or (act.config.brightness if act.config else '?') }}% → {{ act.device or (act.config.device if act.config else '?') }}
+                  {% elif act.type == 'action_color' %}
+                    Color {{ act.color or (act.config.color if act.config else '?') }}
+                  {% elif act.type == 'action_notify' %}
+                    Notificar: {{ act.message or (act.config.message if act.config else 'Notificación') }}
+                  {% elif act.type == 'action_delay' %}
+                    Esperar {{ act.delay or (act.config.delay if act.config else '?') }}{{ act.unit or '' }}
+                  {% elif act.type == 'action_scene' %}
+                    Escena: {{ act.scene or (act.config.scene if act.config else '?') }}
+                  {% else %}{{ act.type }}{% endif %}
+                </span>
+              {% endfor %}
+              {% if ast.actions|length > 3 %}
+                <span class="skill-pill action">+{{ ast.actions|length - 3 }} más</span>
+              {% endif %}
+            {% else %}
+              <span class="skill-pill-empty">Sin acciones definidas</span>
+            {% endif %}
+          </div>
+
         </div>
-        <div style="display: flex; gap: 14px;">
-            <a href="/skills/builder" style="text-decoration: none;">
-                {{ btn.m3_button('Crear Nueva Skill (Builder Visual)', 'filled', icon_path='UI/icons/svg/plus.svg') }}
-            </a>
+
+        <!-- Footer -->
+        <div class="skill-card-footer" onclick="event.stopPropagation()">
+          <div class="footer-actions">
+            <button class="icon-btn-sm" onclick="runSkill({{ skill.id }}, '{{ skill.name|replace("'","\\'")|e }}')" title="Ejecutar ahora">
+              <span class="icon">{% include 'UI/icons/svg/play.svg' ignore missing %}</span>
+            </button>
+            <button class="icon-btn-sm danger" onclick="confirmDelete({{ skill.id }}, '{{ skill.name|replace("'","\\'")|e }}')" title="Eliminar escena">
+              <span class="icon">{% include 'UI/icons/svg/trash.svg' ignore missing %}</span>
+            </button>
+          </div>
+          <a href="/skills/builder?id={{ skill.id }}" class="btn-edit-sm" style="text-decoration:none;">
+            <span class="icon">{% include 'UI/icons/svg/tune.svg' ignore missing %}</span>
+            Editar
+          </a>
         </div>
+      </div>
+      {% endfor %}
+
+    {% else %}
+      <!-- Estado vacío -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon-bg">
+          <div class="icon">{% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}</div>
+        </div>
+        <h3>Aún no tienes escenas</h3>
+        <p>Las escenas te permiten automatizar tu hogar. Por ejemplo: "Cuando sean las 8pm, apagar todas las luces del salón".</p>
+        <a href="/skills/builder" class="btn-edit-sm" style="text-decoration:none; padding: 13px 28px; font-size: 1rem;">
+          <span class="icon">{% include 'UI/icons/svg/plus.svg' ignore missing %}</span>
+          Crear mi primera escena
+        </a>
+      </div>
+    {% endif %}
+
+    <!-- Mensaje de no encontrado (búsqueda) -->
+    <div class="empty-state" id="no-results" style="display:none;">
+      <div class="empty-icon-bg">
+        <div class="icon">{% include 'UI/icons/svg/magnify.svg' ignore missing %}</div>
+      </div>
+      <h3>Sin resultados</h3>
+      <p>No hay escenas que coincidan con tu búsqueda.</p>
     </div>
 
-    <!-- TABLA / CARDS DE SKILLS -->
-    <div style="background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: var(--radius-large); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.04);">
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-                <tr style="border-bottom: 1px solid var(--md-outline-variant); background: var(--md-surface);">
-                    <th style="padding: 16px 22px; font-weight: 600; color: var(--md-text-variant); width: 25%;">Nombre de la Automatizacion</th>
-                    <th style="padding: 16px 22px; font-weight: 600; color: var(--md-text-variant); width: 28%;">Disparador (CUANDO)</th>
-                    <th style="padding: 16px 22px; font-weight: 600; color: var(--md-text-variant); width: 25%;">Accion (ENTONCES HAZ ESTO)</th>
-                    <th style="padding: 16px 22px; font-weight: 600; color: var(--md-text-variant); text-align: center; width: 8%;">Activa</th>
-                    <th style="padding: 16px 22px; font-weight: 600; color: var(--md-text-variant); text-align: right; width: 14%;">Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="skills-table-body">
-                {% if skills and skills|length > 0 %}
-                    {% for skill in skills %}
-                    <tr id="skill-row-{{ skill.id }}" style="border-bottom: 1px solid var(--md-outline-variant); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'" onclick="window.location.href='/skills/builder?id={{ skill.id }}'">
-                        
-                        <!-- 1. NOMBRE E ICONO -->
-                        <td style="padding: 18px 22px;">
-                            <div style="display: flex; align-items: center; gap: 14px;">
-                                <div style="width: 44px; height: 44px; border-radius: 14px; background: rgba(107, 76, 18, 0.1); border: 1px solid rgba(107, 76, 18, 0.25); display: flex; justify-content: center; align-items: center; color: var(--md-primary);">
-                                    <div class="icon" style="width: 24px; height: 24px;">
-                                        {% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}
-                                    </div>
-                                </div>
-                                <div>
-                                    <strong style="font-size: 1.05rem; color: var(--md-text); display: block;">{{ skill.name }}</strong>
-                                    <span style="font-size: 0.78rem; color: var(--md-text-variant); font-family: monospace;">ID: skill_{{ skill.id }}</span>
-                                </div>
-                            </div>
-                        </td>
+  </div>
+</div>
 
-                        <!-- 2. DISPARADOR (CONDICIONES) -->
-                        <td style="padding: 18px 22px;">
-                            {% set ast = skill.ast_json if skill.ast_json else {} %}
-                            {% if ast and ast.conditions and ast.conditions|length > 0 %}
-                                {% for cond in ast.conditions %}
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                        <span class="icon" style="width: 16px; height: 16px; color: var(--md-tertiary);">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</span>
-                                        <span style="font-size: 0.9rem; font-weight: 500; color: var(--md-text);">
-                                            {% if cond.type == 'time' %}
-                                                [Reloj] A las <strong>{{ cond.time or cond.config.time }}</strong> hrs
-                                            {% elif cond.type == 'date' %}
-                                                [Fecha] En: <strong>{{ cond.date or cond.config.date }}</strong>
-                                            {% elif cond.type == 'weather' %}
-                                                [Clima] Si esta <strong>{{ cond.weather or cond.config.weather }}</strong>
-                                            {% elif cond.type == 'location' %}
-                                                [GPS] Al <strong>{{ cond.location or cond.config.location }}</strong>
-                                            {% elif cond.type in ['device_state', 'dev_sensor', 'dev_motion', 'dev_plug'] %}
-                                                [Sensor] <strong>{{ cond.device or cond.config.device }}</strong> {{ cond.operator or cond.config.operator }} <strong>{{ cond.val if cond.val is defined else cond.config.val }}</strong>
-                                            {% elif cond.type == 'dev_button' %}
-                                                [Boton] <strong>{{ cond.device or cond.config.device }}</strong> == <strong>{{ cond.action or cond.config.action }}</strong>
-                                            {% else %}
-                                                [Condicion] {{ cond.type }}
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <span style="font-size: 0.88rem; color: var(--md-text-variant); font-style: italic;">Ejecucion manual / Sin disparadores</span>
-                            {% endif %}
-                        </td>
+<!-- Toast de notificación -->
+<div id="toast">
+  <span class="toast-icon" id="toast-icon"></span>
+  <span id="toast-msg"></span>
+</div>
 
-                        <!-- 3. ACCIÓN -->
-                        <td style="padding: 18px 22px;">
-                            {% set ast = skill.ast_json if skill.ast_json else {} %}
-                            {% if ast and ast.actions and ast.actions|length > 0 %}
-                                {% for act in ast.actions %}
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                        <span class="icon" style="width: 16px; height: 16px; color: #388E3C;">{% include 'UI/icons/svg/check.svg' ignore missing %}</span>
-                                        <span style="font-size: 0.9rem; font-weight: 500; color: var(--md-text);">
-                                            {% if act.type in ['action_device', 'action_light', 'action_plug'] %}
-                                                [Comando] Enviar <strong>{{ act.cmd or act.config.cmd }}</strong> al nodo <strong>{{ act.device or act.config.device }}</strong>
-                                            {% elif act.type == 'action_dimmer' %}
-                                                [Dimmer] Regular <strong>{{ act.device or act.config.device }}</strong> al <strong>{{ act.brightness or act.config.brightness }}%</strong>
-                                            {% elif act.type == 'action_color' %}
-                                                [RGB] Color <strong>{{ act.color or act.config.color }}</strong> ({{ act.brightness or act.config.brightness }}%) en <strong>{{ act.device or act.config.device }}</strong>
-                                            {% elif act.type == 'action_buzzer' %}
-                                                [Alarma] Sonar sirena en <strong>{{ act.device or act.config.device }}</strong> por {{ act.seconds or act.config.seconds }}s
-                                            {% elif act.type == 'action_scene' %}
-                                                [Escena] Activar: <strong>{{ act.scene or act.config.scene }}</strong>
-                                            {% elif act.type == 'action_notify' %}
-                                                [Alerta] Notificar: "<strong>{{ act.message or act.config.message }}</strong>"
-                                            {% elif act.type == 'action_delay' %}
-                                                [Pausa] Esperar {{ act.delay or act.config.delay }} {{ act.unit or act.config.unit }}
-                                            {% else %}
-                                                [Accion] {{ act.type }}
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <span style="font-size: 0.88rem; color: var(--md-text-variant); font-style: italic;">Sin acciones definidas</span>
-                            {% endif %}
-                        </td>
-
-                        <!-- 4. TOGGLE ACTIVO -->
-                        <td style="padding: 18px 22px; text-align: center;" onclick="event.stopPropagation();">
-                            <label class="m3-switch-label" title="Activar / Desactivar automatizacion">
-                                <input type="checkbox" {% if skill.is_active == 1 %}checked{% endif %} onchange="toggleSkillStatus({{ skill.id }}, this.checked)">
-                                <span class="m3-switch"></span>
-                            </label>
-                        </td>
-
-                        <!-- 5. ACCIONES -->
-                        <td style="padding: 18px 22px; text-align: right;" onclick="event.stopPropagation();">
-                            <div style="display: flex; justify-content: flex-end; gap: 6px;">
-                                <a href="/skills/builder?id={{ skill.id }}" style="text-decoration: none;">
-                                    <button type="button" class="btn-m3 btn-tonal ripple-btn" title="Editar esta automatizacion" style="height: 36px; padding: 0 12px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;">
-                                        <div class="icon" style="width: 14px; height: 14px;">{% include 'UI/icons/svg/tune.svg' ignore missing %}</div>
-                                        <span>Editar</span>
-                                    </button>
-                                </a>
-                                <button type="button" class="btn-m3 btn-outlined ripple-btn" onclick="testSkill({{ skill.id }}, '{{ skill.name|replace('\'', '\\\'') }}')" title="Probar acciones ahora" style="height: 36px; padding: 0 12px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px;">
-                                    <div class="icon" style="width: 14px; height: 14px;">{% include 'UI/icons/svg/play.svg' ignore missing %}</div>
-                                    <span>Probar</span>
-                                </button>
-                                <button type="button" class="icon-btn standard ripple-btn" onclick="deleteSkill({{ skill.id }}, '{{ skill.name|replace('\'', '\\\'') }}')" title="Eliminar automatizacion" style="width: 36px; height: 36px; color: #d32f2f;">
-                                    <div class="icon" style="width: 18px; height: 18px;">{% include 'UI/icons/svg/trash.svg' ignore missing %}</div>
-                                </button>
-                            </div>
-                        </td>
-
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr id="empty-state-row">
-                        <td colspan="5" style="text-align: center; padding: 64px 24px;">
-                            <div class="icon" style="width: 52px; height: 52px; margin: 0 auto 16px auto; color: var(--md-outline);">
-                                {% include 'UI/icons/svg/lightning-bolt.svg' ignore missing %}
-                            </div>
-                            <h3 style="margin: 0 0 8px 0; font-weight: 500; font-size: 1.4rem;">No tienes ninguna Skill configurada</h3>
-                            <p style="color: var(--md-text-variant); margin: 0 0 24px 0; max-width: 440px; margin-inline: auto;">Disena logicas inteligentes combinando relojes, sensores analogicos y actuadores RF en el constructor visual.</p>
-                            <a href="/skills/builder" style="text-decoration: none;">
-                                {{ btn.m3_button('Armar mi primera Skill', 'filled', icon_path='UI/icons/svg/plus.svg') }}
-                            </a>
-                        </td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirm-overlay" onclick="closeConfirm()">
+  <div class="confirm-dialog" onclick="event.stopPropagation()">
+    <h3>Eliminar escena</h3>
+    <p id="confirm-msg">¿Estás seguro? Esta acción no se puede deshacer.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn-danger" id="confirm-ok-btn">Eliminar</button>
     </div>
+  </div>
 </div>
 
 <script>
-async function toggleSkillStatus(skillId, isActive) {
-    try {
-        const res = await fetch('/api/skills/' + skillId + '/toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_active: isActive ? 1 : 0 })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-            alert('[Error] No se pudo cambiar el estado de la Skill: ' + (data.error || 'Desconocido'));
-        }
-    } catch (e) {
-        console.error('Error toggling skill:', e);
-        alert('[Error] Problema de comunicacion al cambiar estado.');
-    }
+// ── Estado de filtros ──
+let currentFilter = 'all';
+let deleteTarget = null;
+
+// Contar activas/inactivas al cargar
+document.addEventListener('DOMContentLoaded', () => {
+  updateCounts();
+});
+
+function updateCounts() {
+  const cards = document.querySelectorAll('.skill-card');
+  let active = 0, inactive = 0;
+  cards.forEach(c => {
+    if (c.dataset.active == '1') active++;
+    else inactive++;
+  });
+  const el = id => document.getElementById(id);
+  if (el('count-all'))      el('count-all').textContent      = cards.length;
+  if (el('count-active'))   el('count-active').textContent   = active;
+  if (el('count-inactive')) el('count-inactive').textContent = inactive;
 }
 
-async function testSkill(skillId, skillName) {
-    try {
-        const res = await fetch('/api/skills/' + skillId + '/execute', {
-            method: 'POST'
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-            alert("[Exito] Prueba iniciada: " + (data.message || "Acciones enviadas correctamente al hardware."));
-        } else {
-            alert("[Error] Al probar la Skill: " + (data.error || 'Desconocido'));
-        }
-    } catch (e) {
-        console.error('Error testing skill:', e);
-        alert('[Error] Problema de red al intentar ejecutar la Skill.');
-    }
+// ── Filtro de chips ──
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
 }
 
-async function deleteSkill(skillId, skillName) {
-    if (!confirm("¿Estas seguro de que deseas eliminar la automatizacion '" + skillName + "'?")) {
-        return;
-    }
-    try {
-        const res = await fetch('/api/skills/' + skillId, {
-            method: 'DELETE'
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-            const row = document.getElementById('skill-row-' + skillId);
-            if (row) {
-                row.style.opacity = '0';
-                setTimeout(() => {
-                    row.remove();
-                    const body = document.getElementById('skills-table-body');
-                    if (body && body.querySelectorAll('tr').length === 0) {
-                        location.reload();
-                    }
-                }, 200);
-            }
-        } else {
-            alert('[Error] No se pudo eliminar la Skill: ' + (data.error || 'Desconocido'));
-        }
-    } catch (e) {
-        console.error('Error deleting skill:', e);
-        alert('[Error] Problema de red.');
-    }
+// ── Búsqueda en tiempo real ──
+function filterScenes() { applyFilters(); }
+
+function applyFilters() {
+  const q = document.getElementById('scene-search').value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.skill-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const name = card.dataset.name || '';
+    const isActive = card.dataset.active == '1';
+    const matchSearch = !q || name.includes(q);
+    const matchFilter =
+      currentFilter === 'all' ||
+      (currentFilter === 'active' && isActive) ||
+      (currentFilter === 'inactive' && !isActive);
+
+    const show = matchSearch && matchFilter;
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  const noResults = document.getElementById('no-results');
+  const emptyState = document.getElementById('empty-state');
+  if (noResults) noResults.style.display = visible === 0 && cards.length > 0 ? 'flex' : 'none';
+  if (emptyState) emptyState.style.display = cards.length === 0 ? 'flex' : 'none';
 }
+
+// ── Toggle ON/OFF ──
+async function toggleSkill(id, checkbox) {
+  const isActive = checkbox.checked ? 1 : 0;
+  const card = document.getElementById('skill-card-' + id);
+  try {
+    const res = await fetch('/api/skills/' + id + '/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: isActive })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      if (card) {
+        card.dataset.active = isActive;
+        card.classList.toggle('inactive', isActive !== 1);
+      }
+      showToast(isActive ? 'Escena activada' : 'Escena desactivada');
+      updateCounts();
+    } else {
+      checkbox.checked = !checkbox.checked;
+      showToast('Error al cambiar estado', true);
+    }
+  } catch {
+    checkbox.checked = !checkbox.checked;
+    showToast('Sin conexión con el Hub', true);
+  }
+}
+
+// ── Ejecutar escena ──
+async function runSkill(id, name) {
+  showToast('Ejecutando "' + name + '"…');
+  try {
+    const res = await fetch('/api/skills/' + id + '/execute', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      showToast('Escena ejecutada correctamente');
+    } else {
+      showToast('Error: ' + (data.error || 'Desconocido'), true);
+    }
+  } catch {
+    showToast('Error de conexión', true);
+  }
+}
+
+// ── Eliminar con confirm dialog ──
+function confirmDelete(id, name) {
+  deleteTarget = id;
+  document.getElementById('confirm-msg').textContent =
+    '¿Eliminar la escena "' + name + '"? Esta acción no se puede deshacer.';
+  document.getElementById('confirm-ok-btn').onclick = () => doDelete(id, name);
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  deleteTarget = null;
+}
+async function doDelete(id, name) {
+  closeConfirm();
+  try {
+    const res = await fetch('/api/skills/' + id, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      const card = document.getElementById('skill-card-' + id);
+      if (card) {
+        card.style.transition = 'opacity 0.25s, transform 0.25s';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.93)';
+        setTimeout(() => { card.remove(); updateCounts(); applyFilters(); }, 280);
+      }
+      showToast('Escena "' + name + '" eliminada');
+    } else {
+      showToast('No se pudo eliminar: ' + (data.error || ''), true);
+    }
+  } catch {
+    showToast('Error de conexión', true);
+  }
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.background = isError ? '#b71c1c' : '#323232';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// Cerrar dialog con Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeConfirm();
+});
 </script>
+
 {% endblock %}

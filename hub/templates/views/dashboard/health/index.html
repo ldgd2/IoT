@@ -1,0 +1,13 @@
+{% extends "UI/layout/base.html" %}
+{% block title %}Salud Red - Colmena{% endblock %}
+{% block content %}
+<div class="page-container">
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <div class="icon">{% include 'UI/icons/svg/pulse.svg' ignore missing %}</div>
+        </div>
+        <h2>Salud de la Red</h2>
+        <p>Aquí podrás diagnosticar el estado de tus nodos RF, visualizar la topología de la red y detectar posibles problemas de señal.</p>
+    </div>
+</div>
+{% endblock %}

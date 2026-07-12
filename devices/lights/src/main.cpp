@@ -66,6 +66,7 @@ RGBIndicator    rgbLed;
 TestSerial      testSerial;
 
 // ─── Estado local ─────────────────────────────────────────────────────────────
+static bool isRadioOk = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
@@ -90,9 +91,11 @@ void setup() {
 
     // 5. Verificar salud física del chip de radio (¡Solo es error RF si el chip SPI no responde!)
     if (!connection.getRadio().isChipConnected()) {
+        isRadioOk = false;
         rgbLed.showRfError();
         testSerial.printRfDiagnostics(false);
     } else {
+        isRadioOk = true;
         colmena.startPairingWindow(NODE_NAME);   // Activar ventana de búsqueda automática por 50s
         rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
         testSerial.printRfDiagnostics(true);
@@ -101,9 +104,12 @@ void setup() {
     // Conectar callback en testSerial para disparar la misma animación al mandar PAIR por USB
     testSerial.setPairCallback([]() {
         if (connection.getRadio().isChipConnected()) {
+            isRadioOk = true;
+            rgbLed.clearRfError();
             colmena.startPairingWindow(NODE_NAME);
             rgbLed.startPairing();
         } else {
+            isRadioOk = false;
             rgbLed.showRfError();
         }
     });
@@ -116,97 +122,123 @@ void setup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    bool chipOk = connection.getRadio().isChipConnected();
-
     // 0. Diagnóstico e interacción Serial por USB (siempre activo para responder órdenes aunque esté sin RF)
-    testSerial.update(colmena, relays, chipOk, NODE_NAME, NODE_ID);
+    testSerial.update(colmena, relays, isRadioOk, NODE_NAME, NODE_ID);
 
-    // Verificar salud continua del módulo RF (si se quema o desconecta -> rojo mantenido)
-    if (!chipOk) {
-        rgbLed.showRfError();
-    }
-
-    // 1. Mantener red Mesh (update + checkConnection automático)
-    connection.update();
-
-    // Sincronizar y reintentar anuncio por 50s si el nodo está en ventana de vinculación
-    colmena.tickPairing();
-
-    // Actualizar animación del LED RGB en tiempo real (efecto ola / verde / rojo) sin bloquear
+    // 1. Actualizar animación del LED RGB en tiempo real (efecto ola / verde / rojo) sin bloquear
     rgbLed.update();
 
-    // 2. Procesar paquetes RF entrantes
-    if (connection.available()) {
-        RFPacket pkt;
-        if (connection.receive(&pkt, sizeof(pkt))) {
+    // 2. Operaciones RF: Solamente si el hardware de radio está SANO (evita congelamientos o esperas por error SPI)
+    if (isRadioOk) {
+        // Mantener red Mesh (update + checkConnection automático)
+        connection.update();
 
-            if (!Protocol_verify(&pkt)) return;  // Checksum inválido
+        // Sincronizar y reintentar anuncio por 50s si el nodo está en ventana de vinculación
+        colmena.tickPairing();
 
-            testSerial.logPacketRX(pkt);
-            rgbLed.onPacketReceived(); // ¡Cualquier paquete recibido confirma vinculación exitosa!
+        // Procesar paquetes RF entrantes
+        if (connection.available()) {
+            RFPacket pkt;
+            if (connection.receive(&pkt, sizeof(pkt))) {
 
-            switch (pkt.command) {
+                if (!Protocol_verify(&pkt)) return;  // Checksum inválido
 
-                case CMD_REPORT:
-                case CMD_DISCOVER:
-                    // El master o un nodo pide anuncio — responder y anunciarse
-                    colmena.announce(NODE_NAME);
-                    break;
+                testSerial.logPacketRX(pkt);
+                rgbLed.onPacketReceived(); // ¡Cualquier paquete recibido confirma vinculación exitosa!
 
-                case CMD_UNPAIR:
-                    colmena.unpair();
-                    rgbLed.startPairing();
-                    break;
+                switch (pkt.command) {
 
-                case CMD_CONTROL:
-                    for (uint8_t i = 0; i < RELAY_COUNT && i < 4; i++) {
-                        relays.setState(i, pkt.data[i] != 0);
-                    }
-                    break;
+                    case CMD_REPORT:
+                    case CMD_DISCOVER:
+                        // El master o un nodo pide anuncio — responder y anunciarse
+                        colmena.announce(NODE_NAME);
+                        break;
 
-                case CMD_ON:
-                    relays.setState(pkt.data[0], true);
-                    break;
+                    case CMD_UNPAIR:
+                        colmena.unpair();
+                        rgbLed.startPairing();
+                        break;
 
-                case CMD_OFF:
-                    relays.setState(pkt.data[0], false);
-                    break;
+                    case CMD_CONTROL:
+                        for (uint8_t i = 0; i < RELAY_COUNT && i < 4; i++) {
+                            relays.setState(i, pkt.data[i] != 0);
+                        }
+                        break;
 
-                case CMD_TOGGLE:
-                    relays.toggle(pkt.data[0]);
-                    break;
+                    case CMD_ON:
+                        relays.setState(pkt.data[0], true);
+                        break;
 
-                case CMD_ON_ALL:
-                    relays.setAll(true);
-                    break;
+                    case CMD_OFF:
+                        relays.setState(pkt.data[0], false);
+                        break;
 
-                case CMD_OFF_ALL:
-                    relays.setAll(false);
-                    break;
+                    case CMD_TOGGLE:
+                        relays.toggle(pkt.data[0]);
+                        break;
 
-                case CMD_SET_MASK:
-                    // data[0..1] = bitmask de 16 relays
-                    relays.setMask((uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8));
-                    break;
+                    case CMD_ON_ALL:
+                        relays.setAll(true);
+                        break;
 
-                case CMD_CONFIG_SYNC:
-                    colmena.applySync(pkt);
-                    break;
+                    case CMD_OFF_ALL:
+                        relays.setAll(false);
+                        break;
 
-                default:
-                    break;
+                    case CMD_SET_MASK:
+                        // data[0..1] = bitmask de 16 relays
+                        relays.setMask((uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8));
+                        break;
+
+                    case CMD_CONFIG_SYNC:
+                        colmena.applySync(pkt);
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+        }
+
+        // 3. Verificación y Heartbeat natural reactivo
+        if (colmena.isHeartbeatDue()) {
+            if (!connection.getRadio().isChipConnected()) {
+                // Si se desconectó físicamente: avisa y se olvida (quedó desactivado)
+                isRadioOk = false;
+                rgbLed.showRfError();
+                testSerial.printRfDiagnostics(false);
+            } else {
+                colmena.tickHeartbeat(relays.getMask());
             }
         }
     }
 
-    // 4. Heartbeat automático (envía cada heartbeatInterval segundos)
-    colmena.tickHeartbeat(relays.getMask());
-
-    // 5. Botón de vinculación táctil — re-anuncia al master y dispara el arcoíris en el LED RGB
+    // 4. Botón táctil/físico multifunción y recuperación reactiva ante eventos
 #ifdef PAIR_BUTTON_PIN
-    if (colmena.tickPairButton(NODE_NAME)) {
-        // Iniciar animación "Ola de Colores" si la radio está sana, o rojo fijo si hay error RF
-        if (connection.getRadio().isChipConnected()) {
+    ButtonEvent btn = colmena.checkButtonEvent(NODE_NAME);
+
+    // Si la radio estaba desactivada por error, re-verificar ÚNICAMENTE al presionar botón o al tocar el heartbeat programado
+    if (!isRadioOk && (btn != BTN_NONE || colmena.isHeartbeatDue())) {
+        if (connection.begin() && connection.getRadio().isChipConnected()) {
+            // ¡Lo arreglaron o reconectaron! Al tiro todo nice y se olvida el error
+            isRadioOk = true;
+            rgbLed.clearRfError();
+            colmena.announce(NODE_NAME);
+            testSerial.printRfDiagnostics(true);
+        } else {
+            // Volvió a fallar o sigue desconectado: marca error
+            rgbLed.showRfError();
+            colmena.resetHeartbeatTimer();
+        }
+    }
+
+    if (btn == BTN_SHORT_PRESS) {
+        relays.toggleAll();
+        if (isRadioOk) {
+            colmena.sendHeartbeat(relays.getMask());
+        }
+    } else if (btn == BTN_PAIR_LONG_PRESS) {
+        if (isRadioOk) {
             rgbLed.startPairing();
         } else {
             rgbLed.showRfError();
