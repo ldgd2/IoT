@@ -77,9 +77,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> checkAndRouteConnection() async {
     try {
+      final headers = await _getAuthHeaders();
       final uri = Uri.parse('http://$_localHubHost/api/stats');
-      final r = await http.get(uri).timeout(const Duration(milliseconds: 1200));
-      if (r.statusCode == 200) {
+      final r = await http.get(uri, headers: headers).timeout(const Duration(milliseconds: 1200));
+      if (r.statusCode == 200 || r.statusCode == 401 || r.statusCode == 403) {
         _isLocalActive = true;
         ApiConstants.updateHost(_localHubHost, isLocal: true);
         notifyListeners();
@@ -243,13 +244,24 @@ class AppState extends ChangeNotifier {
   // GATEWAY HUB RF REAL API
   Future<bool> checkHubOnline({String? hostOverride}) async {
     final target = hostOverride ?? _hubHost;
+    final headers = await _getAuthHeaders();
     try {
       final uri = Uri.parse('http://$target/api/stats');
-      final r = await http.get(uri).timeout(const Duration(seconds: 4));
-      return r.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+      if (r.statusCode == 200 || r.statusCode == 401 || r.statusCode == 403) {
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      final uri = Uri.parse('http://$target/api/ping');
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+      if (r.statusCode == 200 || r.statusCode == 401 || r.statusCode == 403) {
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   // -----------------------------------------------------------

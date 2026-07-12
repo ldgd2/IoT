@@ -276,13 +276,13 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
             const AppLabel('Paso 1: Conectar con tu Central Colmena'),
             Gap.s,
             Text(
-              'Confirma la dirección de tu Central Colmena para iniciar la vinculación inalámbrica con tus sensores y dispositivos de hogar.',
+              'Puedes ingresar la IP local de tu Hub (ej. 192.168.xxx.xxx:5000) o la dirección de tu Servidor en la Nube (ej. 157.173.102.129:8000). El sistema enrutará los comandos automáticamente.',
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             Gap.l,
             AppTextField(
               controller: hostCtrl,
-              label: 'Dirección del Hub RF (ej. 192.168.1.100:5000)',
+              label: 'Dirección de la Central o Hub RF',
             ),
             Gap.xl,
             AppButton(

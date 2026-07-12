@@ -337,6 +337,7 @@ def relay_api_pairing_status(hub_id=None):
 
 
 @app.route("/api/devices", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/devices", methods=["GET"])
 @app.route("/api/hubs/<hub_id>/devices_sync", methods=["GET"])
 @require_auth
 def relay_api_get_devices(hub_id=None):
@@ -377,22 +378,50 @@ def relay_api_update_device(device_id):
 
 @app.route("/api/device/<device_id>", methods=["DELETE"])
 @app.route("/api/devices/<device_id>", methods=["DELETE"])
+@app.route("/api/hubs/<hub_id>/devices/<device_id>", methods=["DELETE"])
 @require_auth
-def relay_api_delete_device(device_id):
-    target_hub = _get_target_hub_id()
+def relay_api_delete_device(device_id, hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
     payload = {"cmd": "delete_device", "device_id": device_id}
+    res, status = _execute_relay_job(target_hub, payload, timeout=5.0)
+    cached_devices.pop(target_hub, None)
+    return jsonify(res), status
+
+
+@app.route("/api/pairing", methods=["POST"])
+@app.route("/api/hubs/<hub_id>/pairing", methods=["POST"])
+@require_auth
+def relay_api_pairing(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    data = request.get_json(silent=True) or {}
+    payload = {"cmd": "pairing"}
+    payload.update(data)
+    res, status = _execute_relay_job(target_hub, payload, timeout=6.0)
+    return jsonify(res), status
+
+
+@app.route("/api/pairing/status", methods=["GET"])
+@app.route("/api/hubs/<hub_id>/pairing/status", methods=["GET"])
+@require_auth
+def relay_api_pairing_status(hub_id=None):
+    target_hub = _get_target_hub_id(hub_id)
+    res, status = _execute_relay_job(target_hub, {"cmd": "pairing_status"}, timeout=4.0)
     return jsonify(res), status
 
 
 @app.route("/api/stats", methods=["GET"])
 @app.route("/api/hubs/<hub_id>/stats", methods=["GET"])
-@require_auth
 def relay_api_stats(hub_id=None):
-    target_hub = _get_target_hub_id(hub_id)
-    if target_hub:
-        res, status = _execute_relay_job(target_hub, {"cmd": "stats"}, timeout=3.0)
-        if status == 200 and isinstance(res, dict):
-            return jsonify(res), 200
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            target_hub = _get_target_hub_id(hub_id)
+            if target_hub:
+                res, status = _execute_relay_job(target_hub, {"cmd": "stats"}, timeout=3.0)
+                if status == 200 and isinstance(res, dict):
+                    return jsonify(res), 200
+        except Exception:
+            pass
     return jsonify({"status": "ok", "server": "online", "mode": SERVER_MODE}), 200
 
 
