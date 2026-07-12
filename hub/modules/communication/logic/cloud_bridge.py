@@ -300,18 +300,49 @@ class CloudBridgeWorker:
                 
                 if dest_id > 0:
                     state_dict = dev.state if isinstance(dev.state, dict) else {}
-                    ch1 = 1 if params.get("ch1", params.get("on", state_dict.get("ch1", state_dict.get("on", False)))) else 0
-                    ch2 = 1 if params.get("ch2", state_dict.get("ch2", False)) else 0
-                    ch3 = 1 if params.get("ch3", state_dict.get("ch3", False)) else 0
-                    ch4 = 1 if params.get("ch4", state_dict.get("ch4", False)) else 0
+                    mask = params.get("mask", state_dict.get("mask", 0))
+                    if not isinstance(mask, int):
+                        mask = int(mask) if str(mask).isdigit() else 0
                     
-                    # Comando 0x10 (CMD_CONTROL) con estados de canales
-                    gateway.send_command(dest_id=dest_id, command=0x10, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+                    # Sincronizar mask con cualquier canal individual ('chX') existente o recibido
+                    all_keys = set(state_dict.keys()) | set(params.keys())
+                    has_ch_key = False
+                    for k in all_keys:
+                        if k.startswith("ch") and k[2:].isdigit():
+                            ch_num = int(k[2:])
+                            if ch_num >= 1:
+                                has_ch_key = True
+                                val = params.get(k, state_dict.get(k, False))
+                                if val:
+                                    mask |= (1 << (ch_num - 1))
+                                else:
+                                    mask &= ~(1 << (ch_num - 1))
                     
-                    # Si es comando específico de encendido/apagado general o 1 canal
-                    if "on" in params and not any(k in params for k in ("ch1", "ch2", "ch3", "ch4")):
+                    # Si es orden general 'on' sin canales individuales especificados
+                    if "on" in params and not any(k.startswith("ch") and k[2:].isdigit() for k in params.keys()):
+                        if params["on"]:
+                            mask = 0xFFFFFFFF if mask == 0 else mask | 1
+                        else:
+                            mask = 0
+                            
+                    # Empaquetar en formato bitwise: los primeros 4 bytes transmiten el mask de 32 bits (Little Endian)
+                    # Los siguientes bytes transmiten el estado de cada canal por compatibilidad dual
+                    data_payload = [
+                        mask & 0xFF,
+                        (mask >> 8) & 0xFF,
+                        (mask >> 16) & 0xFF,
+                        (mask >> 24) & 0xFF
+                    ]
+                    for i in range(22):
+                        data_payload.append(1 if (mask & (1 << i)) else 0)
+                    
+                    # Comando 0x10 (CMD_CONTROL) autogestionable con soporte bitwise y multicanal
+                    gateway.send_command(dest_id=dest_id, command=0x10, device_type=getattr(dev, "device_type", 0) or 0, data=data_payload)
+                    
+                    # Si es comando específico de encendido/apagado general sin canales en params
+                    if "on" in params and not any(k.startswith("ch") and k[2:].isdigit() for k in params.keys()):
                         cmd_byte = 0x01 if params["on"] else 0x02
-                        gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
+                        gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=data_payload)
             except Exception as e:
                 print(f"⚠️ [GATEWAY TX] Advertencia al transmitir por hardware: {e}")
 

@@ -1,7 +1,7 @@
 {# Macros Jinja para Toasts, Snackbars y Spinners (Material 3) #}
 
 {% macro m3_spinner(size='40px', color='var(--md-primary)', stroke_width='4px') %}
-<div class="m3-spinner-container" style="width: {{ size }}; height: {{ size }};">
+<div class="m3-spinner-container" style="--sp-sz: {{ size }}; width: var(--sp-sz, 40px); height: var(--sp-sz, 40px);">
     <svg class="m3-spinner-svg" viewBox="25 25 50 50">
         <circle class="m3-spinner-path" cx="50" cy="50" r="20" fill="none" stroke-width="{{ stroke_width }}" stroke-miterlimit="10" stroke="{{ color }}"/>
     </svg>

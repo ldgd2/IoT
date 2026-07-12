@@ -3,7 +3,7 @@ from datetime import datetime
 import serial.tools.list_ports
 
 from hub.core.config import ENV_FILE
-from hub.modules.devices.models.device import Device
+from hub.modules.devices import Device, SmartDevice
 from hub.modules.communication.models.rflog import RFLog
 from hub.modules.automation.evaluator import evaluator
 from hub.db.database import Database
@@ -47,19 +47,14 @@ def process_incoming_packet(data):
                         )
                         log.save()
                         return {"ok": True, "action": "ignored_not_pairing"}, 200
-                    dev = Device(device_id=device_id)
-                
-                dev.name = device_name
-                dev.type_code = reg_info["type_code"]
-                dev.type_name = reg_info["type_name"]
-                dev.type_icon = reg_info["type_icon"]
-                dev.category = reg_info["category"]
-                dev.features = reg_info["features"]
-                dev.feature_keys = reg_info["feature_keys"]
-                
+                ctrl = SmartDevice.recognize(
+                    device_id=device_id,
+                    type_code=reg_info["type_code"],
+                    features=reg_info["features"],
+                    name=device_name
+                )
+                dev = ctrl.orm_device if ctrl else Device.get(device_id)
                 current_state = dev.state if isinstance(dev.state, dict) else {}
-                
-                # Inicializacion dinamica de estado basado en feature keys
                 keys = reg_info["feature_keys"]
                 if "relay" in keys: current_state.setdefault("on", False)
                 if "dimmer" in keys: current_state.setdefault("brightness", 0)
@@ -67,7 +62,6 @@ def process_incoming_packet(data):
                 if "humidity" in keys: current_state.setdefault("humidity", 0.0)
                 if "motion" in keys: current_state.setdefault("motion", False)
                 if "energy" in keys: current_state.setdefault("power", 0.0)
-                    
                 dev.state = current_state
                 dev.status = "online"
                 dev.save()
@@ -95,29 +89,11 @@ def process_incoming_packet(data):
                 
                 return {"ok": True, "action": "discovered", "registry": reg_info}, 200
 
-        elif cmd == 4: # CMD_HEARTBEAT
+        elif cmd in (2, 3, 4): # CMD_REPORT, CMD_SYNC, CMD_HEARTBEAT
             payload = {}
             rssi = 0
-            if dev and isinstance(dev.feature_keys, list):
-                keys = dev.feature_keys
-                # Light/Relay Heartbeat
-                if "relay" in keys or "dimmer" in keys:
-                    if len(raw_data) >= 2:
-                        payload["on"] = (raw_data[0] != 0)
-                        payload["brightness"] = raw_data[1]
-                # Sensor Heartbeat (ejemplo de ProtocolExt.h)
-                elif "temperature" in keys or "humidity" in keys:
-                    if len(raw_data) >= 4:
-                        temp_centi = (raw_data[0] << 8) | raw_data[1]
-                        # Python handles signed 16-bit appropriately
-                        if temp_centi > 32767: temp_centi -= 65536
-                        hum_centi = (raw_data[2] << 8) | raw_data[3]
-                        
-                        payload["temperature"] = temp_centi / 100.0
-                        payload["humidity"] = hum_centi / 100.0
-            else:
-                # Si no está descubierto, no podemos parsearlo de forma segura
-                pass
+            if dev and dev.controller:
+                payload = dev.controller.decode_rx(cmd, raw_data)
         else:
             payload = {} 
             rssi = 0
@@ -185,9 +161,13 @@ def api_command():
     cmd    = data.get("cmd", "set")
     params = data.get("params", {})
 
-    if isinstance(dev.state, dict):
-        dev.state.update(params)
-    dev.save()
+    ctrl = dev.controller
+    if ctrl:
+        ctrl.execute_command(params)
+    else:
+        if isinstance(dev.state, dict):
+            dev.state.update(params)
+        dev.save()
 
     log = RFLog(
         ts=datetime.now().isoformat(),
@@ -197,27 +177,6 @@ def api_command():
         payload=params
     )
     log.save()
-
-    try:
-        from hub.modules.communication.logic.gateway import gateway
-        if gateway.is_connected:
-            dest_id = 0
-            if str(device_id).startswith("dev_"):
-                dest_id = int(str(device_id).split("_")[1])
-            elif str(device_id).isdigit():
-                dest_id = int(str(device_id))
-            if dest_id > 0:
-                state_dict = dev.state if isinstance(dev.state, dict) else {}
-                ch1 = 1 if params.get("ch1", params.get("on", state_dict.get("ch1", state_dict.get("on", False)))) else 0
-                ch2 = 1 if params.get("ch2", state_dict.get("ch2", False)) else 0
-                ch3 = 1 if params.get("ch3", state_dict.get("ch3", False)) else 0
-                ch4 = 1 if params.get("ch4", state_dict.get("ch4", False)) else 0
-                gateway.send_command(dest_id=dest_id, command=0x10, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
-                if "on" in params and not any(k in params for k in ("ch1", "ch2", "ch3", "ch4")):
-                    cmd_byte = 0x01 if params["on"] else 0x02
-                    gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=[ch1, ch2, ch3, ch4])
-    except Exception as e:
-        print(f"⚠️ [GATEWAY TX] Error en api_command: {e}")
 
     return jsonify({"ok": True, "state": dev.state})
 

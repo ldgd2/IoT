@@ -134,7 +134,9 @@ class _RoomCard extends StatelessWidget {
                             final app = context.read<AppState>();
                             for (final d in devices) {
                               if (_supportsMasterToggle(d.kind)) {
-                                await app.setRelay(d, 1, val);
+                                for (int i = 1; i <= d.relays.length; i++) {
+                                  await app.setRelay(d, i, val);
+                                }
                               }
                             }
                           },

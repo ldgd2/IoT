@@ -159,35 +159,59 @@ void loop() {
                         rgbLed.startPairing();
                         break;
 
-                    case CMD_CONTROL:
-                        for (uint8_t i = 0; i < RELAY_COUNT && i < 4; i++) {
-                            relays.setState(i, pkt.data[i] != 0);
+                    case CMD_CONTROL: {
+                        // Soportar formato bitwise en data[0..3] junto con bytes individuales en data[4..25] o data[0..]
+                        uint32_t receivedMask = ((uint32_t)pkt.data[3] << 24) | ((uint32_t)pkt.data[2] << 16) | ((uint32_t)pkt.data[1] << 8) | pkt.data[0];
+                        for (uint8_t i = 0; i < RELAY_COUNT && i < RelayBank::MAX_RELAYS; i++) {
+                            bool chOn = (receivedMask & (1UL << i)) || (pkt.data[i] != 0) || (i + 4 < 26 && pkt.data[i + 4] != 0);
+                            relays.setState(i, chOn);
+                        }
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
                         }
                         break;
+                    }
 
                     case CMD_ON:
                         relays.setState(pkt.data[0], true);
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_OFF:
                         relays.setState(pkt.data[0], false);
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_TOGGLE:
                         relays.toggle(pkt.data[0]);
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_ON_ALL:
                         relays.setAll(true);
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_OFF_ALL:
                         relays.setAll(false);
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_SET_MASK:
-                        // data[0..1] = bitmask de 16 relays
                         relays.setMask((uint16_t)pkt.data[0] | ((uint16_t)pkt.data[1] << 8));
+                        if (isRadioOk) {
+                            colmena.sendHeartbeat(relays.getMask());
+                        }
                         break;
 
                     case CMD_CONFIG_SYNC:

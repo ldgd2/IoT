@@ -309,8 +309,8 @@
               <div class="skill-id">ID #{{ skill.id }}</div>
             </div>
             <label class="m3-toggle" onclick="event.stopPropagation()" title="Activar o desactivar esta escena">
-              <input type="checkbox" {% if skill.is_active == 1 %}checked{% endif %}
-                     onchange="toggleSkill({{ skill.id }}, this)">
+              <input type="checkbox" data-id="{{ skill.id }}" {% if skill.is_active == 1 %}checked{% endif %}
+                     onchange="toggleSkill(this.dataset.id, this)">
               <div class="m3-toggle-track"></div>
             </label>
           </div>
@@ -318,64 +318,56 @@
           <!-- Condiciones / Disparadores -->
           <div class="skill-section">
             <div class="skill-section-label">
-              <span class="dot dot-trigger"></span> CUANDO…
+              <span>HACER (ACCIONES)</span>
+              <span class="skill-section-line"></span>
             </div>
-            {% set ast = skill.ast_json if skill.ast_json else {} %}
-            {% if ast and ast.conditions and ast.conditions|length > 0 %}
-              {% for cond in ast.conditions[:3] %}
-                <span class="skill-pill trigger">
-                  <span class="icon">{% include 'UI/icons/svg/access-point.svg' ignore missing %}</span>
-                  {% if cond.type == 'time' %}
-                    Reloj: {{ cond.time or (cond.config.time if cond.config else '?') }} h
-                  {% elif cond.type == 'date' %}
-                    Fecha: {{ cond.date or (cond.config.date if cond.config else '?') }}
-                  {% elif cond.type == 'weather' %}
-                    Clima: {{ cond.weather or (cond.config.weather if cond.config else '?') }}
-                  {% elif cond.type in ['device_state','dev_sensor','dev_motion','dev_plug'] %}
-                    Sensor: {{ cond.device or (cond.config.device if cond.config else '?') }}
-                  {% elif cond.type == 'dev_button' %}
-                    Botón: {{ cond.device or (cond.config.device if cond.config else '?') }}
-                  {% else %}{{ cond.type }}{% endif %}
-                </span>
-              {% endfor %}
-              {% if ast.conditions|length > 3 %}
-                <span class="skill-pill trigger">+{{ ast.conditions|length - 3 }} más</span>
+            <div class="chips-row">
+              {% if skill.ast_data and skill.ast_data.actions %}
+                {% for act in skill.ast_data.actions %}
+                <div class="s-chip act-chip">
+                  <span class="icon">{% include 'UI/icons/svg/play.svg' ignore missing %}</span>
+                  <div class="chip-content">
+                    {% if act.type == 'device_command' %}
+                      <span class="c-type">Control Dispositivo</span>
+                      <span class="c-val">ID {{ act.device_id }} &bull; {{ act.command }}
+                        {% if act.params %}
+                          {% for k, v in act.params.items() %}
+                            | {{ k }}: {{ v }}
+                          {% endfor %}
+                        {% endif %}
+                      </span>
+                    {% elif act.type == 'notification' %}
+                      <span class="c-type">Notificación</span>
+                      <span class="c-val">{{ act.title }}: {{ act.message }}</span>
+                    {% elif act.type == 'delay' %}
+                      <span class="c-type">Pausa / Espera</span>
+                      <span class="c-val">{{ act.seconds }} segundos</span>
+                    {% else %}
+                      <span class="c-type">{{ act.type }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <div class="s-chip no-data">
+                  <span>Sin acciones</span>
+                </div>
               {% endif %}
-            {% else %}
-              <span class="skill-pill-empty">Manual / Sin disparadores</span>
-            {% endif %}
+            </div>
           </div>
 
-          <!-- Acciones -->
-          <div class="skill-section" style="margin-bottom: 0;">
-            <div class="skill-section-label">
-              <span class="dot dot-action"></span> ENTONCES…
-            </div>
-            {% if ast and ast.actions and ast.actions|length > 0 %}
-              {% for act in ast.actions[:3] %}
-                <span class="skill-pill action">
-                  <span class="icon">{% include 'UI/icons/svg/check.svg' ignore missing %}</span>
-                  {% if act.type in ['action_device','action_light','action_plug'] %}
-                    {{ act.cmd or (act.config.cmd if act.config else '?') }} → {{ act.device or (act.config.device if act.config else '?') }}
-                  {% elif act.type == 'action_dimmer' %}
-                    Dimmer {{ act.brightness or (act.config.brightness if act.config else '?') }}% → {{ act.device or (act.config.device if act.config else '?') }}
-                  {% elif act.type == 'action_color' %}
-                    Color {{ act.color or (act.config.color if act.config else '?') }}
-                  {% elif act.type == 'action_notify' %}
-                    Notificar: {{ act.message or (act.config.message if act.config else 'Notificación') }}
-                  {% elif act.type == 'action_delay' %}
-                    Esperar {{ act.delay or (act.config.delay if act.config else '?') }}{{ act.unit or '' }}
-                  {% elif act.type == 'action_scene' %}
-                    Escena: {{ act.scene or (act.config.scene if act.config else '?') }}
-                  {% else %}{{ act.type }}{% endif %}
-                </span>
-              {% endfor %}
-              {% if ast.actions|length > 3 %}
-                <span class="skill-pill action">+{{ ast.actions|length - 3 }} más</span>
-              {% endif %}
-            {% else %}
-              <span class="skill-pill-empty">Sin acciones definidas</span>
-            {% endif %}
+          <!-- Metadatos inferiores -->
+          <div class="skill-card-meta">
+            <span>Última ejecución:
+              <strong>
+                {% if skill.last_run %}
+                  {{ skill.last_run.split('T')[0] }} {{ skill.last_run.split('T')[1][:5] if 'T' in skill.last_run else skill.last_run }}
+                {% else %}
+                  Nunca
+                {% endif %}
+              </strong>
+            </span>
+            <span>Creada el {{ skill.created_at.split('T')[0] if skill.created_at else 'N/A' }}</span>
           </div>
 
         </div>
@@ -383,10 +375,10 @@
         <!-- Footer -->
         <div class="skill-card-footer" onclick="event.stopPropagation()">
           <div class="footer-actions">
-            <button class="icon-btn-sm" onclick="runSkill({{ skill.id }}, '{{ skill.name|replace("'","\\'")|e }}')" title="Ejecutar ahora">
+            <button class="icon-btn-sm" data-id="{{ skill.id }}" data-name="{{ skill.name|e }}" onclick="runSkill(this.dataset.id, this.dataset.name)" title="Ejecutar ahora">
               <span class="icon">{% include 'UI/icons/svg/play.svg' ignore missing %}</span>
             </button>
-            <button class="icon-btn-sm danger" onclick="confirmDelete({{ skill.id }}, '{{ skill.name|replace("'","\\'")|e }}')" title="Eliminar escena">
+            <button class="icon-btn-sm danger" data-id="{{ skill.id }}" data-name="{{ skill.name|e }}" onclick="confirmDelete(this.dataset.id, this.dataset.name)" title="Eliminar escena">
               <span class="icon">{% include 'UI/icons/svg/trash.svg' ignore missing %}</span>
             </button>
           </div>

@@ -105,7 +105,8 @@ class Device {
     bool online = true,
   }) {
     // Relés por defecto a partir del estado if present
-    bool isOn = state['on'] == true || state['state'] == 'ON';
+    bool isOn = state['on'] == true || state['state'] == 'ON' || state['on'] == 1;
+    final extractedRelays = _extractRelays(state, fallback: [isOn, false, false, false]);
     return Device(
       id: rfId,
       commMode: 'rf',
@@ -119,7 +120,7 @@ class Device {
       kind: _normalizeKind(typeName ?? 'Sensor'),
       room: room ?? 'General',
       rssi: rssi ?? -70,
-      relays: [isOn, false, false, false],
+      relays: extractedRelays,
       state: Map<String, dynamic>.from(state),
       lastSeen: DateTime.now(),
     );
@@ -217,7 +218,7 @@ class Device {
       ip: json['ip'] as String? ?? '0.0.0.0',
       port: (json['port'] as num?)?.toInt() ?? 80,
       online: json['online'] as bool? ?? false,
-      relays: _parseRelaysFromJson(json['relays']) ?? const [false, false, false, false],
+      relays: _parseRelaysFromJson(json['relays']) ?? _extractRelays(json['state'] is Map ? Map<String, dynamic>.from(json['state'] as Map) : {}, fallback: const [false, false, false, false]),
       alias: json['alias'] as String?,
       kind: json['kind'] as String?,
       room: json['room'] as String? ?? 'General',
@@ -237,8 +238,38 @@ class Device {
   static List<bool> _extractRelays(Map<String, dynamic> status, {required List<bool> fallback}) {
     final v = status['relays'];
     final parsed = _parseRelaysFromJson(v);
-    if (parsed == null || parsed.isEmpty) return fallback;
-    return parsed;
+    if (parsed != null && parsed.isNotEmpty) return parsed;
+
+    // Si no vino lista en 'relays', revisemos si vinieron canales ch1, ch2, ch3, ch4 en el dict de estado
+    final extracted = <bool>[];
+    for (int i = 1; i <= 16; i++) {
+      if (status.containsKey('ch$i')) {
+        final val = status['ch$i'];
+        extracted.add(val == true || val == 1 || val == '1' || val == 'ON' || val == 'on');
+      } else {
+        // Si ya encontramos al menos 1 canal anterior pero no el chX, cortamos
+        if (extracted.isNotEmpty) break;
+      }
+    }
+    if (extracted.isNotEmpty) {
+      // Si la lista extraída tiene menos canales que el fallback, rellenamos con el fallback
+      if (extracted.length < fallback.length) {
+        for (int i = extracted.length; i < fallback.length; i++) {
+          extracted.add(fallback[i]);
+        }
+      }
+      return extracted;
+    }
+
+    if (status.containsKey('on') || status.containsKey('state')) {
+      bool isOn = status['on'] == true || status['on'] == 1 || status['state'] == 'ON' || status['state'] == 'on';
+      final res = List<bool>.from(fallback);
+      if (res.isNotEmpty) {
+        res[0] = isOn;
+        return res;
+      }
+    }
+    return fallback;
   }
 
   // -----------------------------------------------------------

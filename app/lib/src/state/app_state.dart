@@ -450,8 +450,19 @@ class AppState extends ChangeNotifier {
         _replace(d.copyWith(relays: newRelays));
         notifyListeners();
 
-        final params = <String, dynamic>{'on': on};
-        if (d.relays.length > 1) params['ch$relayIndex1'] = on;
+        final params = <String, dynamic>{};
+        if (newRelays.length <= 1) {
+          params['on'] = on;
+          params['ch1'] = on;
+        } else {
+          params['ch$relayIndex1'] = on;
+          for (int i = 0; i < newRelays.length; i++) {
+            params['ch${i + 1}'] = newRelays[i];
+          }
+          if (relayIndex1 == 1 || !newRelays.any((e) => e)) {
+            params['on'] = newRelays.any((e) => e);
+          }
+        }
 
         // Send command without blocking UI success
         final ok = await sendRfCommand(d, 'set', params);

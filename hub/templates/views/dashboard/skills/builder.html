@@ -180,7 +180,6 @@
 }
 
 /* ── Zone ── */
-.zone-wrap {}
 .zone-header {
   display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
 }
@@ -508,10 +507,19 @@
 
 <div id="bld-toast"></div>
 
+<script id="builder-meta" type="application/json">
+{
+  "editId": {% if edit_skill %}{{ edit_skill.id }}{% else %}null{% endif %},
+  "astData": {% if ast_json_str %}{{ ast_json_str|safe }}{% else %}{}{% endif %},
+  "devices": {% if devices %}{{ devices | tojson }}{% else %}[]{% endif %}
+}
+</script>
 <script>
-const EDIT_ID   = {{ edit_skill.id if edit_skill else 'null' }};
-const AST_DATA  = {{ ast_json_str|safe if ast_json_str else '{}' }};
-const DEVICES   = {{ devices | tojson if devices else '[]' }};
+const _metaEl = document.getElementById('builder-meta');
+const _metaData = _metaEl ? JSON.parse(_metaEl.textContent || '{}') : {};
+const EDIT_ID   = _metaData.editId ?? null;
+const AST_DATA  = _metaData.astData ?? {};
+const DEVICES   = _metaData.devices ?? [];
 
 let dragType = null, dragZone = null, dragInner = null;
 let activeNode = null;

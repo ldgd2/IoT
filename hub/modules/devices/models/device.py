@@ -72,118 +72,22 @@ class Device(BaseModel):
         return DeviceRegistry.describe(t_code, feats)
 
     @property
+    def controller(self):
+        """Retorna el controlador modular y especializado para este dispositivo (LightDevice, SensorDevice, HvacDevice, etc.)."""
+        from hub.modules.devices.device import DeviceFactory
+        return DeviceFactory.get_controller(self)
+
+    @property
     def modifiable_params(self):
-        """Retorna lista de parámetros y capacidades que este dispositivo permite modificar desde el Hub."""
-        keys = self.feature_keys or []
-        if isinstance(keys, str):
-            import json
-            try: keys = json.loads(keys)
-            except: keys = []
-        if not isinstance(keys, list):
-            keys = []
-            
-        try:
-            t_code = int(self.type_code)
-        except:
-            t_code = 0
-
-        name_lower = (self.name or "").lower()
-        id_lower = (self.device_id or "").lower()
-        is_light = any(kw in name_lower for kw in ["luz", "foco", "lámpara", "lampara", "bombilla", "dimmer"])
-        is_switch = is_light or any(kw in name_lower for kw in ["relay", "enchufe", "switch", "sala", "afuera", "patio", "cuarto", "cocina", "baño", "jardin"]) or ("dev_" in id_lower and "sensor" not in name_lower)
-
-        params = []
-        # Relay / Switching (Luz o Actuador)
-        if "relay" in keys or self.category in ("switching", "light", "actuator") or t_code in (1, 2, 3, 5, 7, 8) or is_switch:
-            params.append({
-                "key": "on",
-                "label": "Estado / Encendido (ON / OFF)",
-                "type": "Booleano (True / False)",
-                "control": "switch",
-                "desc": "Control de encendido y apagado del dispositivo.",
-                "default": False
-            })
-        # Dimmer PWM (Regulador de Luz / Brillo)
-        if "dimmer" in keys or t_code in (2, 4, 9) or is_light:
-            params.append({
-                "key": "brightness",
-                "label": "Intensidad de Brillo",
-                "type": "Entero (0 - 255)",
-                "control": "slider",
-                "desc": "Ajuste de intensidad luminosa (0 a 100%).",
-                "default": 255
-            })
-        # Persiana / Cortina
-        if t_code == 6 or any(kw in name_lower for kw in ["persiana", "cortina", "curtain", "blind"]):
-            params.append({
-                "key": "position",
-                "label": "Posición de Apertura",
-                "type": "Entero (0 - 100%)",
-                "control": "slider",
-                "desc": "Nivel de apertura de la persiana o cortina (0% cerrada, 100% abierta).",
-                "default": 0
-            })
-        # Termostato / Clima HVAC
-        if t_code in (0x20, 0x21, 0x22) or self.category == "hvac" or any(kw in name_lower for kw in ["clima", "termostato", "hvac", "aire"]):
-            params.append({
-                "key": "target_temp",
-                "label": "Temperatura Consigna (°C)",
-                "type": "Decimal (°C)",
-                "control": "number",
-                "desc": "Temperatura objetivo para el control automático del climatizador.",
-                "default": 22.0
-            })
-            params.append({
-                "key": "mode",
-                "label": "Modo Operativo HVAC",
-                "type": "Texto ('cool' | 'heat' | 'auto' | 'off')",
-                "control": "select",
-                "desc": "Modo de funcionamiento del climatizador.",
-                "default": "auto"
-            })
-        # Cerradura / Seguridad
-        if t_code == 0x30 or self.category == "security" or any(kw in name_lower for kw in ["cerradura", "chapa", "lock", "puerta"]):
-            params.append({
-                "key": "locked",
-                "label": "Estado de la Cerradura",
-                "type": "Booleano (True / False)",
-                "control": "switch",
-                "desc": "Control de bloqueo de la cerradura inteligente.",
-                "default": True
-            })
-        return params
+        """Retorna lista de parámetros delegando al controlador modular según su tipo y capacidades."""
+        ctrl = self.controller
+        return ctrl.can_receive() if ctrl else []
 
     @property
     def readonly_params(self):
-        """Retorna lista de sensores o telemetría de hardware que son de solo lectura."""
-        keys = self.feature_keys or []
-        if isinstance(keys, str):
-            import json
-            try: keys = json.loads(keys)
-            except: keys = []
-        if not isinstance(keys, list):
-            keys = []
-            
-        try:
-            t_code = int(self.type_code)
-        except:
-            t_code = 0
-
-        name_lower = (self.name or "").lower()
-
-        params = []
-        if "temperature" in keys or t_code == 0x11 or any(kw in name_lower for kw in ["temp", "temperatura", "clima", "ambiental"]):
-            params.append({"key": "temperature", "unit": "°C", "label": "Sensor de Temperatura", "desc": "Medición térmica en tiempo real."})
-        if "humidity" in keys or any(kw in name_lower for kw in ["humedad", "higrometro", "humidity"]):
-            params.append({"key": "humidity", "unit": "%", "label": "Sensor de Humedad", "desc": "Humedad relativa en el ambiente."})
-        if "motion" in keys or t_code == 0x12 or any(kw in name_lower for kw in ["movimiento", "pir", "motion", "presencia"]):
-            params.append({"key": "motion", "unit": "PIR", "label": "Detector de Movimiento", "desc": "Detección de presencia en el área."})
-        if "energy" in keys or t_code == 0x19 or any(kw in name_lower for kw in ["consumo", "medidor", "potencia", "power", "energy"]):
-            params.append({"key": "power", "unit": "W", "label": "Consumo de Potencia", "desc": "Consumo eléctrico en tiempo real."})
-            params.append({"key": "voltage", "unit": "V", "label": "Voltaje de Red", "desc": "Tensión o voltaje medido."})
-        if "battery" in keys:
-            params.append({"key": "battery", "unit": "%", "label": "Nivel de Batería", "desc": "Carga de batería restante."})
-        return params
+        """Retorna lista de sensores o telemetría delegando al controlador modular según su tipo y capacidades."""
+        ctrl = self.controller
+        return ctrl.can_send() if ctrl else []
 
     def to_dict(self):
         data = {k: getattr(self, k) for k in self._get_fields()}
