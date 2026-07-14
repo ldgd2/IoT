@@ -36,7 +36,7 @@ class CloudBridgeWorker:
             self.running = True
             self.thread = threading.Thread(target=self._loop, daemon=True, name="CloudBridgeWorker")
             self.thread.start()
-            print(f"☁️ [CLOUD BRIDGE] Enlace saliente activo hacia: {self.bridge_url}")
+            print(f"[CLOUD BRIDGE] Enlace saliente activo hacia: {self.bridge_url}")
 
     def stop(self):
         self.running = False
@@ -86,9 +86,9 @@ class CloudBridgeWorker:
                             timeout=5
                         )
                         if cmd_name != "pairing_status":
-                            print(f"📤 [CLOUD BRIDGE] Confirmación enviada al Bridge Server ✔️\n")
+                            print(f"[CLOUD BRIDGE] Confirmación enviada al Bridge Server\n")
                 elif r.status_code == 401:
-                    print(f"⚠️ [CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
+                    print(f"[CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
                     time.sleep(10) # Backoff on auth error
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException):
@@ -96,7 +96,7 @@ class CloudBridgeWorker:
                 time.sleep(5)
             except Exception as e:
                 # Solo mostrar error si es algo excepcional de lógica de programación
-                print(f"⚠️ [CLOUD BRIDGE] Error interno: {e}")
+                print(f"[CLOUD BRIDGE] Error interno: {e}")
                 time.sleep(5)
 
     def _sync_devices(self):
@@ -126,12 +126,12 @@ class CloudBridgeWorker:
             if action == "start" or cmd == "pairing_start":
                 gateway.last_paired_device = None
                 res = gateway.send_command(0x00, 0x0D)
-                print(f"📡 [CLOUD BRIDGE] Modo emparejamiento RF INICIADO por orden remota")
+                print(f"[CLOUD BRIDGE] Modo emparejamiento RF INICIADO por orden remota")
                 return {"ok": res, "mode": "pairing_started", "status": "active"}
             elif action == "stop" or cmd == "pairing_stop":
                 gateway.pairing_start_time = 0
                 res = gateway.send_command(0x00, 0x0E)
-                print(f"📡 [CLOUD BRIDGE] Modo emparejamiento RF DETENIDO por orden remota")
+                print(f"[CLOUD BRIDGE] Modo emparejamiento RF DETENIDO por orden remota")
                 return {"ok": res, "mode": "pairing_stopped", "status": "idle"}
 
         if cmd == "pairing_status":
@@ -251,13 +251,13 @@ class CloudBridgeWorker:
             dev = Device.get(del_id)
             if dev:
                 dev.delete()
-                print(f"🗑️ [CLOUD BRIDGE] Dispositivo eliminado: '{del_id}'")
+                print(f"[CLOUD BRIDGE] Dispositivo eliminado: '{del_id}'")
             try:
                 node_num = int(str(del_id).replace("dev_", ""))
                 gateway.send_command(dest_id=node_num, command=0x0F, device_type=0, data=[0]*8)
-                print(f"📡 [CLOUD BRIDGE] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
+                print(f"[CLOUD BRIDGE] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
             except Exception as e:
-                print(f"⚠️ [CLOUD BRIDGE] No se pudo enviar CMD_UNPAIR al Gateway: {e}")
+                print(f"[CLOUD BRIDGE] No se pudo enviar CMD_UNPAIR al Gateway: {e}")
             self._sync_devices()
             return {"ok": True, "deleted": del_id}
 
@@ -344,9 +344,9 @@ class CloudBridgeWorker:
                         cmd_byte = 0x01 if params["on"] else 0x02
                         gateway.send_command(dest_id=dest_id, command=cmd_byte, device_type=getattr(dev, "device_type", 0) or 0, data=data_payload)
             except Exception as e:
-                print(f"⚠️ [GATEWAY TX] Advertencia al transmitir por hardware: {e}")
+                print(f"[GATEWAY TX] Advertencia al transmitir por hardware: {e}")
 
-        print(f"🏠 [HUB NATIVO] Dispositivo '{dev.name}' actualizado a: {params}")
+        print(f"[HUB NATIVO] Dispositivo '{dev.name}' actualizado a: {params}")
         return {"ok": True, "state": dev.state, "device": dev.to_dict()}
 
 cloud_bridge = CloudBridgeWorker()

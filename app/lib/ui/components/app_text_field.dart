@@ -7,8 +7,9 @@ class AppTextField extends StatefulWidget {
   final String? hint;
   final bool obscure;
   final TextInputType? keyboardType;
+  final ValueChanged<String>? onChanged;
 
-  const AppTextField({super.key, required this.controller, required this.label, this.hint, this.obscure = false, this.keyboardType});
+  const AppTextField({super.key, required this.controller, required this.label, this.hint, this.obscure = false, this.keyboardType, this.onChanged});
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -43,6 +44,7 @@ class _AppTextFieldState extends State<AppTextField> {
         focusNode: _node,
         keyboardType: widget.keyboardType,
         obscureText: widget.obscure,
+        onChanged: widget.onChanged,
         decoration: InputDecoration(border: InputBorder.none, labelText: widget.label, hintText: widget.hint),
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),

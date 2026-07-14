@@ -4,13 +4,17 @@ class DeviceToken(BaseModel):
     __table__ = "device_tokens"
     
     token = Field("TEXT", primary_key=True)
+    user_id = Field("TEXT", default="")
     platform = Field("TEXT", default="android")
+    device_name = Field("TEXT", default="Android Device")
     updated_at = Field("TEXT", default="")
     
     def to_dict(self):
         return {
             "token": self.token,
+            "user_id": self.user_id,
             "platform": self.platform,
+            "device_name": self.device_name,
             "updated_at": self.updated_at
         }
 

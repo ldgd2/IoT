@@ -91,4 +91,32 @@ def ensure_tables():
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
     """)
-    print("[SERVER DB] Tablas de la arquitectura Multi-Hub verificadas/creadas.")
+    # 6. user_fcm_tokens (relacion muchos a muchos entre usuarios y tokens fcm de dispositivos moviles)
+    execute("""
+        CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+            token_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT NOT NULL,
+            fcm_token     TEXT NOT NULL,
+            platform      TEXT DEFAULT 'android',
+            device_name   TEXT DEFAULT 'Android Device',
+            updated_at    TEXT NOT NULL,
+            UNIQUE(user_id, fcm_token),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    """)
+
+    # Migrar columnas adicionales a devices si no existen
+    for col_def in [
+        "user_id TEXT DEFAULT ''",
+        "room TEXT DEFAULT ''",
+        "type_name TEXT DEFAULT 'generic'",
+        "state TEXT DEFAULT '{}'"
+    ]:
+        col_name = col_def.split()[0]
+        try:
+            execute(f"ALTER TABLE devices ADD COLUMN {col_def}")
+        except Exception:
+            pass
+
+    print("[SERVER DB] Tablas de la arquitectura Multi-Hub verificadas/creadas con relacion muchos a muchos de tokens.")
+

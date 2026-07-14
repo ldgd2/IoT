@@ -85,16 +85,16 @@ class PushNotifier:
             }
             resp = requests.post(url, headers=headers, json=payload, timeout=8)
             if resp.status_code in (200, 201):
-                logger.info(f"✅ [NOTIF PUSH] Enviada: '{title}'")
+                logger.info(f"[NOTIF PUSH] Enviada: '{title}'")
             else:
-                logger.warning(f"⚠️ [NOTIF PUSH] Respuesta {resp.status_code}: {resp.text[:120]}")
+                logger.warning(f"[NOTIF PUSH] Respuesta {resp.status_code}: {resp.text[:120]}")
         except Exception as e:
-            logger.warning(f"⚠️ [NOTIF PUSH] No se pudo enviar al bridge ({_BRIDGE_URL}): {e}")
-            logger.info(f"📲 [NOTIF LOCAL] {title}: {body}")
+            logger.warning(f"[NOTIF PUSH] No se pudo enviar al bridge ({_BRIDGE_URL}): {e}")
+            logger.info(f"[NOTIF LOCAL] {title}: {body}")
 
     @classmethod
     def notify_device_connected(cls, dev):
-        title = "✅ Dispositivo Vinculado"
+        title = "Dispositivo Vinculado"
         body = f"'{dev.name}' ({dev.type_name}) se conectó a la Colmena."
         cls.send_notification(
             title=title,
@@ -106,7 +106,7 @@ class PushNotifier:
 
     @classmethod
     def notify_device_disconnected(cls, dev):
-        title = "⚠️ Dispositivo Desconectado"
+        title = "Dispositivo Desconectado"
         body = f"'{dev.name}' dejó de responder (Offline)."
         cls.send_notification(
             title=title,
@@ -118,7 +118,7 @@ class PushNotifier:
 
     @classmethod
     def notify_skill_action(cls, skill_name: str, message: str, priority: str = "high", extra: dict = None):
-        title = f"⚡ Skill Colmena: {skill_name}"
+        title = f"Skill Colmena: {skill_name}"
         cls.send_notification(
             title=title,
             body=message,

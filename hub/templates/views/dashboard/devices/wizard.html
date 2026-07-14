@@ -23,70 +23,97 @@
 
     <div style="background: var(--md-surface-container); border-radius: var(--radius-large); padding: 32px; overflow: hidden; position: relative;">
         
-        <!-- STEP INDICATOR -->
+        <!-- STEP INDICATORS -->
         <div style="display: flex; gap: 8px; margin-bottom: 32px;">
             <div id="ind-1" style="flex: 1; height: 6px; background: var(--md-primary); border-radius: 3px; transition: 0.3s;"></div>
             <div id="ind-2" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
+            <div id="ind-3" style="flex: 1; height: 6px; background: var(--md-outline-variant); border-radius: 3px; transition: 0.3s;"></div>
         </div>
 
         <!-- STEP 1: ESCANEO Y DETECCION -->
         <div id="step-1" class="wizard-step" style="display: block;">
-            <h2>Paso 1: Buscar Dispositivos</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Pon tu dispositivo en modo vinculación (pulsa el botón físico del nodo).</p>
+            <h2>Paso 1: Buscar Dispositivos en la Red</h2>
+            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Pon tu dispositivo o nodo RF en modo vinculación (pulsa el botón físico o reinícialo).</p>
             
             <div id="scan-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 0; background: var(--md-surface); border-radius: var(--radius-medium); border: 2px dashed var(--md-outline-variant); margin-bottom: 24px;">
                 <div class="progress-circ indeterminate" style="margin-bottom: 16px;"></div>
-                <p>Escuchando red Mesh...</p>
+                <p>Escuchando red Mesh Colmena...</p>
             </div>
 
-            <!-- RECUADRO DE DIAGNÓSTICO EN TIEMPO REAL (RX / TX) -->
+            <!-- RECUADRO DE DIAGNOSTICO EN TIEMPO REAL (RX / TX) -->
             <div id="diag-box" style="background: var(--md-surface-container-high); border-radius: var(--radius-medium); padding: 16px; margin-bottom: 24px; font-family: monospace; font-size: 0.9rem; border-left: 4px solid var(--md-primary);">
                 <div style="font-weight: bold; margin-bottom: 8px; color: var(--md-primary); display: flex; align-items: center; justify-content: space-between;">
-                    <span>📡 INTERCEPTOR RF (PAQUETES EN VIVO)</span>
+                    <span>INTERCEPTOR RF (PAQUETES EN VIVO)</span>
                     <span id="diag-timer" style="font-size: 0.8rem; background: var(--md-primary-container); color: var(--md-on-primary-container); padding: 2px 8px; border-radius: 12px;">Ventana: 0s / 50s</span>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 8px; word-break: break-all;">
                     <div style="display: flex; gap: 8px;">
-                        <span style="color: var(--md-tertiary); font-weight: bold; min-width: 50px;">[TX ➔]</span>
+                        <span style="color: var(--md-tertiary); font-weight: bold; min-width: 50px;">[TX]</span>
                         <span id="live-tx" style="color: var(--md-text);">Iniciando búsqueda en ventana de 50s...</span>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <span style="color: #4CAF50; font-weight: bold; min-width: 50px;">[RX ⬅]</span>
+                        <span style="color: #4CAF50; font-weight: bold; min-width: 50px;">[RX]</span>
                         <span id="live-rx" style="color: var(--md-text);">Esperando anuncio del nodo...</span>
                     </div>
                 </div>
             </div>
 
             <!-- RESULTADO DEL ESCANEO (Oculto al inicio) -->
-            <div id="scan-result" style="display: none; padding: 24px; background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-medium); margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+            <div id="scan-result" style="display: none; padding: 24px; background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-medium); margin-bottom: 24px; align-items: center; gap: 16px;">
                 <div class="icon" style="width: 32px; height: 32px;">
                     {% include 'UI/icons/svg/radar.svg' ignore missing %}
                 </div>
                 <div>
-                    <strong style="display: block; font-size: 1.1rem; margin-bottom: 4px;">¡Dispositivo Encontrado!</strong>
+                    <strong style="display: block; font-size: 1.1rem; margin-bottom: 4px;">Dispositivo Detectado</strong>
                     <span>ID: <strong id="found-id">DEV_9X2A</strong> | Tipo Auto-Detectado: <strong id="found-type">Foco / Luz</strong></span>
                 </div>
             </div>
             
             <div style="display: flex; justify-content: flex-end;">
-                <!-- Botón removido porque ahora la detección es 100% real y automática -->
                 <button id="btn-next-1" class="btn-m3 btn-filled ripple-btn" onclick="nextStep(2)" style="display: none; margin-left: 12px;">Siguiente</button>
             </div>
         </div>
 
-        <!-- STEP 2: NOMBRE -->
+        <!-- STEP 2: NOMBRE E IDENTIFICACION -->
         <div id="step-2" class="wizard-step" style="display: none;">
-            <h2>Paso 2: Identificación</h2>
-            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Asígnale un nombre fácil de recordar para tus automatizaciones.</p>
+            <h2>Paso 2: Identificación del Dispositivo</h2>
+            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Asígnale un nombre descriptivo para identificarlo fácilmente en tu hogar y comandos automáticos.</p>
             
             <div style="margin-bottom: 24px;">
                 <label style="display: block; font-weight: 500; margin-bottom: 8px;">Nombre del Dispositivo</label>
-                <input type="text" placeholder="Ej: Luz Sala de Estar" style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem;">
+                <input id="device-name-input" type="text" placeholder="Ej: Luz Principal, Ventilador Sala" style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem;">
             </div>
             
             <div style="display: flex; justify-content: space-between;">
                 <button class="btn-m3 btn-outlined ripple-btn" onclick="nextStep(1)">Atrás</button>
-                <button class="btn-m3 btn-filled ripple-btn" onclick="finishWizard()">Guardar Dispositivo</button>
+                <button class="btn-m3 btn-filled ripple-btn" onclick="nextStep(3)">Continuar a Sala</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: ASIGNACION DE SALA / UBICACION -->
+        <div id="step-3" class="wizard-step" style="display: none;">
+            <h2>Paso 3: Habitación o Lugar de Instalación</h2>
+            <p style="color: var(--md-text-variant); margin: 8px 0 24px 0;">Selecciona la sala o área de tu cuenta a donde sincronizarás este dispositivo.</p>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 500; margin-bottom: 12px;">Salas Rápidas</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Sala')">Sala</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Dormitorio')">Dormitorio</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Cocina')">Cocina</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Baño')">Baño</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Oficina')">Oficina</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Exterior / Patio')">Exterior / Patio</button>
+                    <button type="button" class="btn-m3 btn-outlined ripple-btn room-chip" onclick="selectRoomChip('Garaje')">Garaje</button>
+                </div>
+                
+                <label style="display: block; font-weight: 500; margin-bottom: 8px; margin-top: 16px;">O escribir una nueva habitación / zona</label>
+                <input id="device-room-input" type="text" placeholder="Ej: Terraza, Sala de Juegos, Pasillo" style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--md-outline); background: var(--md-surface); color: var(--md-text); font-family: inherit; font-size: 1rem;">
+            </div>
+            
+            <div style="display: flex; justify-content: space-between;">
+                <button class="btn-m3 btn-outlined ripple-btn" onclick="nextStep(2)">Atrás</button>
+                <button class="btn-m3 btn-filled ripple-btn" onclick="finishWizard()">Confirmar y Vincular</button>
             </div>
         </div>
 
@@ -100,6 +127,21 @@
     let initialDeviceCount = null;
     let isPairingActive = false;
     let pairedDeviceId = null;
+
+    function selectRoomChip(roomName) {
+        document.getElementById('device-room-input').value = roomName;
+        document.querySelectorAll('.room-chip').forEach(el => {
+            if (el.innerText === roomName) {
+                el.style.background = 'var(--md-primary-container)';
+                el.style.color = 'var(--md-on-primary-container)';
+                el.style.borderColor = 'var(--md-primary)';
+            } else {
+                el.style.background = 'transparent';
+                el.style.color = 'var(--md-text)';
+                el.style.borderColor = 'var(--md-outline)';
+            }
+        });
+    }
 
     async function setGatewayPairingMode(action) {
         try {
@@ -117,7 +159,17 @@
     async function pollForNewDevices() {
         if (!isPairingActive && initialDeviceCount !== null) return;
         try {
-            // 1. Consultar estado y paquetes en vivo del Gateway
+            let statsData = null;
+            try {
+                const resStats = await fetch('/api/stats');
+                statsData = await resStats.json();
+                if (initialDeviceCount === null && statsData && statsData.total !== undefined) {
+                    initialDeviceCount = statsData.total;
+                }
+            } catch (errStats) {
+                console.warn('No se pudo consultar conteo de dispositivos:', errStats);
+            }
+
             let pairData = null;
             try {
                 const resPair = await fetch('/api/pairing/status');
@@ -135,7 +187,7 @@
                         setTimeout(() => { window.location.href = '/devices'; }, 2000);
                         return;
                     }
-                    if (pairData.status === 'success' || (initialDeviceCount !== null && data && data.total > initialDeviceCount)) {
+                    if (pairData.status === 'success' || (initialDeviceCount !== null && statsData && statsData.total > initialDeviceCount)) {
                         let devInfo = pairData.last_device || null;
                         if (!devInfo) {
                             try {
@@ -154,7 +206,7 @@
                         document.getElementById('found-id').innerText = pairedDeviceId ? pairedDeviceId.toUpperCase() : 'NUEVO NODO';
                         document.getElementById('found-type').innerText = devInfo ? (devInfo.type_name || 'Dispositivo Mesh') : 'Detectado vía RF';
                         
-                        const nameInput = document.querySelector('#step-2 input[type="text"]');
+                        const nameInput = document.getElementById('device-name-input');
                         if (nameInput && !nameInput.value && devInfo && devInfo.name) {
                             nameInput.value = devInfo.name;
                         }
@@ -167,44 +219,10 @@
             } catch (errPair) {
                 console.warn('No se pudo obtener estado de pairing:', errPair);
             }
-
-            // 2. Consultar lista de dispositivos para ver si se unió uno nuevo por conteo
-            const res = await fetch('/api/stats');
-            const data = await res.json();
-            
-            if (initialDeviceCount === null) {
-                initialDeviceCount = data.total;
-            } else if (data.total > initialDeviceCount) {
-                let devInfo = null;
-                try {
-                    const resAll = await fetch('/api/devices');
-                    const allDevs = await resAll.json();
-                    if (allDevs && allDevs.length > 0) {
-                        devInfo = allDevs[allDevs.length - 1];
-                    }
-                } catch(e) {}
-
-                pairedDeviceId = devInfo ? (devInfo.id || devInfo.device_id) : 'dev_1';
-                document.getElementById('scan-container').style.display = 'none';
-                document.getElementById('diag-box').style.display = 'none';
-                document.getElementById('scan-result').style.display = 'flex';
-                document.getElementById('found-id').innerText = pairedDeviceId ? pairedDeviceId.toUpperCase() : 'NUEVO NODO';
-                document.getElementById('found-type').innerText = devInfo ? (devInfo.type_name || 'Dispositivo Mesh') : 'Detectado vía RF';
-                
-                const nameInput = document.querySelector('#step-2 input[type="text"]');
-                if (nameInput && !nameInput.value && devInfo && devInfo.name) {
-                    nameInput.value = devInfo.name;
-                }
-
-                setGatewayPairingMode('stop');
-                setTimeout(() => nextStep(2), 1500);
-                return;
-            }
         } catch (e) {
             console.error('Error al hacer polling:', e);
         }
         
-        // Seguir buscando cada 1 segundo para una animación fluida
         if (isPairingActive || initialDeviceCount === null) {
             setTimeout(pollForNewDevices, 1000);
         }
@@ -224,32 +242,41 @@
             setGatewayPairingMode('stop');
         }
 
-        // Actualizar indicadores
-        for(let i=1; i<=2; i++) {
+        // Actualizar indicadores (ahora 3 pasos)
+        for(let i=1; i<=3; i++) {
             const ind = document.getElementById('ind-' + i);
-            if(i <= step) ind.style.background = 'var(--md-primary)';
-            else ind.style.background = 'var(--md-outline-variant)';
+            if (ind) {
+                if(i <= step) ind.style.background = 'var(--md-primary)';
+                else ind.style.background = 'var(--md-outline-variant)';
+            }
         }
     }
 
     async function finishWizard() {
         setGatewayPairingMode('stop');
-        const nameInput = document.querySelector('#step-2 input[type="text"]');
-        if (pairedDeviceId && nameInput && nameInput.value.trim()) {
+        const nameInput = document.getElementById('device-name-input');
+        const roomInput = document.getElementById('device-room-input');
+        const nameVal = nameInput ? nameInput.value.trim() : 'Dispositivo Colmena';
+        const roomVal = roomInput ? roomInput.value.trim() : 'Sala';
+
+        if (pairedDeviceId) {
             try {
                 await fetch('/api/device/' + pairedDeviceId, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: nameInput.value.trim() })
+                    body: JSON.stringify({ 
+                        name: nameVal,
+                        room: roomVal,
+                        category: roomVal
+                    })
                 });
             } catch (e) {
-                console.error('Error al guardar nombre del dispositivo:', e);
+                console.error('Error al guardar datos del dispositivo:', e);
             }
         }
         window.location.href = "/devices";
     }
 
-    // Asegurar que si el usuario cierra la pestaña o navega hacia atrás, se cancele la vinculación en el Gateway
     window.addEventListener('beforeunload', () => {
         if (isPairingActive) {
             const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
@@ -257,7 +284,6 @@
         }
     });
 
-    // Iniciar modo vinculación en el Gateway y auto-descubrimiento en la web
     setGatewayPairingMode('start').then(() => {
         pollForNewDevices();
     });

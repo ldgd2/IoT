@@ -106,6 +106,7 @@ class AuthState extends ChangeNotifier {
 
   // ── Logout ────────────────────────────────────────────────────
   Future<void> logout() async {
+    await PushNotificationService.unregisterTokenFromBackend();
     await AuthService.clearSession();
     _token = null;
     _user = null;

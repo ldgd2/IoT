@@ -271,11 +271,22 @@ class AppState extends ChangeNotifier {
   Future<bool> registerDeviceOnHub(Device d) async {
     final target = d.hubIp ?? _hubHost;
     try {
+      final sp = await SharedPreferences.getInstance();
+      final userRaw = sp.getString('auth_user_v1');
+      String userId = '';
+      if (userRaw != null && userRaw.isNotEmpty) {
+        try {
+          final userMap = jsonDecode(userRaw) as Map<String, dynamic>;
+          userId = userMap['id']?.toString() ?? userMap['user_id']?.toString() ?? '';
+        } catch (_) {}
+      }
+
       final uri = Uri.parse('http://$target/api/devices');
       final headers = await _getAuthHeaders();
       final body = jsonEncode({
         'device_id': d.rfNodeId ?? d.id,
         'name': d.alias ?? d.id,
+        'user_id': userId,
         'type_name': d.kind ?? 'generic',
         'category': d.room ?? 'General',
         'room': d.room ?? 'General',
@@ -315,6 +326,7 @@ class AppState extends ChangeNotifier {
             name: item['name']?.toString() ?? 'RF Device $id',
             hubHost: target,
             typeName: item['type_name']?.toString() ?? 'Sensor',
+            room: item['room']?.toString() ?? item['category']?.toString() ?? 'General',
             rssi: (item['rssi'] as num?)?.toInt(),
             state: stateMap,
             online: item['status']?.toString().toLowerCase() == 'online',

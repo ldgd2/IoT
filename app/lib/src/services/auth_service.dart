@@ -142,4 +142,21 @@ class AuthService {
       return false;
     }
   }
+
+  // ── Obtener lista de Hubs del usuario (Nube VPS) ──────────────
+  static Future<List<Map<String, dynamic>>> getUserHubs() async {
+    try {
+      final headers = await _authHeaders();
+      if (!headers.containsKey('Authorization')) return [];
+      final uri = Uri.parse('${ApiConstants.serverBaseUrl}/hubs');
+      final r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 5));
+      if (r.statusCode == 200) {
+        final list = jsonDecode(r.body) as List;
+        return list.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }

@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../components/index.dart';
 import '../../../src/models/device.dart';
 import '../../../src/state/app_state.dart';
+import '../../../src/services/auth_service.dart';
 
 enum _RfStep { connectHub, chooseKind, scanOrInput, customize, success, error }
 
@@ -26,12 +27,14 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   final hostCtrl = TextEditingController();
   final nodeIdCtrl = TextEditingController();
   final nameCtrl = TextEditingController();
+  final roomCtrl = TextEditingController(text: 'Sala');
 
   String selectedKind = 'Luz';
   String selectedRoom = 'Sala';
   String progressMsg = '';
   List<Device> discoveredFromHub = [];
   Device? selectedHubDevice;
+  List<Map<String, dynamic>> myHubs = [];
   
   Timer? _pairingTimer;
   Map<String, dynamic>? pairingApiDevice;
@@ -56,6 +59,11 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     super.initState();
     final app = context.read<AppState>();
     hostCtrl.text = app.hubHost;
+    AuthService.getUserHubs().then((list) {
+      if (mounted && list.isNotEmpty) {
+        setState(() => myHubs = list);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (app.hubHost.isNotEmpty) {
         _verifyHubConnection(silent: true);
@@ -71,6 +79,7 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     hostCtrl.dispose();
     nodeIdCtrl.dispose();
     nameCtrl.dispose();
+    roomCtrl.dispose();
     super.dispose();
   }
 
@@ -203,6 +212,9 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   Future<void> _finishProvision() async {
     final nodeId = nodeIdCtrl.text.trim();
     final name = nameCtrl.text.trim();
+    if (roomCtrl.text.trim().isNotEmpty) {
+      selectedRoom = roomCtrl.text.trim();
+    }
 
     if (nodeId.isEmpty || name.isEmpty) {
       _snack('Por favor completa el identificador de nodo y el nombre.');
@@ -273,16 +285,47 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const AppLabel('Paso 1: Conectar con tu Central Colmena'),
+            const AppLabel('Paso 1: Conectar o Seleccionar tu Central Colmena'),
             Gap.s,
             Text(
-              'Puedes ingresar la IP local de tu Hub (ej. 192.168.xxx.xxx:5000) o la dirección de tu Servidor en la Nube (ej. 157.173.102.129:8000). El sistema enrutará los comandos automáticamente.',
+              'Selecciona a cuál de tus Hubs vas a vincular y sincronizar este dispositivo, o escribe su dirección IP local / nube.',
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             Gap.l,
+            if (myHubs.isNotEmpty) ...[
+              Text('Seleccionar de tus Hubs en cuenta:', style: tt.titleSmall),
+              Gap.s,
+              for (final h in myHubs)
+                Card(
+                  color: cs.surfaceContainerHighest,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  child: ListTile(
+                    leading: Icon(Icons.hub_rounded, color: cs.primary),
+                    title: Text(h['name']?.toString() ?? 'Hub RF', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Host: ${h['local_url'] ?? h['hub_id']}'),
+                    trailing: ElevatedButton(
+                      onPressed: () {
+                        final url = h['local_url']?.toString() ?? '';
+                        if (url.isNotEmpty) {
+                          hostCtrl.text = url;
+                          _verifyHubConnection();
+                        } else {
+                          _snack('Este Hub no tiene URL configurada');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
+                      child: const Text('Conectar'),
+                    ),
+                  ),
+                ),
+              Gap.m,
+              const Divider(),
+              Gap.m,
+            ],
             AppTextField(
               controller: hostCtrl,
-              label: 'Dirección de la Central o Hub RF',
+              label: 'Dirección manual de la Central o Hub RF',
             ),
             Gap.xl,
             AppButton(
@@ -624,10 +667,23 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
                     label: Text(r),
                     selected: selectedRoom == r,
                     onSelected: (sel) {
-                      if (sel) setState(() => selectedRoom = r);
+                      if (sel) {
+                        setState(() => selectedRoom = r);
+                        roomCtrl.text = r;
+                      }
                     },
                   ),
               ],
+            ),
+            Gap.m,
+            AppTextField(
+              controller: roomCtrl,
+              label: 'O escribir una nueva habitación / zona',
+              onChanged: (v) {
+                if (v.trim().isNotEmpty) {
+                  setState(() => selectedRoom = v.trim());
+                }
+              },
             ),
             Gap.xl,
             AppButton(

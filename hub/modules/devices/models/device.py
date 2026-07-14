@@ -5,6 +5,8 @@ class Device(BaseModel):
     
     device_id = Field("TEXT", primary_key=True)
     name = Field("TEXT", default="Unknown")
+    user_id = Field("TEXT", default="")
+    room = Field("TEXT", default="")
     type_code = Field("INTEGER", default=0)
     type_name = Field("TEXT", default="generic")
     type_icon = Field("TEXT", default="help-circle.svg")

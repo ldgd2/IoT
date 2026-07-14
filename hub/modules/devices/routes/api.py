@@ -10,8 +10,8 @@ def api_devices():
 @devices_bp.route("/devices", methods=["POST"])
 def api_create_device():
     """Crea o actualiza un dispositivo en la base de datos del Hub.
-    Llamado desde la app Flutter cuando el usuario vincula un dispositivo manualmente.
-    Body JSON: { device_id, name, type_name, category, room, rssi }
+    Llamado desde la app Flutter o UI del Hub cuando el usuario vincula un dispositivo.
+    Body JSON: { device_id, name, type_name, category, room, user_id, rssi }
     """
     data = request.get_json(silent=True) or {}
     device_id = (data.get("device_id") or "").strip()
@@ -28,9 +28,10 @@ def api_create_device():
         dev.type_name = data["type_name"]
     if "category" in data:
         dev.category = data["category"]
-    if "room" in data:
-        # Guardamos la habitacion en el campo category si no hay campo room dedicado
-        dev.category = data["room"]
+    if "room" in data and data["room"] is not None:
+        dev.room = str(data["room"])
+    if "user_id" in data and data["user_id"] is not None:
+        dev.user_id = str(data["user_id"])
     if "rssi" in data:
         dev.rssi = int(data["rssi"]) if data["rssi"] is not None else 0
     if "state" in data and isinstance(data["state"], dict):
@@ -70,8 +71,10 @@ def api_update_device(device_id):
         dev.name = data["name"].strip()
     if "category" in data:
         dev.category = data["category"]
-    if "room" in data:
-        dev.category = data["room"]
+    if "room" in data and data["room"] is not None:
+        dev.room = str(data["room"])
+    if "user_id" in data and data["user_id"] is not None:
+        dev.user_id = str(data["user_id"])
     if "type_name" in data:
         dev.type_name = data["type_name"]
     if "state" in data and isinstance(data["state"], dict):
@@ -97,10 +100,9 @@ def api_delete_device(device_id):
     try:
         from hub.modules.communication.logic.gateway import gateway
         node_num = int(str(device_id).replace("dev_", ""))
-        gateway.send_command(dest_id=node_num, command=0x0F, device_type=0, data=[0]*8)
-        print(f"🗑️ [HUB API] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
+        print(f"[HUB API] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
     except Exception as e:
-        print(f"⚠️ [HUB API] No se pudo notificar desvinculación al Gateway: {e}")
+        print(f"[HUB API] No se pudo notificar desvinculación al Gateway: {e}")
 
     try:
         from hub.modules.communication.logic.cloud_bridge import cloud_bridge

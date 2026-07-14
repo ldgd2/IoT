@@ -106,6 +106,12 @@ def api_me():
 @auth_bp.route("/auth/logout", methods=["POST"])
 @require_auth
 def api_logout():
+    data = request.get_json(silent=True) or {}
+    token = (data.get("fcm_token") or data.get("token") or "").strip()
+    if token:
+        db.execute("DELETE FROM user_fcm_tokens WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
+        db.execute("UPDATE users SET fcm_token = NULL WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
+        print(f"[FCM] Token eliminado en logout para usuario '{g.user['username']}': {token[:20]}...")
     return jsonify({"ok": True}), 200
 
 
@@ -217,20 +223,32 @@ def api_get_hub_devices(hub_id):
 @auth_bp.route("/hubs/<hub_id>/devices/<device_id>", methods=["POST", "PUT"])
 @require_auth
 def api_upsert_device(hub_id, device_id):
-    """Guarda o actualiza un dispositivo en el servidor"""
+    """Guarda o actualiza un dispositivo en el servidor vinculado a la cuenta y sala"""
     data = request.get_json(silent=True) or {}
-    space_id = data.get("space_id")
-    alias = data.get("alias", "")
+    space_id = data.get("space_id") or data.get("room") or ""
+    alias = data.get("alias") or data.get("name") or ""
+    type_name = data.get("type_name", "generic")
+    user_id = g.user["user_id"]
+    import json
+    state_str = json.dumps(data.get("state", {})) if isinstance(data.get("state"), dict) else "{}"
     
     # Verificar owner
-    hub = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (hub_id, g.user["user_id"])).fetchone()
+    hub = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (hub_id, user_id)).fetchone()
     if not hub:
         return jsonify({"error": "Hub no encontrado"}), 404
         
-    db.execute(
-        "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at) VALUES (?, ?, ?, ?, ?)",
-        (device_id, hub_id, space_id, alias, _now())
-    )
+    try:
+        db.execute(
+            "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at, user_id, room, type_name, state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (device_id, hub_id, space_id, alias, _now(), user_id, space_id, type_name, state_str)
+        )
+    except Exception:
+        # Fallback si no tuvieran aun las nuevas columnas
+        db.execute(
+            "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at) VALUES (?, ?, ?, ?, ?)",
+            (device_id, hub_id, space_id, alias, _now())
+        )
     return jsonify({"ok": True}), 200
 
 @auth_bp.route("/hubs/<hub_id>/devices/<device_id>", methods=["DELETE"])
@@ -283,22 +301,44 @@ def api_mark_all_read():
 
 
 # ── FCM Token ─────────────────────────────────────────────────
-@auth_bp.route("/auth/fcm-token", methods=["POST"])
+@auth_bp.route("/auth/fcm-token", methods=["POST", "DELETE"])
 @require_auth
 def api_register_fcm_token():
     """
-    Guarda o actualiza el token FCM del dispositivo del usuario autenticado.
-    La app Flutter llama a este endpoint tras obtener el token de Firebase Messaging.
-    Body: { "fcm_token": "<token>" }
+    Guarda, actualiza o elimina (si DELETE) el token FCM del dispositivo del usuario autenticado en relacion muchos a muchos.
+    La app Flutter llama a este endpoint tras obtener el token o al cerrar sesion.
+    Body: { "fcm_token": "<token>", "platform": "android", "device_name": "Galaxy S24" }
     """
     data = request.get_json(silent=True) or {}
-    token = (data.get("fcm_token") or data.get("token") or "").strip()
+    token = (data.get("fcm_token") or data.get("token") or request.args.get("fcm_token") or "").strip()
     if not token:
         return jsonify({"error": "fcm_token requerido"}), 400
 
+    if request.method == "DELETE":
+        db.execute("DELETE FROM user_fcm_tokens WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
+        db.execute("UPDATE users SET fcm_token = NULL WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
+        print(f"[FCM] Token eliminado por signout M:N para usuario '{g.user['username']}': {token[:20]}...")
+        return jsonify({"ok": True, "message": "Token FCM eliminado del usuario exitosamente"}), 200
+
+    platform = data.get("platform", "android")
+    device_name = data.get("device_name", "Dispositivo Android")
+
+    # 1. Guardar en la tabla relacional muchos a muchos user_fcm_tokens
+    try:
+        db.execute(
+            "INSERT INTO user_fcm_tokens (user_id, fcm_token, platform, device_name, updated_at) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id, fcm_token) DO UPDATE SET updated_at = excluded.updated_at, platform = excluded.platform, device_name = excluded.device_name",
+            (g.user["user_id"], token, platform, device_name, _now())
+        )
+    except Exception as e:
+        print(f"[FCM] Error al insertar en user_fcm_tokens: {e}")
+
+    # 2. Mantener ultimo token en la tabla users (compatibilidad hacia atras)
     db.execute(
         "UPDATE users SET fcm_token = ? WHERE user_id = ?",
         (token, g.user["user_id"])
     )
-    print(f"[FCM] Token registrado para usuario '{g.user['username']}': {token[:20]}...")
-    return jsonify({"ok": True}), 200
+    print(f"[FCM] Token M:N registrado para usuario '{g.user['username']}' ({device_name}): {token[:20]}...")
+    return jsonify({"ok": True, "message": "Token FCM registrado en relacion muchos a muchos"}), 200
+

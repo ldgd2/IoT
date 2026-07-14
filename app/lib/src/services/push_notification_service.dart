@@ -145,36 +145,56 @@ class PushNotificationService {
     }
   }
 
-  /// Registra (o actualiza) el FCM token en el servidor para recibir notificaciones push.
+  /// Registra (o actualiza) el FCM token en el servidor Nube y en el Hub local para recibir notificaciones push M:N.
   /// Se autentica con el JWT guardado en SharedPreferences (clave 'auth_token_v1').
   static Future<void> registerTokenWithBackend(String token) async {
     try {
-      // Leer el JWT almacenado por auth_service.dart
       final sp = await SharedPreferences.getInstance();
       final jwtToken = sp.getString('auth_token_v1') ?? '';
-
-      if (jwtToken.isEmpty) {
-        log("[WARN] No hay JWT disponible para registrar FCM token. Se reintentará al iniciar sesión.");
-        return;
+      final userRaw = sp.getString('auth_user_v1');
+      String userId = '';
+      if (userRaw != null && userRaw.isNotEmpty) {
+        try {
+          final userMap = jsonDecode(userRaw) as Map<String, dynamic>;
+          userId = userMap['id']?.toString() ?? userMap['user_id']?.toString() ?? '';
+        } catch (_) {}
       }
 
-      final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
-      final res = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $jwtToken',
-        },
-        body: jsonEncode({'fcm_token': token}),
-      ).timeout(const Duration(seconds: 5));
-
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        log("[OK] Token FCM registrado en el servidor exitosamente.");
+      // 1) Registro en Nube VPS (relación M:N usuario <-> tokens)
+      if (jwtToken.isNotEmpty) {
+        final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
+        await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $jwtToken',
+          },
+          body: jsonEncode({'fcm_token': token, 'device_name': 'Android Mobile'}),
+        ).timeout(const Duration(seconds: 5));
+        log("[OK] Token FCM registrado M:N en la nube VPS.");
       } else {
-        log("[WARN] Respuesta servidor al registrar token FCM: ${res.statusCode} ${res.body}");
+        log("[WARN] No hay JWT disponible para registrar FCM token en la nube.");
+      }
+
+      // 2) Registro local en el Hub Colmena (para funcionar sin internet o modo local)
+      try {
+        final Uri localUri = Uri.parse('${ApiConstants.localBaseUrl}/device-token');
+        await http.post(
+          localUri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'token': token,
+            'user_id': userId,
+            'platform': 'android',
+            'device_name': 'Android Mobile'
+          }),
+        ).timeout(const Duration(seconds: 3));
+        log("[OK] Token FCM registrado en el Hub Local.");
+      } catch (errLocal) {
+        log("[INFO] Hub Local no alcanzable para registro de token fcm: $errLocal");
       }
     } catch (e) {
-      log("[WARN] No se pudo registrar el FCM token (puede que el servidor aún no responda): $e");
+      log("[WARN] Excepción al registrar el FCM token: $e");
     }
   }
 
@@ -187,6 +207,46 @@ class PushNotificationService {
       }
     } catch (e) {
       log("Error en syncTokenWithBackend: $e");
+    }
+  }
+
+  /// Elimina el FCM token del servidor (Nube VPS y Hub local) al cerrar sesión.
+  static Future<void> unregisterTokenFromBackend() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null || token.isEmpty) return;
+
+      final sp = await SharedPreferences.getInstance();
+      final jwtToken = sp.getString('auth_token_v1') ?? '';
+
+      // 1) Eliminar en Nube VPS
+      if (jwtToken.isNotEmpty) {
+        final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
+        await http.delete(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $jwtToken',
+          },
+          body: jsonEncode({'fcm_token': token}),
+        ).timeout(const Duration(seconds: 4));
+        log("[OK] Token FCM eliminado de la Nube VPS al cerrar sesión.");
+      }
+
+      // 2) Eliminar en Hub Local si está accesible
+      try {
+        final Uri localUri = Uri.parse('${ApiConstants.localBaseUrl}/device-token');
+        await http.delete(
+          localUri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'token': token}),
+        ).timeout(const Duration(seconds: 3));
+        log("[OK] Token FCM eliminado del Hub Local al cerrar sesión.");
+      } catch (errLocal) {
+        log("[INFO] Hub Local no alcanzable durante eliminación de token fcm: $errLocal");
+      }
+    } catch (e) {
+      log("[WARN] Excepción al eliminar el FCM token al cerrar sesión: $e");
     }
   }
 }

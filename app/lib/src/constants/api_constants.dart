@@ -21,12 +21,16 @@ class ApiConstants {
 
   /// URL base del Hub activo — puede ser local o remoto (proxy)
   static String get mainBaseUrl => 'http://$activeHost/api';
+  static String get localBaseUrl => 'http://$localHost/api';
   static bool isConnectedLocally = false;
 
   static void updateHost(String host, {bool isLocal = false}) {
     final cleanHost =
         host.trim().replaceFirst(RegExp(r'^https?://'), '').split('/').first;
     activeHost = cleanHost;
+    if (isLocal) {
+      localHost = cleanHost;
+    }
     isConnectedLocally = isLocal;
   }
 }

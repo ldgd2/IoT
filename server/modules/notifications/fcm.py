@@ -209,41 +209,54 @@ def send_push_notification(fcm_token: str, title: str, body: str, data: dict = N
 
 def notify_device_offline(hub_id: str, device_name: str, device_id: str):
     """
-    Notifica a todos los usuarios dueños del hub que un dispositivo
-    se desconectó (pasó a estado offline).
+    Notifica a todos los usuarios dueños del hub y a todos sus telefonos M:N
+    que un dispositivo se desconecto (paso a estado offline).
     """
     from server.db import database as db
 
     # Obtener todos los usuarios propietarios del hub
     rows = db.execute(
-        "SELECT u.user_id, u.fcm_token, u.username FROM users u "
+        "SELECT u.user_id, u.username FROM users u "
         "JOIN hubs h ON u.user_id = h.user_id "
         "WHERE h.hub_id = ?",
         (hub_id,),
     ).fetchall()
 
-    title = "⚠️ Dispositivo desconectado"
-    body = f"El dispositivo '{device_name}' se desconectó y está offline."
+    title = "Dispositivo desconectado"
+    body = f"El dispositivo '{device_name}' se desconecto y esta offline."
 
     for row in rows:
         user = dict(row)
-        fcm_token = user.get("fcm_token", "")
         user_id = user["user_id"]
 
-        # Guardar notificación en BD (historial)
+        # Guardar notificacion en BD (historial)
         db.execute(
             "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (user_id, hub_id, device_id, title, body, "device_offline", datetime.now().isoformat()),
         )
 
-        # Enviar push si tiene token
-        if fcm_token:
-            threading.Thread(
-                target=send_push_notification,
-                args=(fcm_token, title, body),
-                kwargs={"data": {"hub_id": hub_id, "device_id": device_id, "event": "device_offline"}},
-                daemon=True,
-            ).start()
+        # Obtener todos los tokens del usuario (M:N de user_fcm_tokens + users.fcm_token)
+        token_rows = db.execute(
+            "SELECT DISTINCT fcm_token FROM ("
+            "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' "
+            "  UNION "
+            "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != ''"
+            ")",
+            (user_id, user_id)
+        ).fetchall()
+
+        tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+        if tokens:
+            for token in tokens:
+                threading.Thread(
+                    target=send_push_notification,
+                    args=(token, title, body),
+                    kwargs={"data": {"hub_id": hub_id, "device_id": device_id, "event": "device_offline"}},
+                    daemon=True,
+                ).start()
+            print(f"[FCM] Notificacion de desconexion enviada a {len(tokens)} telefonos del usuario '{user.get('username')}'.")
         else:
-            print(f"[FCM] ℹ️  Usuario '{user.get('username')}' sin FCM token registrado.")
+            print(f"[FCM] Usuario '{user.get('username')}' sin FCM tokens registrados.")
+

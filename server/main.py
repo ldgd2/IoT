@@ -512,7 +512,7 @@ def relay_api_test_notification():
 def hub_notify(hub_id: str):
     """
     El Hub llama a este endpoint para pedir al servidor que envíe un push FCM
-    a todos los usuarios dueños de ese hub.
+    a todos los usuarios dueños de ese hub y a todos sus teléfonos (M:N tokens).
     Body: { "title": "...", "body": "...", "event_type": "...", "device_id": "...", "data": {} }
     """
     data = request.get_json(silent=True) or {}
@@ -522,12 +522,12 @@ def hub_notify(hub_id: str):
     device_id  = data.get("device_id", "")
     extra_data = data.get("data", {})
 
-    # Buscar los usuarios dueños de este hub y sus tokens FCM
+    # Buscar los usuarios dueños de este hub
     from server.db import database as db
     from datetime import datetime
 
     rows = db.execute(
-        "SELECT u.user_id, u.fcm_token, u.username FROM users u "
+        "SELECT u.user_id, u.username FROM users u "
         "JOIN hubs h ON u.user_id = h.user_id "
         "WHERE h.hub_id = ?",
         (hub_id,)
@@ -536,32 +536,46 @@ def hub_notify(hub_id: str):
     sent = 0
     for row in rows:
         user = dict(row)
-        fcm_token = user.get("fcm_token", "")
+        user_id = user["user_id"]
 
         # Guardar en historial de notificaciones
         try:
             db.execute(
                 "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user["user_id"], hub_id, device_id, title, body, event_type, datetime.now().isoformat())
+                (user_id, hub_id, device_id, title, body, event_type, datetime.now().isoformat())
             )
         except Exception:
             pass
 
-        if fcm_token:
+        # Obtener absolutamente TODOS los tokens de este usuario (M:N de user_fcm_tokens + users.fcm_token)
+        token_rows = db.execute(
+            "SELECT DISTINCT fcm_token FROM ("
+            "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' "
+            "  UNION "
+            "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != ''"
+            ")",
+            (user_id, user_id)
+        ).fetchall()
+
+        tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+        if tokens:
             from server.modules.notifications.fcm import send_push_notification
             import threading
             push_data = {"hub_id": hub_id, "device_id": device_id, "event": event_type}
             push_data.update({k: str(v) for k, v in extra_data.items()})
-            threading.Thread(
-                target=send_push_notification,
-                args=(fcm_token, title, body),
-                kwargs={"data": push_data},
-                daemon=True
-            ).start()
-            sent += 1
+            for token in tokens:
+                threading.Thread(
+                    target=send_push_notification,
+                    args=(token, title, body),
+                    kwargs={"data": push_data},
+                    daemon=True
+                ).start()
+                sent += 1
+            print(f"[NOTIFY M:N] Enviadas {len(tokens)} notificaciones al usuario '{user.get('username')}'.")
         else:
-            print(f"[NOTIFY] Usuario '{user.get('username')}' sin token FCM.")
+            print(f"[NOTIFY] Usuario '{user.get('username')}' sin tokens FCM registrados.")
 
     return jsonify({"ok": True, "pushed": sent, "total_users": len(rows)}), 200
 

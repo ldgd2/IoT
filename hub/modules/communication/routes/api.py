@@ -15,6 +15,58 @@ def process_incoming_packet(data):
     if not data:
         return {"error": "bad request"}, 400
 
+    from hub.modules.communication.logic.gateway import gateway
+
+    # Soporte para eventos de pairing del traductor ("event": "pairing_success")
+    if data.get("event") == "pairing_success":
+        node_id = data.get("nodeId") or data.get("origin")
+        if node_id is not None:
+            device_id = f"dev_{node_id}"
+            device_name = data.get("name", f"Nodo {node_id}")
+            device_type = data.get("type", 1) # Por defecto Luz/Relay (1)
+            features = data.get("features", 1) # Por defecto relay
+
+            dev = Device.get(device_id)
+            if not dev:
+                reg_info = DeviceRegistry.describe(device_type, features)
+                ctrl = SmartDevice.recognize(
+                    device_id=device_id,
+                    type_code=reg_info["type_code"],
+                    features=reg_info["features"],
+                    name=device_name
+                )
+                dev = ctrl.orm_device if ctrl else Device.get(device_id)
+                if dev:
+                    current_state = dev.state if isinstance(dev.state, dict) else {}
+                    if "relay" in reg_info["feature_keys"]: current_state.setdefault("on", False)
+                    dev.state = current_state
+                    dev.status = "online"
+                    dev.save()
+
+            if dev:
+                dev.status = "online"
+                dev.save()
+                was_active = (gateway.pairing_status == "active")
+                gateway.pairing_status = "success"
+                gateway.last_paired_device = {
+                    "id": device_id,
+                    "name": dev.name,
+                    "type_name": dev.type_name,
+                    "category": dev.category
+                }
+                if was_active:
+                    try:
+                        from hub.modules.communication.logic.notifier import PushNotifier
+                        PushNotifier.notify_device_connected(dev)
+                    except Exception:
+                        pass
+                try:
+                    from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                    cloud_bridge.send_event("device_paired", dev.to_dict())
+                except Exception:
+                    pass
+        return {"ok": True, "action": "pairing_success_processed"}, 200
+
     # Soporte para paquetes RAW de RF24Mesh (origin, cmd, data)
     if "origin" in data and "cmd" in data:
         node_id = data["origin"]
@@ -25,35 +77,47 @@ def process_incoming_packet(data):
         dev = Device.get(device_id)
         
         if cmd == 5: # CMD_DISCOVER
+            device_name = data.get("name", f"Nodo {node_id}")
+            features = 1
+            device_type = data.get("type", 1)
+
             if len(raw_data) >= 17:
                 name_len = raw_data[0]
                 name_chars = raw_data[1:1+name_len]
-                device_name = "".join([chr(c) for c in name_chars if c != 0])
+                parsed_name = "".join([chr(c) for c in name_chars if c != 0])
+                if parsed_name.strip():
+                    device_name = parsed_name.strip()
                 features = raw_data[16]
-                device_type = data.get("type", 0)
-                
-                reg_info = DeviceRegistry.describe(device_type, features)
-                from hub.modules.communication.logic.gateway import gateway
-                
-                if not dev:
-                    if gateway.pairing_status not in ("active", "success"):
-                        # Si llega CMD_DISCOVER de un nodo RF desconocido y el Hub NO está en modo vinculación, no lo creamos en la interfaz
-                        log = RFLog(
-                            ts=datetime.now().isoformat(),
-                            device_id=device_id,
-                            rssi=0,
-                            payload={"warn": "ignored_discover_not_pairing"},
-                            direction="RX"
-                        )
-                        log.save()
-                        return {"ok": True, "action": "ignored_not_pairing"}, 200
-                ctrl = SmartDevice.recognize(
-                    device_id=device_id,
-                    type_code=reg_info["type_code"],
-                    features=reg_info["features"],
-                    name=device_name
-                )
-                dev = ctrl.orm_device if ctrl else Device.get(device_id)
+            elif len(raw_data) > 1:
+                name_len = raw_data[0]
+                if name_len < len(raw_data):
+                    name_chars = raw_data[1:1+name_len]
+                    parsed_name = "".join([chr(c) for c in name_chars if c != 0])
+                    if parsed_name.strip():
+                        device_name = parsed_name.strip()
+
+            reg_info = DeviceRegistry.describe(device_type, features)
+            
+            if not dev:
+                if gateway.pairing_status not in ("active", "success"):
+                    log = RFLog(
+                        ts=datetime.now().isoformat(),
+                        device_id=device_id,
+                        rssi=0,
+                        payload={"warn": "ignored_discover_not_pairing"},
+                        direction="RX"
+                    )
+                    log.save()
+                    return {"ok": True, "action": "ignored_not_pairing"}, 200
+
+            ctrl = SmartDevice.recognize(
+                device_id=device_id,
+                type_code=reg_info["type_code"],
+                features=reg_info["features"],
+                name=device_name
+            )
+            dev = ctrl.orm_device if ctrl else Device.get(device_id)
+            if dev:
                 current_state = dev.state if isinstance(dev.state, dict) else {}
                 keys = reg_info["feature_keys"]
                 if "relay" in keys: current_state.setdefault("on", False)
@@ -65,27 +129,27 @@ def process_incoming_packet(data):
                 dev.state = current_state
                 dev.status = "online"
                 dev.save()
-                
-                if gateway.pairing_status in ("active", "success"):
-                    was_active = (gateway.pairing_status == "active")
-                    gateway.pairing_status = "success"
-                    gateway.last_paired_device = {
-                        "id": device_id,
-                        "name": dev.name,
-                        "type_name": dev.type_name,
-                        "category": dev.category
-                    }
-                    if was_active:
-                        try:
-                            from hub.modules.communication.logic.notifier import PushNotifier
-                            PushNotifier.notify_device_connected(dev)
-                        except Exception:
-                            pass
+            
+            if gateway.pairing_status in ("active", "success") and dev:
+                was_active = (gateway.pairing_status == "active")
+                gateway.pairing_status = "success"
+                gateway.last_paired_device = {
+                    "id": device_id,
+                    "name": dev.name,
+                    "type_name": dev.type_name,
+                    "category": dev.category
+                }
+                if was_active:
                     try:
-                        from hub.modules.communication.logic.cloud_bridge import cloud_bridge
-                        cloud_bridge._sync_devices()
+                        from hub.modules.communication.logic.notifier import PushNotifier
+                        PushNotifier.notify_device_connected(dev)
                     except Exception:
                         pass
+                try:
+                    from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                    cloud_bridge._sync_devices()
+                except Exception:
+                    pass
                 
                 return {"ok": True, "action": "discovered", "registry": reg_info}, 200
 
@@ -336,16 +400,23 @@ def api_settings():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@communication_bp.route("/device-token/", methods=["POST", "PUT"])
-@communication_bp.route("/device-token", methods=["POST", "PUT"])
+@communication_bp.route("/device-token/", methods=["POST", "PUT", "DELETE"])
+@communication_bp.route("/device-token", methods=["POST", "PUT", "DELETE"])
 def api_device_token():
     data = request.get_json(silent=True) or {}
     token = (data.get("token") or "").strip()
     if not token:
         return jsonify({"error": "token requerido"}), 400
     
+    if request.method == "DELETE":
+        from hub.db.database import Database
+        Database.execute("DELETE FROM device_tokens WHERE token = ?", (token,))
+        return jsonify({"ok": True, "message": "Token eliminado del Hub local exitosamente"})
+
+    user_id = (data.get("user_id") or "").strip()
+    device_name = data.get("device_name", "Android Device")
     from hub.modules.communication.models.notification import DeviceToken
-    dt = DeviceToken(token=token, platform=data.get("platform", "android"), updated_at=datetime.now().isoformat())
+    dt = DeviceToken(token=token, user_id=user_id, platform=data.get("platform", "android"), device_name=device_name, updated_at=datetime.now().isoformat())
     dt.save()
     return jsonify({"ok": True, "message": "Token FCM registrado exitosamente en el Hub"})
 

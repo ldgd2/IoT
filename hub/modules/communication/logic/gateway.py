@@ -240,10 +240,10 @@ class IoTGateway:
                                     event_dict = json.loads(text)
                                     if event_dict.get("event") == "pairing_timeout":
                                         self.pairing_status = "timeout"
-                                        self.last_rx = "⏱️ TIMEOUT: El traductor reporta ventana agotada (50s)"
+                                        self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"
                                     elif event_dict.get("event") == "pairing_success":
                                         self.pairing_status = "success"
-                                        self.last_rx = "✔️ ÉXITO: Nuevo nodo emparejado con el traductor"
+                                        self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
                                         node_id = event_dict.get("nodeId") or event_dict.get("origin")
                                         if node_id:
                                             self.last_paired_device = {
@@ -255,6 +255,8 @@ class IoTGateway:
                                                 self.send_command(dest_id=int(node_id), command=0x07, device_type=0, data=[76, 0, 15, 67, 111, 108, 109, 101])
                                             except Exception:
                                                 pass
+                                        if self.on_packet_received:
+                                            self.on_packet_received(event_dict)
                             except Exception:
                                 pass
                 except Exception:
@@ -269,10 +271,10 @@ class IoTGateway:
                                 packet_dict = json.loads(line)
                                 if packet_dict.get("event") == "pairing_timeout":
                                     self.pairing_status = "timeout"
-                                    self.last_rx = "⏱️ TIMEOUT: El traductor reporta ventana agotada (50s)"
+                                    self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"
                                 elif packet_dict.get("event") == "pairing_success":
                                     self.pairing_status = "success"
-                                    self.last_rx = "✔️ ÉXITO: Nuevo nodo emparejado con el traductor"
+                                    self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
                                     node_id = packet_dict.get("nodeId") or packet_dict.get("origin")
                                     if node_id:
                                         self.last_paired_device = {
@@ -280,12 +282,14 @@ class IoTGateway:
                                             "origin": node_id,
                                             "name": packet_dict.get("name", f"Nodo {node_id}")
                                         }
+                                    if self.on_packet_received:
+                                        self.on_packet_received(packet_dict)
                                 elif "cmd" in packet_dict and "origin" in packet_dict:
                                     cmd = packet_dict["cmd"]
                                     origin = packet_dict["origin"]
                                     cmd_names = {1: "PING", 2: "REPORT", 3: "SYNC", 4: "HEARTBEAT", 5: "DISCOVER", 6: "CONTROL"}
                                     cmd_str = cmd_names.get(cmd, f"0x{cmd:02X}")
-                                    self.last_rx = f"ID {origin} ➔ Gateway | CMD: {cmd_str}"
+                                    self.last_rx = f"ID {origin} -> Gateway | CMD: {cmd_str}"
                                     if cmd == 5:
                                         self.pairing_status = "success"
                                         self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
@@ -300,7 +304,7 @@ class IoTGateway:
             if self.pairing_status == "active" and self.pairing_start_time > 0:
                 if time.time() - self.pairing_start_time > 52:
                     self.pairing_status = "timeout"
-                    self.last_rx = "⏱️ TIMEOUT: Ventana de vinculación vencida (50s)"
+                    self.last_rx = "TIMEOUT: Ventana de vinculación vencida (50s)"
                     
             time.sleep(0.01) # Prevenir uso de 100% CPU
 

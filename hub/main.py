@@ -80,9 +80,9 @@ cloud_bridge.start()
 if gateway.connect():
     gateway.on_packet_received = process_incoming_packet
     gateway.start_listening()
-    print("📡 Gateway RF Conectado y escuchando...")
+    print("[GATEWAY] Gateway RF Conectado y escuchando...")
 else:
-    print("⚠️ Gateway RF No conectado. Revisa tu puerto USB/COM.")
+    print("[GATEWAY] Gateway RF No conectado. Revisa tu puerto USB/COM.")
 
 # Aseguramos de que las tablas existan al inicio
 # IMPORTANTE: importar TODOS los modelos antes de migrate_all()
@@ -93,8 +93,8 @@ from hub.modules.auth.models.room import Room
 from hub.modules.auth.models.user import User as HubUser
 BaseModel.migrate_all()
 
-@app.route("/device-token/", methods=["POST", "PUT"])
-@app.route("/device-token", methods=["POST", "PUT"])
+@app.route("/device-token/", methods=["POST", "PUT", "DELETE"])
+@app.route("/device-token", methods=["POST", "PUT", "DELETE"])
 def root_device_token():
     from hub.modules.communication.routes.api import api_device_token
     return api_device_token()
