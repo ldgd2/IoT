@@ -47,7 +47,7 @@ def _get_access_token() -> str | None:
 
         cred_file = _find_credential_file()
         if not cred_file:
-            print("[FCM] ⚠️  No se encontró archivo de credenciales Firebase (.json)")
+            print("[FCM] No se encontró archivo de credenciales Firebase (.json)")
             return None
 
         try:
@@ -66,10 +66,10 @@ def _get_access_token() -> str | None:
                 _token_cache["expires_at"] = time.time() + 3500
             return _token_cache["access_token"]
         except ImportError:
-            print("[FCM] ⚠️  Faltan dependencias de Google. Instálalas con: pip install google-auth cryptography requests")
+            print("[FCM] Faltan dependencias de Google. Instálalas con: pip install google-auth cryptography requests")
             return None
         except Exception as e:
-            print(f"[FCM] ⚠️  Excepción al obtener token OAuth2 con google-auth: {e}")
+            print(f"[FCM] Excepción al obtener token OAuth2 con google-auth: {e}")
             return None
 
 
@@ -109,7 +109,7 @@ def send_push_notification(fcm_token: str, title: str, body: str, data: dict = N
 
     project_id = _get_project_id()
     if not project_id:
-        print("[FCM] ⚠️  No se encontró project_id en las credenciales.")
+        print("[FCM] No se encontró project_id en las credenciales.")
         return False
 
     fcm_url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
@@ -155,13 +155,13 @@ def send_push_notification(fcm_token: str, title: str, body: str, data: dict = N
             timeout=10,
         )
         if resp.status_code == 200:
-            print(f"[FCM] ✅ Notificación enviada: '{title}'")
+            print(f"[FCM] Notificación enviada: '{title}'")
             return True
         else:
-            print(f"[FCM] ⚠️  Error FCM {resp.status_code}: {resp.text}")
+            print(f"[FCM] Error FCM {resp.status_code}: {resp.text}")
             return False
     except Exception as e:
-        print(f"[FCM] ⚠️  Excepción al enviar notificación: {e}")
+        print(f"[FCM] Excepción al enviar notificación: {e}")
         return False
 
 
@@ -217,4 +217,97 @@ def notify_device_offline(hub_id: str, device_name: str, device_id: str):
             print(f"[FCM] Notificacion de desconexion enviada a {len(tokens)} telefonos del usuario '{user.get('username')}'.")
         else:
             print(f"[FCM] Usuario '{user.get('username')}' sin FCM tokens registrados.")
+
+
+def notify_hub_registered(user_id: str, hub_name: str, hub_id: str):
+    """
+    Notifica al usuario que un nuevo Hub fue registrado exitosamente.
+    """
+    from server.db import database as db
+
+    user_row = db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    username = dict(user_row)["username"] if user_row else "Usuario"
+
+    title = "Hub registrado"
+    body = f"Tu Hub '{hub_name}' se ha registrado y vinculado correctamente a tu cuenta Colmena."
+
+    db.execute(
+        "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, hub_id, None, title, body, "hub_registered", datetime.now().isoformat()),
+    )
+
+    token_rows = db.execute(
+        "SELECT DISTINCT fcm_token FROM ("
+        "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' "
+        "  UNION "
+        "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != ''"
+        ")",
+        (user_id, user_id)
+    ).fetchall()
+
+    tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+    if tokens:
+        for token in tokens:
+            threading.Thread(
+                target=send_push_notification,
+                args=(token, title, body),
+                kwargs={"data": {"hub_id": hub_id, "event": "hub_registered"}},
+                daemon=True,
+            ).start()
+        print(f"[FCM] Notificacion de registro de Hub enviada a {len(tokens)} telefonos del usuario '{username}'.")
+    else:
+        print(f"[FCM] Usuario '{username}' sin FCM tokens registrados para notificacion de Hub.")
+
+
+def notify_device_registered(hub_id: str, device_name: str, device_id: str):
+    """
+    Notifica a los duenos del Hub que un nuevo dispositivo fue registrado o vinculado al Hub.
+    """
+    from server.db import database as db
+
+    rows = db.execute(
+        "SELECT u.user_id, u.username FROM users u "
+        "JOIN hubs h ON u.user_id = h.user_id "
+        "WHERE h.hub_id = ?",
+        (hub_id,),
+    ).fetchall()
+
+    title = "Dispositivo registrado"
+    body = f"El dispositivo '{device_name}' se registro correctamente en tu Hub."
+
+    for row in rows:
+        user = dict(row)
+        user_id = user["user_id"]
+
+        db.execute(
+            "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, hub_id, device_id, title, body, "device_registered", datetime.now().isoformat()),
+        )
+
+        token_rows = db.execute(
+            "SELECT DISTINCT fcm_token FROM ("
+            "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' "
+            "  UNION "
+            "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != ''"
+            ")",
+            (user_id, user_id)
+        ).fetchall()
+
+        tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+        if tokens:
+            for token in tokens:
+                threading.Thread(
+                    target=send_push_notification,
+                    args=(token, title, body),
+                    kwargs={"data": {"hub_id": hub_id, "device_id": device_id, "event": "device_registered"}},
+                    daemon=True,
+                ).start()
+            print(f"[FCM] Notificacion de registro de dispositivo enviada a {len(tokens)} telefonos del usuario '{user.get('username')}'.")
+        else:
+            print(f"[FCM] Usuario '{user.get('username')}' sin FCM tokens registrados para notificacion de dispositivo.")
+
 

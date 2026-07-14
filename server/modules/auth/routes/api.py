@@ -174,6 +174,12 @@ def api_register_hub():
         (hub_id, g.user["user_id"], name, local_url, relay_secret, _now())
     )
     
+    try:
+        from server.modules.notifications.fcm import notify_hub_registered
+        notify_hub_registered(g.user["user_id"], name, hub_id)
+    except Exception as e:
+        print(f"[NOTIF] Error al notificar registro de Hub: {e}")
+    
     return jsonify({
         "ok": True,
         "hub_id": hub_id,
@@ -272,6 +278,8 @@ def api_upsert_device(hub_id, device_id):
     if not hub:
         return jsonify({"error": "Hub no encontrado"}), 404
         
+    existing = db.execute("SELECT 1 FROM devices WHERE device_id = ? AND hub_id = ?", (device_id, hub_id)).fetchone()
+    
     try:
         db.execute(
             "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at, user_id, room, type_name, state) "
@@ -284,6 +292,14 @@ def api_upsert_device(hub_id, device_id):
             "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at) VALUES (?, ?, ?, ?, ?)",
             (device_id, hub_id, space_id, alias, _now())
         )
+        
+    if not existing:
+        try:
+            from server.modules.notifications.fcm import notify_device_registered
+            notify_device_registered(hub_id, alias or device_id, device_id)
+        except Exception as e:
+            print(f"[NOTIF] Error al notificar registro de dispositivo: {e}")
+            
     return jsonify({"ok": True}), 200
 
 @auth_bp.route("/hubs/<hub_id>/devices/<device_id>", methods=["DELETE"])

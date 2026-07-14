@@ -178,7 +178,7 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
     dispara una notificación push al propietario del Hub.
     """
     try:
-        from server.modules.notifications.fcm import notify_device_offline
+        from server.modules.notifications.fcm import notify_device_offline, notify_device_registered
 
         prev = cached_devices.get(hub_id, [])
         # Construir mapas { device_id -> status } de la sincronización anterior
@@ -192,7 +192,7 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
                 current_st = new_dev.get("status", "offline")
                 if old_st == "online" and current_st != "online":
                     dev_name = new_dev.get("name", dev_id)
-                    print(f"📴 [SYNC] Dispositivo '{dev_name}' ({dev_id}) pasó a OFFLINE en Hub {hub_id}")
+                    print(f"[SYNC] Dispositivo '{dev_name}' ({dev_id}) pasó a OFFLINE en Hub {hub_id}")
                     import threading
                     threading.Thread(
                         target=notify_device_offline,
@@ -202,15 +202,28 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
             # Caso 2: dispositivo desapareció del listado y antes estaba online
             elif old_st == "online":
                 dev_name = dev_id  # sin info de nombre, usar ID
-                print(f"📴 [SYNC] Dispositivo '{dev_name}' desapareció del Hub {hub_id} (se asume offline)")
+                print(f"[SYNC] Dispositivo '{dev_name}' desapareció del Hub {hub_id} (se asume offline)")
                 import threading
                 threading.Thread(
                     target=notify_device_offline,
                     args=(hub_id, dev_name, dev_id),
                     daemon=True
                 ).start()
+
+        # Si ya había dispositivos cacheados para este hub, comprobar si apareció uno nuevo
+        if prev:
+            for dev_id, new_dev in new_status.items():
+                if dev_id and dev_id not in prev_status:
+                    dev_name = new_dev.get("name") or new_dev.get("alias") or dev_id
+                    print(f"[SYNC] Nuevo dispositivo '{dev_name}' ({dev_id}) detectado en Hub {hub_id}")
+                    import threading
+                    threading.Thread(
+                        target=notify_device_registered,
+                        args=(hub_id, dev_name, dev_id),
+                        daemon=True
+                    ).start()
     except Exception as e:
-        print(f"⚠️ [SYNC] Error al detectar dispositivos offline: {e}")
+        print(f"[SYNC] Error al detectar cambios de dispositivos: {e}")
 
 
 # =============================================================
