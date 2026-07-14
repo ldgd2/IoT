@@ -138,10 +138,14 @@ def compile_flutter(target="apk", server_ip=CURRENT_SERVER_IP) -> bool:
     print("⏳ Compilando (Release)... Esto puede tardar unos minutos.\n")
 
     start_time = time.time()
+    info("Limpiando caché temporal de build en Windows (`flutter clean`)....")
+    run_cmd(["flutter", "clean"], cwd=BASE_DIR, check=False)
+
     build_cmd = [
         "flutter", "build", target,
         "--release",
-        f"--dart-define=HUB_HOST={server_ip}"
+        f"--dart-define=HUB_HOST={server_ip}",
+        "--no-tree-shake-icons"
     ]
     
     if not run_cmd(build_cmd, cwd=BASE_DIR, check=False):
