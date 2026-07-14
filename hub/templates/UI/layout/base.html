@@ -23,6 +23,9 @@
                 <span style="font-size: 1.1rem;">Mi Hogar Colmena</span>
             </div>
             <div class="app-bar-actions">
+                <a href="/profile" class="icon-btn standard" title="Consumo API y Enlace Cloud">
+                    <div class="icon" style="color: var(--md-primary);">{% include 'UI/icons/svg/access-point-network.svg' ignore missing %}</div>
+                </a>
                 <a href="/notifications" class="icon-btn standard" title="Notificaciones">
                     <div class="icon">{% include 'UI/icons/svg/bell.svg' ignore missing %}</div>
                 </a>
@@ -32,8 +35,11 @@
                 <a href="/settings" class="icon-btn standard" title="Configuración RF">
                     <div class="icon">{% include 'UI/icons/svg/cog.svg' ignore missing %}</div>
                 </a>
-                <a href="/login" class="icon-btn standard" title="Perfil / Login">
+                <a href="/profile" class="icon-btn standard" title="Perfil de Usuario y Telemetría">
                     <div class="icon">{% include 'UI/icons/svg/account.svg' ignore missing %}</div>
+                </a>
+                <a href="/logout" class="icon-btn standard" title="Cerrar Sesión" style="color: #ef5350;">
+                    <div class="icon">{% include 'UI/icons/svg/logout.svg' ignore missing %}</div>
                 </a>
             </div>
         </header>
@@ -42,9 +48,6 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/m3-core.js') }}"></script>
-    <script>
-        // Scripts especificos de cada vista
-        {% block extra_js %}{% endblock %}
-    </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

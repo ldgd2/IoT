@@ -25,12 +25,23 @@ class CloudBridgeWorker:
         self.thread = None
         self.bridge_url = ""
         self.last_sync = 0
+        self.stats = {
+            "polls_sent": 0,
+            "syncs_sent": 0,
+            "commands_executed": 0,
+            "last_sync_time": "Pendiente",
+            "last_poll_time": "Pendiente",
+            "status": "Inactivo"
+        }
 
     def start(self, bridge_url=None):
         url = bridge_url or os.environ.get("CLOUD_SERVER_URL") or os.environ.get("CLOUD_BRIDGE_URL", "http://127.0.0.1:8000")
         if not url:
             return
         
+        url = url.rstrip("/")
+        if url.endswith("/api"):
+            url = url[:-4]
         self.bridge_url = url.rstrip("/")
         if not self.running:
             self.running = True
@@ -65,6 +76,9 @@ class CloudBridgeWorker:
                     self.last_sync = now
 
                 # 2. Consultar salientemente por peticiones pendientes (Long-Polling)
+                self.stats["polls_sent"] += 1
+                self.stats["last_poll_time"] = datetime.now().strftime("%H:%M:%S")
+                self.stats["status"] = "Conectado al Cloud"
                 r = requests.get(f"{self.bridge_url}/api/hub/poll", headers=self._get_headers(), timeout=5)
                 if r.status_code == 200:
                     data = r.json()
@@ -77,6 +91,7 @@ class CloudBridgeWorker:
                         
                         # Procesar comando con la lógica nativa del Hub
                         result = self._execute_local_command(payload)
+                        self.stats["commands_executed"] += 1
                         
                         # Retornar el resultado saliendo hacia el exterior
                         requests.post(
@@ -93,28 +108,27 @@ class CloudBridgeWorker:
                         err_code = r.json().get("code", "")
                     except Exception:
                         pass
-                    if err_code == "HUB_UNLINKED":
-                        print("[CLOUD BRIDGE] Hub eliminado o desvinculado desde el exterior. Limpiando credenciales locales...")
+                    if err_code == "HUB_UNLINKED" or not err_code:
+                        print("[CLOUD BRIDGE] Hub no autorizado o desvinculado por el servidor exterior. Pausando polling saliente...")
+                        self.stats["status"] = "Desvinculado / No Autorizado"
                         os.environ.pop("HUB_ID", None)
                         os.environ.pop("HUB_RELAY_SECRET", None)
-                        try:
-                            from dotenv import unset_key
-                            from pathlib import Path
-                            env_file = Path(__file__).parent.parent.parent.parent / ".env"
-                            if env_file.exists():
-                                unset_key(str(env_file), "HUB_ID")
-                                unset_key(str(env_file), "HUB_RELAY_SECRET")
-                        except Exception as e:
-                            print(f"[CLOUD BRIDGE] Error al limpiar archivo .env: {e}")
-                    else:
-                        print("[CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
-                    time.sleep(10) # Backoff on auth error
+                        if err_code == "HUB_UNLINKED":
+                            try:
+                                from dotenv import unset_key
+                                from pathlib import Path
+                                env_file = Path(__file__).parent.parent.parent.parent / ".env"
+                                if env_file.exists():
+                                    unset_key(str(env_file), "HUB_ID")
+                                    unset_key(str(env_file), "HUB_RELAY_SECRET")
+                            except Exception as e:
+                                print(f"[CLOUD BRIDGE] Error al limpiar archivo .env: {e}")
+                    time.sleep(5) # Pausar y esperar que se vuelva a vincular
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException):
-                # Si el servidor cloud (o VPS) no está accesible o el dominio aún no se configura, esperar en silencio
+                self.stats["status"] = "Esperando Conexión Nube"
                 time.sleep(5)
             except Exception as e:
-                # Solo mostrar error si es algo excepcional de lógica de programación
                 print(f"[CLOUD BRIDGE] Error interno: {e}")
                 time.sleep(5)
 
@@ -128,7 +142,10 @@ class CloudBridgeWorker:
                 headers=self._get_headers(),
                 timeout=3
             )
+            self.stats["syncs_sent"] += 1
+            self.stats["last_sync_time"] = datetime.now().strftime("%H:%M:%S")
         except Exception:
+            self.stats["status"] = "Sin conexión al servidor Sync"
             pass
 
     def _execute_local_command(self, payload):

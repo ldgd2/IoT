@@ -53,9 +53,11 @@ app.register_blueprint(auth_view_bp)
 
 @app.before_request
 def require_login():
-    if request.path.startswith("/static") or request.path.startswith("/api") or request.path in ["/login", "/register", "/device-token", "/device-token/"]:
+    if request.path.startswith("/static") or request.path.startswith("/api") or request.path in ["/login", "/register", "/logout", "/device-token", "/device-token/"]:
         return
     if not session.get("logged_in"):
+        if request.path != "/" and not request.path.startswith("/login"):
+            return redirect(f"/login?next={request.path}")
         return redirect("/login")
 
 @app.after_request

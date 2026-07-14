@@ -40,10 +40,10 @@ class BaseModel:
     @classmethod
     def migrate_all(cls) -> dict:
         """Migra todas las clases hijas al vuelo y retorna un reporte"""
-        report = {"created": [], "exists": []}
+        report = {"created": [], "exists": [], "migrated": []}
         for subclass in cls.__subclasses__():
             status = subclass.create_table()
-            report[status].append(subclass.__table__)
+            report.setdefault(status, []).append(subclass.__table__)
         return report
 
     @classmethod
@@ -110,6 +110,10 @@ class BaseModel:
                         pass
             results.append(cls(**data))
         return results
+
+    @classmethod
+    def get_all(cls: Type[T]) -> List[T]:
+        return cls.all()
 
     @classmethod
     def get(cls: Type[T], pk_value: Any) -> Optional[T]:

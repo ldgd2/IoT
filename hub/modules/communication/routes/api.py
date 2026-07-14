@@ -459,6 +459,9 @@ def api_hub_pair():
         return jsonify({"error": "server_url y user_token son requeridos"}), 400
 
     server_url = server_url.rstrip('/')
+    if server_url.endswith('/api'):
+        server_url = server_url[:-4]
+    server_url = server_url.rstrip('/')
     
     # Intentar obtener la IP local del hub para enviarla al servidor
     local_ip = "127.0.0.1:5000"

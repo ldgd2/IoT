@@ -217,7 +217,7 @@ def api_delete_hub(hub_id):
     row = db.execute("SELECT * FROM hubs WHERE hub_id = ?", (hub_id,)).fetchone()
     if not row or row["user_id"] != g.user["user_id"]:
         return jsonify({"error": "Hub no encontrado"}), 404
-    hub_name = row.get("name", "Hub")
+    hub_name = dict(row).get("name", "Hub")
     db.execute("DELETE FROM devices WHERE hub_id = ?", (hub_id,))
     db.execute("DELETE FROM spaces WHERE hub_id = ?", (hub_id,))
     db.execute("DELETE FROM hubs WHERE hub_id = ?", (hub_id,))

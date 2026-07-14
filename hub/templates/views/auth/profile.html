@@ -1,0 +1,428 @@
+{% extends "UI/layout/base.html" %}
+
+{% block title %}Perfil de Usuario y Central Colmena{% endblock %}
+
+{% block extra_css %}
+<style>
+/* CSS para vista de Perfil y Estado del Hub M3 */
+.profile-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: var(--md-surface-container);
+    padding: 24px 32px;
+    border-radius: var(--radius-large, 24px);
+    border: 1px solid var(--md-outline-variant);
+}
+.user-identity {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.avatar-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+.user-info h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--md-text);
+}
+.user-info p {
+    margin: 4px 0 0 0;
+    color: var(--md-text-variant);
+    font-size: 0.95rem;
+}
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 24px;
+}
+.info-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-large, 24px);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--md-outline-variant);
+    padding-bottom: 16px;
+}
+.card-header .icon {
+    width: 28px;
+    height: 28px;
+    color: var(--md-primary);
+}
+.card-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--md-text);
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--md-outline-variant);
+}
+.info-row:last-child {
+    border-bottom: none;
+}
+.info-label {
+    color: var(--md-text-variant);
+    font-size: 0.9rem;
+}
+.info-value {
+    color: var(--md-text);
+    font-weight: 500;
+    font-size: 0.92rem;
+    font-family: monospace;
+    background: var(--md-surface-container);
+    padding: 4px 12px;
+    border-radius: 8px;
+    max-width: 58%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 8px;
+}
+.metric-box {
+    background: var(--md-surface-container);
+    border-radius: var(--radius-medium, 16px);
+    padding: 16px;
+    text-align: center;
+}
+.metric-number {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--md-primary);
+}
+.metric-label {
+    font-size: 0.85rem;
+    color: var(--md-text-variant);
+    margin-top: 4px;
+}
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.modal-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+.modal-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-large, 24px);
+    padding: 28px 32px;
+    width: 90%;
+    max-width: 440px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    transform: scale(0.95);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.modal-overlay.active .modal-card {
+    transform: scale(1);
+}
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.modal-header .icon {
+    width: 32px;
+    height: 32px;
+    color: #cf6679;
+}
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--md-text);
+}
+.modal-body {
+    color: var(--md-text-variant);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+.btn-logout-confirm {
+    background: #cf6679;
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 100px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+}
+.btn-logout-confirm:hover {
+    filter: brightness(1.1);
+}
+.btn-logout-confirm:active {
+    transform: scale(0.98);
+}
+.btn-cancel {
+    background: transparent;
+    color: var(--md-text);
+    border: 1px solid var(--md-outline-variant);
+    padding: 12px 24px;
+    border-radius: 100px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-cancel:hover {
+    background: var(--md-surface-container);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="user-identity">
+            <div class="avatar-circle">
+                {{ user.username[:1].upper() if user and user.username else 'C' }}
+            </div>
+            <div class="user-info">
+                <h1>{{ user.username if user else session.get('username', 'Administrador Local') }}</h1>
+                <p>{{ user.email if user and user.email else 'Cuenta Local del Hub Colmena' }}</p>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span style="background: var(--md-surface-container-high); padding: 8px 16px; border-radius: 50px; font-size: 0.85rem; color: var(--md-primary); border: 1px solid var(--md-outline-variant);">
+                Sesión Activa
+            </span>
+            <button type="button" class="btn-logout-confirm" onclick="showLogoutModal()">
+                Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <div class="profile-grid">
+        <div class="info-card">
+            <div class="card-header">
+                <div class="icon">{% include 'UI/icons/svg/account-circle.svg' ignore missing %}</div>
+                <h2>Información de la Cuenta</h2>
+            </div>
+            <div class="info-row">
+                <span class="info-label">ID de Usuario</span>
+                <span class="info-value" title="{{ user.user_id if user else session.get('user_id', 'N/A') }}">{{ user.user_id if user else session.get('user_id', 'N/A') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Nombre de Usuario</span>
+                <span class="info-value">{{ user.username if user else session.get('username', 'N/A') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Correo Electrónico</span>
+                <span class="info-value">{{ user.email if user and user.email else 'No especificado' }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Tipo de Acceso</span>
+                <span class="info-value">Administrador Local del Hub</span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="card-header">
+                <div class="icon">{% include 'UI/icons/svg/router-wireless.svg' ignore missing %}</div>
+                <h2>Identidad de la Central</h2>
+            </div>
+            <div class="info-row">
+                <span class="info-label">ID del Hub (HUB_ID)</span>
+                <span class="info-value" title="{{ hub_id }}">{{ hub_id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Nombre de la Central</span>
+                <span class="info-value">Central Colmena Hub</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Estado de Conexión</span>
+                <span class="info-value" style="color: #81c784;">Enlace Nube Activo</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Modo Operativo</span>
+                <span class="info-value">Puente Cloud & Local RF</span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="card-header">
+                <div class="icon">{% include 'UI/icons/svg/access-point-network.svg' ignore missing %}</div>
+                <h2>Red y Conectividad</h2>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Dirección IP Local</span>
+                <span class="info-value">{{ local_ip }} : 5000</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Servidor Central Nube</span>
+                <span class="info-value" title="{{ cloud_url }}">{{ cloud_url }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Puerto API HTTP</span>
+                <span class="info-value">5000</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Transceptor RF</span>
+                <span class="info-value">Activo / En Escucha</span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="card-header">
+                <div class="icon">{% include 'UI/icons/svg/api.svg' ignore missing %}</div>
+                <h2>Consumo API y Enlace Cloud</h2>
+            </div>
+            <div class="metrics-row">
+                <div class="metric-box">
+                    <div class="metric-number" style="color: #64b5f6;">{{ cloud_stats.get('polls_sent', 0) }}</div>
+                    <div class="metric-label">Sondeos API (Polls)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-number" style="color: #81c784;">{{ cloud_stats.get('syncs_sent', 0) }}</div>
+                    <div class="metric-label">Sincronizaciones (Syncs)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-number" style="color: #ffb74d;">{{ cloud_stats.get('commands_executed', 0) }}</div>
+                    <div class="metric-label">Comandos Recibidos</div>
+                </div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Estado del Worker Cloud</span>
+                <span class="info-value" style="color: #81c784;">{{ cloud_stats.get('status', 'Inactivo') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Último Sondeo (Long-Poll)</span>
+                <span class="info-value" style="font-size: 0.82rem;">{{ cloud_stats.get('last_poll_time', 'No disponible') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Último Sync de Estado</span>
+                <span class="info-value" style="font-size: 0.82rem;">{{ cloud_stats.get('last_sync_time', 'No disponible') }}</span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="card-header">
+                <div class="icon">{% include 'UI/icons/svg/view-dashboard-outline.svg' ignore missing %}</div>
+                <h2>Recursos y Configuración</h2>
+            </div>
+            <div class="metrics-row">
+                <div class="metric-box">
+                    <div class="metric-number">{{ devices_count }}</div>
+                    <div class="metric-label">Dispositivos</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-number">{{ rooms_count }}</div>
+                    <div class="metric-label">Espacios</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-number">{{ skills_count }}</div>
+                    <div class="metric-label">Escenas</div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; display: flex; justify-content: space-between; gap: 12px;">
+                <a href="/devices" class="btn-cancel" style="text-align: center; flex: 1; font-size: 0.85rem; padding: 10px;">Ver Dispositivos</a>
+                <a href="/rooms" class="btn-cancel" style="text-align: center; flex: 1; font-size: 0.85rem; padding: 10px;">Ver Espacios</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="logoutModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="icon">{% include 'UI/icons/svg/logout.svg' ignore missing %}</div>
+            <h3>¿Cerrar sesión en esta Central?</h3>
+        </div>
+        <div class="modal-body">
+            Se cerrará tu sesión actual en el Hub local. Para acceder nuevamente o administrar dispositivos desde este navegador, deberás volver a ingresar tus credenciales.
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="hideLogoutModal()">Cancelar</button>
+            <button type="button" class="btn-logout-confirm" onclick="confirmLogout()">Cerrar Sesión</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showLogoutModal() {
+    const modal = document.getElementById('logoutModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function hideLogoutModal() {
+    const modal = document.getElementById('logoutModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+function confirmLogout() {
+    window.location.href = '/logout';
+}
+
+document.getElementById('logoutModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        hideLogoutModal();
+    }
+});
+</script>
+{% endblock %}

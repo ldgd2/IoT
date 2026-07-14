@@ -128,6 +128,16 @@
             font-size: 0.9rem;
             margin-bottom: 16px;
         }
+        .success-msg {
+            background: rgba(76, 175, 80, 0.15);
+            color: #81c784;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
     </style>
 </head>
 <body class="theme-dark">
@@ -141,8 +151,12 @@
         </div>
 
         <form action="/login" method="POST">
+            <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
             {% if error %}
             <div class="error-msg">{{ error }}</div>
+            {% endif %}
+            {% if msg %}
+            <div class="success-msg">{{ msg }}</div>
             {% endif %}
 
             <div class="input-group">

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:bthapp/src/state/app_state.dart';
+import 'package:bthapp/src/models/device.dart';
 
 class TerminalDiagnosticsScreen extends StatefulWidget {
   const TerminalDiagnosticsScreen({super.key});
@@ -8,17 +11,34 @@ class TerminalDiagnosticsScreen extends StatefulWidget {
 }
 
 class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
-  final List<String> _logs = [
-    '[INFO] [15:40:12] Gateway RF 433MHz: Heartbeat recibido OK (RSSI: -54 dBm)',
-    '[INFO] [15:40:15] Hub Colmena: Sincronización con servidor cloud completada en 120ms',
-    '[WARN] [15:41:02] Sensor Exterior Jardín: Ping timeout (Intento 1 de 3)',
-    '[ERROR] [15:41:10] Sensor Exterior Jardín: Nodo marcado como OFFLINE en topología Mesh',
-    '[INFO] [15:42:00] Motor de Automatización: Escena "Modo Cine en Casa" evaluada con éxito',
-    '[INFO] [15:43:22] Cámara 01: Fragmento de grabación RTSP guardado en almacenamiento local',
-    '[INFO] [15:44:05] Watchdog: Todos los servicios internos operando en parámetros normales',
-  ];
-
+  final List<String> _logs = [];
   final _cmdCtrl = TextEditingController();
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _initRealDiagnostics();
+    }
+  }
+
+  void _initRealDiagnostics() {
+    final app = context.read<AppState>();
+    final now = DateTime.now().toLocal().toString().split('.').first;
+
+    setState(() {
+      _logs.add('[INFO] [$now] Consola de diagnóstico Colmena IoT iniciada en cliente.');
+      _logs.add('[INFO] Host Hub central configurado: ${app.hubHost}');
+      _logs.add('[INFO] Dispositivos en caché local: ${app.devices.length} nodos registrados.');
+      int onlineCount = app.devices.where((d) => d.online).length;
+      _logs.add('[INFO] Nodos en línea: $onlineCount/${app.devices.length}');
+      if (app.lastError != null && app.lastError!.isNotEmpty) {
+        _logs.add('[ERROR] Última excepción registrada: ${app.lastError}');
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +52,20 @@ class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Consola de Logs del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Limpiar logs',
-                onPressed: () => setState(() => _logs.clear()),
+              const Text('Consola de Logs y Comandos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Sincronizar y generar reporte real',
+                    onPressed: _initRealDiagnostics,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Limpiar historial de logs',
+                    onPressed: () => setState(() => _logs.clear()),
+                  ),
+                ],
               ),
             ],
           ),
@@ -60,11 +89,13 @@ class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
                     textColor = const Color(0xFFFFB800);
                   } else if (line.contains('[INFO]')) {
                     textColor = const Color(0xFF00E5A8);
+                  } else if (line.contains('[USER]')) {
+                    textColor = Colors.lightBlueAccent;
                   }
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text(
+                    child: SelectableText(
                       line,
                       style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: textColor),
                     ),
@@ -81,7 +112,7 @@ class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
                   controller: _cmdCtrl,
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Escribir comando de diagnóstico (ej. ping 192.168.1.10)...',
+                    hintText: 'Comandos disponibles: sync, status, devices, ping <ip>, clear...',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     filled: true,
                     fillColor: cs.surfaceContainerHigh,
@@ -89,14 +120,14 @@ class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
                   onSubmitted: _executeCommand,
                 ),
               ),
-              const SizedBox(height: 8, width: 8),
+              const SizedBox(width: 8),
               FilledButton(
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () => _executeCommand(_cmdCtrl.text),
-                child: const Text('Enviar'),
+                child: const Text('Ejecutar'),
               ),
             ],
           ),
@@ -105,12 +136,80 @@ class _TerminalDiagnosticsScreenState extends State<TerminalDiagnosticsScreen> {
     );
   }
 
-  void _executeCommand(String cmd) {
-    if (cmd.trim().isEmpty) return;
+  Future<void> _executeCommand(String cmd) async {
+    final raw = cmd.trim();
+    if (raw.isEmpty) return;
+
+    final app = context.read<AppState>();
+    final now = DateTime.now().toLocal().toString().split('.').first;
+
     setState(() {
-      _logs.add('[USER] > $cmd');
-      _logs.add('[INFO] Ejecutando comando en daemon local...');
+      _logs.add('[USER] [$now] > $raw');
       _cmdCtrl.clear();
     });
+
+    final parts = raw.split(' ');
+    final action = parts.first.toLowerCase();
+
+    if (action == 'clear') {
+      setState(() => _logs.clear());
+      return;
+    } else if (action == 'sync' || action == 'refresh') {
+      setState(() => _logs.add('[INFO] Sincronizando todos los nodos y consultando Hub en paralelo...'));
+      final start = DateTime.now();
+      await app.refreshAll(parallel: true);
+      final elapsed = DateTime.now().difference(start).inMilliseconds;
+      if (mounted) {
+        setState(() {
+          _logs.add('[INFO] Sincronización terminada en ${elapsed}ms. Nodos descubiertos: ${app.devices.length}');
+        });
+      }
+    } else if (action == 'status') {
+      int online = app.devices.where((d) => d.online).length;
+      setState(() {
+        _logs.add('[INFO] Estado global de la red Colmena:');
+        _logs.add('       - Dispositivos en línea: $online');
+        _logs.add('       - Dispositivos desconectados: ${app.devices.length - online}');
+        _logs.add('       - Hub activo: ${!app.loading ? "Sí (Normal)" : "Sincronizando"}');
+      });
+    } else if (action == 'devices' || action == 'ls') {
+      setState(() {
+        if (app.devices.isEmpty) {
+          _logs.add('[WARN] No hay dispositivos registrados en memoria actualmente.');
+        } else {
+          _logs.add('[INFO] Lista de nodos vinculados (${app.devices.length}):');
+          for (final d in app.devices) {
+            final st = d.online ? 'ONLINE ' : 'OFFLINE';
+            _logs.add('       - [$st] ID: ${d.id} | IP: ${d.ip} | Tipo: ${d.kind ?? "General"} | Relés: ${d.relays}');
+          }
+        }
+      });
+    } else if (action == 'ping') {
+      if (parts.length < 2) {
+        setState(() => _logs.add('[ERROR] Sintaxis incorrecta. Uso: ping <ip_o_id>'));
+        return;
+      }
+      final target = parts[1];
+      final dev = app.devices.cast<Device?>().firstWhere(
+        (d) => d?.ip == target || d?.id == target || d?.mdns == target,
+        orElse: () => null,
+      );
+      if (dev != null) {
+        setState(() => _logs.add('[INFO] Consultando estado directo de ${dev.alias ?? dev.id} (${dev.ip})...'));
+        await app.refreshDevice(dev);
+        if (mounted) {
+          setState(() {
+            _logs.add('[INFO] Ping/refresh completado. Estado actual: ${dev.online ? "ONLINE" : "OFFLINE"} (RSSI: ${dev.rssi ?? "N/A"} dBm)');
+          });
+        }
+      } else {
+        setState(() => _logs.add('[WARN] Dispositivo con objetivo "$target" no encontrado en la lista local. Intenta ejecutar "sync" primero.'));
+      }
+    } else {
+      setState(() {
+        _logs.add('[ERROR] Comando no reconocido: "$raw"');
+        _logs.add('[INFO] Comandos válidos: sync, status, devices, ping <ip>, clear');
+      });
+    }
   }
 }
