@@ -3,6 +3,7 @@
 // Comunicación con endpoints /api/auth/* del Hub
 // =============================================================
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
@@ -50,6 +51,7 @@ class AuthService {
       final token = await getSavedToken();
       if (token == null || token.isEmpty) return;
       final fcmToken = await PushNotificationService.getTokenSafe();
+      debugPrint("[AUTH] Enviando POST /auth/logout al servidor con fcm_token: '$fcmToken'");
       final uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/logout');
       await http.post(
         uri,
@@ -123,6 +125,7 @@ class AuthService {
   }) async {
     try {
       final fcmToken = await PushNotificationService.getTokenSafe();
+      debugPrint("[AUTH] Enviando POST /auth/login al servidor con fcm_token: '$fcmToken'");
       final uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/login');
       final r = await http
           .post(

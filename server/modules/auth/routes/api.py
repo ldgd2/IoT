@@ -114,9 +114,11 @@ def api_login():
                 (user["user_id"], fcm_token, platform, device_name, _now())
             )
             db.execute("UPDATE users SET fcm_token = ? WHERE user_id = ?", (fcm_token, user["user_id"]))
-            print(f"[FCM] Token M:N registrado en login para usuario '{user['username']}': {fcm_token[:20]}...")
+            print(f"[AUTH] Login consumido por usuario '{user['username']}'. Token FCM registrado M:N: {fcm_token[:25]}...")
         except Exception as e:
-            print(f"[FCM] Error al registrar token en login: {e}")
+            print(f"[AUTH] Error al registrar token en login: {e}")
+    else:
+        print(f"[AUTH] Login consumido por usuario '{user['username']}' (fcm_token enviado en body: VACIO/SIN TOKEN)")
 
     return jsonify({
         "ok": True,
@@ -142,7 +144,9 @@ def api_logout():
     if token:
         db.execute("DELETE FROM user_fcm_tokens WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
         db.execute("UPDATE users SET fcm_token = NULL WHERE user_id = ? AND fcm_token = ?", (g.user["user_id"], token))
-        print(f"[FCM] Token eliminado en logout para usuario '{g.user['username']}': {token[:20]}...")
+        print(f"[AUTH] Logout consumido por usuario '{g.user['username']}'. Token FCM eliminado M:N: {token[:25]}...")
+    else:
+        print(f"[AUTH] Logout consumido por usuario '{g.user['username']}' (fcm_token enviado en body: VACIO/SIN TOKEN)")
     return jsonify({"ok": True}), 200
 
 

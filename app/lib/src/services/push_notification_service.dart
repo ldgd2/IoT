@@ -81,12 +81,14 @@ class PushNotificationService {
       // 3. Obtener y Registrar Token FCM
       String? token = await getTokenSafe();
       if (token != null) {
-        log("FCM Token obtenido: $token");
+        debugPrint("[FCM] FCM Token obtenido al iniciar app: $token");
         await registerTokenWithBackend(token);
+      } else {
+        debugPrint("[FCM] Token fue null al iniciar app, esperando refresh o login.");
       }
 
       _firebaseMessaging.onTokenRefresh.listen((newToken) async {
-        log("FCM Token refrescado: $newToken");
+        debugPrint("[FCM] FCM Token refrescado: $newToken");
         _cachedFcmToken = newToken;
         final sp = await SharedPreferences.getInstance();
         await sp.setString('fcm_token_v1', newToken);
@@ -152,12 +154,14 @@ class PushNotificationService {
 
   static Future<String?> getTokenSafe() async {
     if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
+      debugPrint("[FCM] getTokenSafe devuelto de memoria: $_cachedFcmToken");
       return _cachedFcmToken;
     }
     try {
       final sp = await SharedPreferences.getInstance();
       _cachedFcmToken = sp.getString('fcm_token_v1');
       if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
+        debugPrint("[FCM] getTokenSafe devuelto de SharedPreferences: $_cachedFcmToken");
         _firebaseMessaging.getToken().then((tok) {
           if (tok != null && tok.isNotEmpty && tok != _cachedFcmToken) {
             _cachedFcmToken = tok;
@@ -168,23 +172,30 @@ class PushNotificationService {
         return _cachedFcmToken;
       }
       
+      debugPrint("[FCM] Solicitando token a FirebaseMessaging.getToken()...");
       // Intentar obtener el token con 10s de timeout y guardar siempre
       _firebaseMessaging.getToken().then((tok) async {
         if (tok != null && tok.isNotEmpty) {
+          debugPrint("[FCM] Token obtenido en background from Firebase: $tok");
           _cachedFcmToken = tok;
           final spLocal = await SharedPreferences.getInstance();
           await spLocal.setString('fcm_token_v1', tok);
+          registerTokenWithBackend(tok);
         }
-      }).catchError((_) {});
+      }).catchError((err) {
+        debugPrint("[FCM] Error asíncrono obteniendo token de Firebase: $err");
+      });
 
-      final token = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 10));
+      final token = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 4));
       if (token != null && token.isNotEmpty) {
+        debugPrint("[FCM] Token obtenido síncronamente de Firebase: $token");
         _cachedFcmToken = token;
         await sp.setString('fcm_token_v1', token);
       }
     } catch (e) {
-      log("No se pudo obtener el token FCM en línea en getTokenSafe: $e");
+      debugPrint("[FCM] Excepción/timeout en getTokenSafe: $e");
     }
+    debugPrint("[FCM] getTokenSafe final devuelto: '$_cachedFcmToken'");
     return _cachedFcmToken;
   }
 
@@ -206,7 +217,7 @@ class PushNotificationService {
       // 1) Registro en Nube VPS (relación M:N usuario <-> tokens)
       if (jwtToken.isNotEmpty) {
         final Uri uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/fcm-token');
-        log("Sincronizando token FCM M:N con Nube VPS: $uri");
+        debugPrint("[FCM] Sincronizando token FCM M:N con Nube VPS: $uri");
         try {
           final res = await http.post(
             uri,
@@ -216,12 +227,12 @@ class PushNotificationService {
             },
             body: jsonEncode({'fcm_token': token, 'platform': 'android', 'device_name': 'Android Mobile'}),
           ).timeout(const Duration(seconds: 6));
-          log("[OK] Token FCM registrado M:N en la nube VPS. Status: ${res.statusCode}");
+          debugPrint("[FCM] [OK] Token FCM registrado M:N en la nube VPS. Status: ${res.statusCode}");
         } catch (e) {
-          log("[WARN] Excepción HTTP registrando FCM en nube: $e");
+          debugPrint("[FCM] [WARN] Excepción HTTP registrando FCM en nube: $e");
         }
       } else {
-        log("[WARN] No hay JWT disponible en registerTokenWithBackend para registrar en nube.");
+        debugPrint("[FCM] [WARN] No hay JWT disponible en registerTokenWithBackend para registrar en nube.");
       }
 
       // 2) Registro local en el Hub Colmena (para funcionar sin internet o modo local)
@@ -237,27 +248,28 @@ class PushNotificationService {
             'device_name': 'Android Mobile'
           }),
         ).timeout(const Duration(seconds: 3));
-        log("[OK] Token FCM registrado en el Hub Local.");
+        debugPrint("[FCM] [OK] Token FCM registrado en el Hub Local.");
       } catch (errLocal) {
-        log("[INFO] Hub Local no alcanzable para registro de token fcm: $errLocal");
+        debugPrint("[FCM] [INFO] Hub Local no alcanzable para registro de token fcm: $errLocal");
       }
     } catch (e) {
-      log("[WARN] Excepción al registrar el FCM token: $e");
+      debugPrint("[FCM] [WARN] Excepción al registrar el FCM token: $e");
     }
   }
 
   /// Sincroniza el FCM token en cuanto el usuario inicia sesión.
   static Future<void> syncTokenWithBackend({String? explicitJwt}) async {
     try {
+      debugPrint("[FCM] syncTokenWithBackend disparado...");
       String? token = await getTokenSafe();
       if (token != null && token.isNotEmpty) {
         await registerTokenWithBackend(token, explicitJwt: explicitJwt);
       } else {
-        log("[WARN] Token FCM no disponible de inmediato, reintentando en segundo plano...");
+        debugPrint("[FCM] [WARN] Token FCM no disponible de inmediato, reintentando en segundo plano...");
         _retrySyncInBackground(explicitJwt);
       }
     } catch (e) {
-      log("Error en syncTokenWithBackend: $e");
+      debugPrint("[FCM] Error en syncTokenWithBackend: $e");
     }
   }
 
@@ -265,9 +277,10 @@ class PushNotificationService {
     for (int i = 1; i <= 3; i++) {
       await Future.delayed(Duration(seconds: i * 3));
       try {
+        debugPrint("[FCM] Reintento #$i de obtención de token FCM...");
         final token = await getTokenSafe();
         if (token != null && token.isNotEmpty) {
-          log("[OK] Token FCM obtenido al reintento #$i, registrando en backend...");
+          debugPrint("[FCM] [OK] Token FCM obtenido al reintento #$i, registrando en backend...");
           await registerTokenWithBackend(token, explicitJwt: explicitJwt);
           break;
         }
