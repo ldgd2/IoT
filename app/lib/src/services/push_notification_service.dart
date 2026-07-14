@@ -253,7 +253,7 @@ class PushNotificationService {
   /// Elimina el FCM token del servidor (Nube VPS y Hub local) al cerrar sesión.
   static Future<void> unregisterTokenFromBackend() async {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await getTokenSafe();
       if (token == null || token.isEmpty) return;
 
       final sp = await SharedPreferences.getInstance();
