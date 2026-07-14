@@ -239,14 +239,29 @@ class PushNotificationService {
   /// Sincroniza el FCM token en cuanto el usuario inicia sesión.
   static Future<void> syncTokenWithBackend({String? explicitJwt}) async {
     try {
-      final token = await getTokenSafe();
+      String? token = await getTokenSafe();
       if (token != null && token.isNotEmpty) {
         await registerTokenWithBackend(token, explicitJwt: explicitJwt);
       } else {
-        log("[WARN] No se obtuvo ningún token FCM para sincronizar al backend.");
+        log("[WARN] Token FCM no disponible de inmediato, reintentando en segundo plano...");
+        _retrySyncInBackground(explicitJwt);
       }
     } catch (e) {
       log("Error en syncTokenWithBackend: $e");
+    }
+  }
+
+  static void _retrySyncInBackground(String? explicitJwt) async {
+    for (int i = 1; i <= 3; i++) {
+      await Future.delayed(Duration(seconds: i * 3));
+      try {
+        final token = await getTokenSafe();
+        if (token != null && token.isNotEmpty) {
+          log("[OK] Token FCM obtenido al reintento #$i, registrando en backend...");
+          await registerTokenWithBackend(token, explicitJwt: explicitJwt);
+          break;
+        }
+      } catch (_) {}
     }
   }
 
