@@ -134,6 +134,8 @@ class CloudBridgeWorker:
 
     def _sync_devices(self):
         """Envía la lista actual de dispositivos al Bridge Server para caché"""
+        if not os.environ.get("HUB_ID") or not getattr(self, "bridge_url", None):
+            return
         try:
             devices = [d.to_dict() for d in Device.all()]
             requests.post(
@@ -147,6 +149,23 @@ class CloudBridgeWorker:
         except Exception:
             self.stats["status"] = "Sin conexión al servidor Sync"
             pass
+
+    def send_event(self, event_type, payload):
+        """Notifica eventos instantáneos del Hub al Servidor exterior (ej. device_paired, device_unpaired)"""
+        if not os.environ.get("HUB_ID") or not getattr(self, "bridge_url", None):
+            return
+        try:
+            self._sync_devices()
+            requests.post(
+                f"{self.bridge_url}/api/hub/event",
+                json={"event": event_type, "payload": payload, "ts": datetime.now().isoformat()},
+                headers=self._get_headers(),
+                timeout=4
+            )
+            print(f"[CLOUD BRIDGE] Evento saliente '{event_type}' notificado al servidor en nube.")
+        except Exception as e:
+            print(f"[CLOUD BRIDGE] Error al notificar evento '{event_type}': {e}")
+
 
     def _execute_local_command(self, payload):
         """Ejecuta la lógica real que antes residía solo en las rutas REST locales del Hub"""

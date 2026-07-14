@@ -21,8 +21,8 @@ def _auto_link_with_vps(vps_url, token, identifier):
         try:
             hub_name = os.environ.get("HUB_NAME", "Central Colmena Hub")
             reg_headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-            reg_r = requests.post(f"{vps_url}/hubs", json={"name": hub_name, "local_url": "http://127.0.0.1:5000"}, headers=reg_headers, timeout=5)
-            if reg_r.status_code == 201:
+            reg_r = requests.post(f"{vps_url}/hubs", json={"name": hub_name, "local_url": "http://127.0.0.1:5000", "hub_id": os.environ.get("HUB_ID", "")}, headers=reg_headers, timeout=5)
+            if reg_r.status_code in [200, 201]:
                 reg_data = reg_r.json()
                 new_hub_id = reg_data.get("hub_id")
                 relay_secret = reg_data.get("relay_secret")
@@ -201,8 +201,14 @@ def profile_view():
         users = User.all()
         if users:
             user = users[0]
-        else:
-            return redirect("/login")
+            
+    if not user:
+        class SyntheticUser:
+            def __init__(self):
+                self.user_id = session.get("user_id", "local-admin")
+                self.username = session.get("username", "Administrador Colmena")
+                self.email = session.get("email", "admin@colmena.local")
+        user = SyntheticUser()
             
     from hub.modules.devices.models.device import Device
     from hub.modules.auth.models.room import Room
@@ -243,7 +249,20 @@ def profile_view():
         cloud_stats=cloud_stats
     )
 
+@auth_view_bp.route("/api/profile/stats")
+def api_profile_stats():
+    from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+    cloud_stats = getattr(cloud_bridge, "stats", {
+        "polls_sent": 0, "syncs_sent": 0, "commands_executed": 0,
+        "last_sync_time": "No disponible", "last_poll_time": "No disponible", "status": "Inactivo"
+    })
+    return cloud_stats
+
 @auth_view_bp.route("/logout")
 def logout_view():
+    session.pop("logged_in", None)
+    session.pop("user_id", None)
+    session.pop("username", None)
+    session.pop("email", None)
     session.clear()
     return redirect("/login?logout=1")

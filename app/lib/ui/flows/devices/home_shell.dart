@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bthapp/src/state/app_state.dart';
 import 'package:bthapp/src/state/auth_state.dart';
+import 'package:bthapp/src/services/push_notification_service.dart';
 import 'devices_view.dart';
 import 'room_dashboard_view.dart';
 import 'automation_scenes_view.dart';
@@ -12,14 +14,15 @@ import '../hubs/hub_link_view.dart';
 import '../hubs/hub_management_view.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  final int initialTab;
+  const HomeShell({super.key, this.initialTab = 0});
 
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
-  int currentIndex = 0;
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
+  late int currentIndex;
 
   final List<Widget> pages = const [
     DevicesView(),
@@ -28,6 +31,35 @@ class _HomeShellState extends State<HomeShell> {
     NetworkHealthView(),
     InteractiveProvisionGuideView(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    currentIndex = widget.initialTab;
+    WidgetsBinding.instance.addObserver(this);
+    PushNotificationService.onRemoteEvent = () {
+      if (mounted) {
+        context.read<AuthState>().refreshHubs();
+        context.read<AppState>().load();
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) {
+        context.read<AuthState>().refreshHubs();
+        context.read<AppState>().load();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

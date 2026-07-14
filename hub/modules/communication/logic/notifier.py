@@ -73,7 +73,7 @@ class PushNotifier:
         body  = payload.get("body", "")
 
         if not _BRIDGE_URL or not _HUB_ID:
-            logger.info(f"📲 [NOTIF LOCAL] {title}: {body}")
+            logger.info(f"[NOTIF LOCAL] {title}: {body}")
             return
 
         try:
@@ -114,6 +114,18 @@ class PushNotifier:
             event_type="disconnected",
             device_id=getattr(dev, "device_id", str(getattr(dev, "id", ""))),
             extra_data={"type": "DISCONNECTED"}
+        )
+
+    @classmethod
+    def notify_device_unpaired(cls, device_id: str, name: str = ""):
+        title = "Dispositivo Desvinculado"
+        body = f"El dispositivo {name or device_id} fue desvinculado de la Colmena."
+        cls.send_notification(
+            title=title,
+            body=body,
+            event_type="unpaired",
+            device_id=device_id,
+            extra_data={"type": "UNPAIRED", "device_id": device_id}
         )
 
     @classmethod

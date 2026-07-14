@@ -95,18 +95,27 @@ def api_delete_device(device_id):
     dev = Device.get(device_id)
     if not dev:
         return jsonify({"error": "not found"}), 404
+    dev_name = dev.name
     dev.delete()
 
     try:
         from hub.modules.communication.logic.gateway import gateway
         node_num = int(str(device_id).replace("dev_", ""))
-        print(f"[HUB API] CMD_UNPAIR (0x0F) enviado al Gateway para desvincular el Nodo {node_num}")
+        gateway.send_command(dest_id=node_num, command=0x0E, device_type=0, data=[])
+        print(f"[HUB API] CMD_UNPAIR (0x0E) enviado al Gateway para desvincular el Nodo {node_num}")
     except Exception as e:
-        print(f"[HUB API] No se pudo notificar desvinculación al Gateway: {e}")
+        print(f"[HUB API] No se pudo notificar desvinculacion al Gateway: {e}")
 
     try:
         from hub.modules.communication.logic.cloud_bridge import cloud_bridge
         cloud_bridge._sync_devices()
+        cloud_bridge.send_event("device_unpaired", {"device_id": device_id})
+    except Exception as e:
+        print(f"[HUB API] Error notificando al cloud bridge: {e}")
+
+    try:
+        from hub.modules.communication.logic.notifier import PushNotifier
+        PushNotifier.notify_device_unpaired(device_id, dev_name)
     except Exception:
         pass
 

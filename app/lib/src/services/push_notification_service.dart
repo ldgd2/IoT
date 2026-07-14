@@ -8,10 +8,17 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
+import 'notification_storage_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   log("Recibido mensaje en segundo plano: ${message.messageId}");
+  await NotificationStorageService.saveNotification(
+    title: message.notification?.title ?? message.data['title'] ?? 'Colmena IoT',
+    body: message.notification?.body ?? message.data['body'] ?? '',
+    eventType: message.data['event_type'] ?? message.data['type'] ?? 'info',
+    deviceId: message.data['device_id'] ?? '',
+  );
 }
 
 class PushNotificationService {
@@ -21,6 +28,7 @@ class PushNotificationService {
   
   // Clave global para navegar al tocar la notificación
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static VoidCallback? onRemoteEvent;
 
   static Future<void> initializeApp() async {
     try {
@@ -60,6 +68,7 @@ class PushNotificationService {
         initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           _handleNotificationClick(response.payload);
+          onRemoteEvent?.call();
         },
       );
 
@@ -99,12 +108,20 @@ class PushNotificationService {
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         log("Mensaje en Foreground: ${message.notification?.title} - ${message.notification?.body}");
         _showLocalNotification(message);
+        NotificationStorageService.saveNotification(
+          title: message.notification?.title ?? message.data['title'] ?? 'Colmena IoT',
+          body: message.notification?.body ?? message.data['body'] ?? '',
+          eventType: message.data['event_type'] ?? message.data['type'] ?? 'info',
+          deviceId: message.data['device_id'] ?? '',
+        );
+        onRemoteEvent?.call();
       });
 
       // 5. Escuchar clics cuando la app se abre desde una notificación en segundo plano
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         log("App abierta por notificación en Background: ${message.data}");
         _handleNotificationClick(jsonEncode(message.data));
+        onRemoteEvent?.call();
       });
     } catch (e) {
       log("Error inicializando PushNotificationService: $e");
@@ -145,7 +162,24 @@ class PushNotificationService {
 
   static void _handleNotificationClick(String? payload) {
     if (payload != null && navigatorKey.currentState != null) {
-      log("Navegando a vista de notificaciones por clic: $payload");
+      log("Procesando clic en notificación: $payload");
+      String eventType = 'info';
+      String title = '';
+      String body = '';
+      try {
+        final map = jsonDecode(payload) as Map<String, dynamic>;
+        eventType = map['event_type']?.toString() ?? map['type']?.toString() ?? 'info';
+        title = map['title']?.toString() ?? '';
+        body = map['body']?.toString() ?? '';
+      } catch (_) {
+        title = payload;
+      }
+      NotificationStorageService.routeFromNotification(
+        eventType: eventType,
+        title: title,
+        body: body,
+      );
+    } else if (navigatorKey.currentState != null) {
       navigatorKey.currentState!.pushNamed('/notificaciones');
     }
   }

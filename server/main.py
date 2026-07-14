@@ -158,18 +158,102 @@ def hub_response():
     return jsonify({"status": "error", "message": "Trabajo no encontrado"}), 404
 
 
+def _persist_hub_devices(hub_id: str, user_id: str, devs: list):
+    """Persiste en la tabla 'devices' de la base de datos del servidor los dispositivos reportados por un hub"""
+    try:
+        from server.db.database import execute
+        import json
+        now_str = datetime.now().isoformat()
+        for dev in devs:
+            if not isinstance(dev, dict):
+                continue
+            device_id = dev.get("device_id") or dev.get("id") or ""
+            if not device_id:
+                continue
+            alias = dev.get("name") or dev.get("alias") or f"Nodo {device_id}"
+            space_id = dev.get("space_id") or dev.get("room") or ""
+            type_name = dev.get("type_name") or dev.get("category") or "generic"
+            state_val = dev.get("state", {})
+            state_str = json.dumps(state_val) if isinstance(state_val, dict) else (str(state_val) if state_val is not None else "{}")
+            created_at = dev.get("created_at") or now_str
+            
+            existing = execute("SELECT space_id, alias FROM devices WHERE device_id = ? AND hub_id = ?", (device_id, hub_id)).fetchone()
+            if existing:
+                if not space_id and existing["space_id"]:
+                    space_id = existing["space_id"]
+                if (not alias or alias.startswith("dev_") or alias.startswith("Nodo ")) and existing["alias"] and not existing["alias"].startswith("dev_") and not existing["alias"].startswith("Nodo "):
+                    alias = existing["alias"]
+                execute(
+                    "UPDATE devices SET space_id = ?, alias = ?, user_id = ?, room = ?, type_name = ?, state = ? WHERE device_id = ? AND hub_id = ?",
+                    (space_id, alias, user_id, space_id, type_name, state_str, device_id, hub_id)
+                )
+            else:
+                execute(
+                    "INSERT OR REPLACE INTO devices (device_id, hub_id, space_id, alias, created_at, user_id, room, type_name, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (device_id, hub_id, space_id, alias, created_at, user_id, space_id, type_name, state_str)
+                )
+    except Exception as e:
+        print(f"[SERVER DB] Error al persistir dispositivos sincronizados del hub '{hub_id}': {e}")
+
+
 @app.route("/api/hub/sync", methods=["POST"])
 @require_hub_auth
 def hub_sync():
     hub_id = request.hub_record["hub_id"]
+    user_id = request.hub_record["user_id"]
     data = request.get_json(silent=True) or {}
     devs = data.get("devices")
     if isinstance(devs, list):
         _detect_and_notify_offline(hub_id, devs)
         cached_devices[hub_id] = devs
+        _persist_hub_devices(hub_id, user_id, devs)
         return jsonify({"status": "ok"}), 200
     return jsonify({"status": "error"}), 400
 
+
+@app.route("/api/hub/event", methods=["POST"])
+@require_hub_auth
+def hub_event():
+    hub_id = request.hub_record["hub_id"]
+    user_id = request.hub_record["user_id"]
+    data = request.get_json(silent=True) or {}
+    event_type = data.get("event")
+    payload = data.get("payload", {})
+    
+    if event_type == "device_paired" and isinstance(payload, dict):
+        _persist_hub_devices(hub_id, user_id, [payload])
+        if hub_id not in cached_devices:
+            cached_devices[hub_id] = []
+        dev_id = payload.get("device_id") or payload.get("id")
+        cached_devices[hub_id] = [d for d in cached_devices[hub_id] if (d.get("device_id") or d.get("id")) != dev_id]
+        cached_devices[hub_id].append(payload)
+        
+        try:
+            from server.modules.notifications.fcm import notify_device_registered
+            alias = payload.get("name") or payload.get("alias") or dev_id
+            notify_device_registered(hub_id, alias, dev_id)
+        except Exception as e:
+            print(f"[SERVER NOTIF] Error notificando push de device_paired: {e}")
+        return jsonify({"status": "ok", "action": "device_paired_processed"}), 200
+        
+    elif event_type == "device_unpaired" and isinstance(payload, dict):
+        dev_id = payload.get("device_id") or payload.get("id")
+        if dev_id:
+            try:
+                from server.db.database import execute
+                execute("DELETE FROM devices WHERE device_id = ? AND hub_id = ?", (dev_id, hub_id))
+            except Exception as e:
+                print(f"[SERVER DB] Error al eliminar dispositivo {dev_id}: {e}")
+            if hub_id in cached_devices:
+                cached_devices[hub_id] = [d for d in cached_devices[hub_id] if (d.get("device_id") or d.get("id")) != dev_id]
+        return jsonify({"status": "ok", "action": "device_unpaired_processed"}), 200
+
+    return jsonify({"status": "ok"}), 200
+
+
+
+_notified_events = {}
+_notified_lock = threading.Lock()
 
 def _detect_and_notify_offline(hub_id: str, new_devices: list):
     """
@@ -185,15 +269,20 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
         prev_status = {d.get("device_id", d.get("id", "")): d.get("status", "offline") for d in prev}
         new_status  = {d.get("device_id", d.get("id", "")): d for d in new_devices}
 
+        now_ts = time.time()
         for dev_id, old_st in prev_status.items():
             new_dev = new_status.get(dev_id)
             # Caso 1: dispositivo presente pero ahora offline
             if new_dev is not None:
                 current_st = new_dev.get("status", "offline")
                 if old_st == "online" and current_st != "online":
+                    with _notified_lock:
+                        key = (hub_id, dev_id, "offline")
+                        if now_ts - _notified_events.get(key, 0) < 60:
+                            continue
+                        _notified_events[key] = now_ts
                     dev_name = new_dev.get("name", dev_id)
                     print(f"[SYNC] Dispositivo '{dev_name}' ({dev_id}) pasó a OFFLINE en Hub {hub_id}")
-                    import threading
                     threading.Thread(
                         target=notify_device_offline,
                         args=(hub_id, dev_name, dev_id),
@@ -201,9 +290,13 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
                     ).start()
             # Caso 2: dispositivo desapareció del listado y antes estaba online
             elif old_st == "online":
+                with _notified_lock:
+                    key = (hub_id, dev_id, "offline")
+                    if now_ts - _notified_events.get(key, 0) < 60:
+                        continue
+                    _notified_events[key] = now_ts
                 dev_name = dev_id  # sin info de nombre, usar ID
                 print(f"[SYNC] Dispositivo '{dev_name}' desapareció del Hub {hub_id} (se asume offline)")
-                import threading
                 threading.Thread(
                     target=notify_device_offline,
                     args=(hub_id, dev_name, dev_id),
@@ -214,9 +307,13 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
         if prev:
             for dev_id, new_dev in new_status.items():
                 if dev_id and dev_id not in prev_status:
+                    with _notified_lock:
+                        key = (hub_id, dev_id, "registered")
+                        if now_ts - _notified_events.get(key, 0) < 60:
+                            continue
+                        _notified_events[key] = now_ts
                     dev_name = new_dev.get("name") or new_dev.get("alias") or dev_id
                     print(f"[SYNC] Nuevo dispositivo '{dev_name}' ({dev_id}) detectado en Hub {hub_id}")
-                    import threading
                     threading.Thread(
                         target=notify_device_registered,
                         args=(hub_id, dev_name, dev_id),
@@ -381,7 +478,29 @@ def relay_api_get_devices(hub_id=None):
     res, status = _execute_relay_job(target_hub, {"cmd": "sync_devices"}, timeout=4.5)
     if status == 200 and isinstance(res, dict) and "devices" in res:
         cached_devices[target_hub] = res["devices"]
+        _persist_hub_devices(target_hub, g.user["user_id"], res["devices"])
         return jsonify(res["devices"]), 200
+    if target_hub:
+        try:
+            from server.db.database import execute
+            rows = execute("SELECT * FROM devices WHERE hub_id = ? AND user_id = ?", (target_hub, g.user["user_id"])).fetchall()
+            if rows:
+                import json
+                db_devs = []
+                for r in rows:
+                    d = dict(r)
+                    if d.get("state") and isinstance(d["state"], str) and d["state"].startswith("{"):
+                        try: d["state"] = json.loads(d["state"])
+                        except Exception: d["state"] = {}
+                    if not d.get("id") and d.get("device_id"):
+                        d["id"] = d["device_id"]
+                    if not d.get("name") and d.get("alias"):
+                        d["name"] = d["alias"]
+                    db_devs.append(d)
+                cached_devices[target_hub] = db_devs
+                return jsonify(db_devs), 200
+        except Exception as e:
+            print(f"[SERVER DB] Error en fallback DB get_devices para hub '{target_hub}': {e}")
     return jsonify(cached_devices.get(target_hub, [])), 200
 
 

@@ -15,6 +15,16 @@ class _HubManagementViewState extends State<HubManagementView> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      if (mounted) {
+        context.read<AuthState>().refreshHubs();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
     final cs = Theme.of(context).colorScheme;
@@ -36,22 +46,28 @@ class _HubManagementViewState extends State<HubManagementView> {
         ],
       ),
       body: auth.hubs.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          ? RefreshIndicator(
+              onRefresh: () async {
+                await context.read<AuthState>().refreshHubs();
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 120, horizontal: 24),
                 children: [
                   Icon(Icons.hub_outlined, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
-                  Text('No tienes ningún Hub vinculado.', style: tt.titleMedium),
+                  Text('No tienes ningún Hub vinculado.', style: tt.titleMedium, textAlign: TextAlign.center),
                   const SizedBox(height: 24),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Vincular Hub ahora'),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const HubLinkView()),
-                      );
-                    },
+                  Center(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Vincular Hub ahora'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const HubLinkView()),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),

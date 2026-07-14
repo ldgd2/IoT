@@ -66,9 +66,9 @@ public:
     }
 
     void onPacketReceived() {
-        // Si recibimos un paquete del master mientras estamos en modo vinculación o en reposo,
+        // Si recibimos un paquete del master mientras estamos en modo vinculación,
         // significa que el master nos detectó y nos respondió. ¡Vinculación Exitosa!
-        if (_state == STATE_PAIRING || _state == STATE_IDLE) {
+        if (_state == STATE_PAIRING) {
             _state = STATE_SUCCESS;
             _statusStartMs = millis();
             _lastWaveMs = millis();

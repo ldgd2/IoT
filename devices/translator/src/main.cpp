@@ -151,23 +151,22 @@ void loop() {
                     bool isUnknown = (colmena.findNode(pkt.originId) == nullptr);
                     bool isDiscover = (pkt.command == CMD_DISCOVER);
 
-                    if (!isPairingMode && (isDiscover || isUnknown)) {
-                        snprintf(lastActivityStr, sizeof(lastActivityStr), "Ignorado ID %u (Sin PAIR)", pkt.originId);
-                        pTransport->sendAck(false, pkt.originId);
-                    } else {
-                        colmena.onPacketReceived(pkt);
-                        if (isDiscover || isUnknown) {
-                            const NodeInfo* n = colmena.findNode(pkt.originId);
-                            if (n) {
-                                snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
-                                ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                    // Registrar siempre en tabla interna para recuperar nodos tras reinicio de RAM del traductor
+                    colmena.onPacketReceived(pkt);
+
+                    if (isDiscover || isUnknown) {
+                        const NodeInfo* n = colmena.findNode(pkt.originId);
+                        if (n) {
+                            snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
+                            ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
+                            if (isPairingMode || isDiscover) {
                                 if (isPairingMode) {
                                     isPairingMode = false;
-                                    char pairBuf[128];
-                                    snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\"}", n->nodeId, n->name);
-                                    pTransport->sendStatus(pairBuf);
-                                    snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
                                 }
+                                char pairBuf[192];
+                                snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\",\"type\":%u,\"features\":%u}", n->nodeId, n->name, n->deviceType, n->features);
+                                pTransport->sendStatus(pairBuf);
+                                snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
                             }
                         }
                     }
@@ -196,6 +195,10 @@ void loop() {
                 snprintf(lastRxPktStr, sizeof(lastRxPktStr), "RX: Ninguno");
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Modo vinculacion ACTIVO");
                 pTransport->sendAck(true, pkt.destId);
+                // Enviar un CMD_REPORT broadcast para que todos los dispositivos cercanos se anuncien de inmediato
+                if (isRadioOk) {
+                    colmena.broadcastPing();
+                }
             } else if (pkt.command == CMD_PAIR_STOP) {
                 isPairingMode = false;
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");

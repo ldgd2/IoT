@@ -28,7 +28,7 @@ void ColmenaNode::startPairingWindow(const char* nodeName) {
         _pairingNodeName[0] = '\0';
     }
     Serial.println("\n=================================================");
-    Serial.println("🔍 [VINCULACIÓN NODO] Ventana de búsqueda activa por 50 segundos...");
+    Serial.println("[VINCULACIÓN NODO] Ventana de búsqueda activa por 50 segundos...");
     Serial.println("=================================================");
 }
 
@@ -38,14 +38,14 @@ void ColmenaNode::tickPairing() {
     unsigned long now = millis();
     if (now - _pairingStartMs > 50000UL) {
         _isPairingMode = false;
-        Serial.println("\n⏱️ [VINCULACIÓN NODO] Tiempo agotado (50s) sin respuesta del Gateway. Deteniendo búsqueda.\n");
+        Serial.println("\n[VINCULACIÓN NODO] Tiempo agotado (50s) sin respuesta del Gateway. Deteniendo búsqueda.\n");
         return;
     }
     
     if (now - _lastPairingRetryMs > 2500UL) {
         _lastPairingRetryMs = now;
         unsigned long quedan = (50000UL - (now - _pairingStartMs)) / 1000UL;
-        Serial.printf("\n🔄 [VINCULACIÓN 50s] Buscando Gateway (Quedan %lu seg)...\r\n", quedan);
+        Serial.printf("\n[VINCULACIÓN 50s] Buscando Gateway (Quedan %lu seg)...\r\n", quedan);
         announce(_pairingNodeName);
     }
 }
@@ -56,7 +56,7 @@ void ColmenaNode::announce(const char* nodeName) {
         _pairingNodeName[sizeof(_pairingNodeName) - 1] = '\0';
     }
     if (!_conn.isConnected()) {
-        Serial.println("🔄 [TX RF] Verificando enlace RF y conectividad con el Gateway...");
+        Serial.println("[TX RF] Verificando enlace RF y conectividad con el Gateway...");
         _conn.reconnect();
     }
     RFPacket pkt;
@@ -64,13 +64,12 @@ void ColmenaNode::announce(const char* nodeName) {
     LightPayload::setDiscovery(pkt, _pairingNodeName, _p.features, _p.fwVersion);
     Protocol_seal(&pkt);
     
-    Serial.printf("📤 [TX RF] Enviando CMD_DISCOVER (Anuncio) al Master [ID Orig: %u -> Dest: 0]\r\n", _p.nodeId);
+    Serial.printf("[TX RF] Enviando CMD_DISCOVER (Anuncio) al Master [ID Orig: %u -> Dest: 0]\r\n", _p.nodeId);
     bool ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
     if (ok) {
-        Serial.println("✔️ [TX RF] ¡CMD_DISCOVER entregado y confirmado por el Gateway!");
-        _isPairingMode = false;
+        Serial.println("[TX RF] ¡CMD_DISCOVER entregado a radio del Gateway! Esperando CONFIG_SYNC...");
     } else {
-        Serial.println("❌ [TX RF] Falló envío. (Se reintentará automáticamente sin bloquear el botón/LED).");
+        Serial.println("[TX RF] Falló envío. (Se reintentará automáticamente sin bloquear el botón/LED).");
     }
 }
 
@@ -84,15 +83,15 @@ void ColmenaNode::sendHeartbeat(uint16_t relayMask, uint8_t brightness) {
     pkt.data[2] = (uint8_t)(relayMask & 0xFF);
     pkt.data[3] = (uint8_t)((relayMask >> 8) & 0xFF);
     Protocol_seal(&pkt);
-    Serial.printf("📤 [TX RF] Enviando CMD_HEARTBEAT al Master [ID Orig: %u]\r\n", _p.nodeId);
+    Serial.printf("[TX RF] Enviando CMD_HEARTBEAT al Master [ID Orig: %u]\r\n", _p.nodeId);
     bool ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
     if (!ok) {
         ok = _conn.send(&pkt, sizeof(pkt), ADDR_MASTER);
     }
     if (ok) {
-        Serial.println("✔️ [TX RF] Heartbeat enviado OK.");
+        Serial.println("[TX RF] Heartbeat enviado OK.");
     } else {
-        Serial.println("❌ [TX RF] Falló envío de Heartbeat.");
+        Serial.println("[TX RF] Falló envío de Heartbeat.");
     }
     _lastHeartbeatMs = millis();
 }
@@ -107,13 +106,13 @@ void ColmenaNode::tickHeartbeat(uint16_t relayMask, uint8_t brightness) {
 
 void ColmenaNode::applySync(const RFPacket& pkt) {
     _isPairingMode = false;
-    Serial.printf("📥 [RX RF] Recibido CONFIG_SYNC del Gateway (CH: %u, Rate: %u)\r\n", GatewayPayload::getConfigChannel(pkt), GatewayPayload::getConfigDataRate(pkt));
+    Serial.printf("[RX RF] Recibido CONFIG_SYNC del Gateway (CH: %u, Rate: %u)\r\n", GatewayPayload::getConfigChannel(pkt), GatewayPayload::getConfigDataRate(pkt));
     _p.rfChannel         = GatewayPayload::getConfigChannel(pkt);
     _p.rfDataRate        = GatewayPayload::getConfigDataRate(pkt);
     _p.heartbeatInterval = GatewayPayload::getConfigHeartbeat(pkt);
     GatewayPayload::getConfigName(pkt, _p.colmenaName, sizeof(_p.colmenaName));
     save();
-    Serial.println("✔️ [RX RF] Configuración de red sincronizada y guardada.");
+    Serial.println("[RX RF] Configuración de red sincronizada y guardada.");
 }
 
 void ColmenaNode::unpair() {
@@ -121,7 +120,7 @@ void ColmenaNode::unpair() {
     _pairingStartMs = millis();
     _p.rfChannel = 76;
     save();
-    Serial.println("🔄 [ColmenaNode] Desvinculado por orden remota del Gateway. Volviendo a modo emparejamiento...");
+    Serial.println("[ColmenaNode] Desvinculado por orden remota del Gateway. Volviendo a modo emparejamiento...");
 }
 
 // ── Botón de vinculación ──────────────────────────────────────────────────
@@ -163,7 +162,7 @@ ButtonEvent ColmenaNode::checkButtonEvent(const char* nodeName) {
             // Si se mantuvo entre 50ms (antibounce) y < 7000ms (7 segundos) y aún no disparó vinculación larga -> ¡Pulsación corta!
             if (heldMs >= 50UL && heldMs < 7000UL && !_pairLongPressTriggered) {
                 _pairDebounceMs = 0;
-                Serial.printf("\n🔘 [BOTÓN] Pulsación corta detectada (%lu ms) -> Alternar estado del relay/luz\r\n", heldMs);
+                Serial.printf("\n[BOTÓN] Pulsación corta detectada (%lu ms) -> Alternar estado del relay/luz\r\n", heldMs);
                 return BTN_SHORT_PRESS;
             }
         }
@@ -190,7 +189,7 @@ ButtonEvent ColmenaNode::checkButtonEvent(const char* nodeName) {
         if ((now - _pairLastAnnounce) >= 2000UL) {
             _pairLongPressTriggered = true;
             _pairLastAnnounce = now;
-            Serial.printf("\n🔥 [BOTÓN] ¡Sostenido por 7 segundos (%lu ms)! Activando modo vinculación...\r\n", heldMs);
+            Serial.printf("\n[BOTÓN] ¡Sostenido por 7 segundos (%lu ms)! Activando modo vinculación...\r\n", heldMs);
             startPairingWindow(nodeName);
             return BTN_PAIR_LONG_PRESS;
         }

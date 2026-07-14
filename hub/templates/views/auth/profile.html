@@ -227,6 +227,60 @@
 .btn-cancel:hover {
     background: var(--md-surface-container);
 }
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+.modal-overlay.active {
+    display: flex;
+}
+.modal-card {
+    background: var(--md-surface);
+    padding: 32px;
+    border-radius: var(--radius-large, 24px);
+    max-width: 460px;
+    width: 90%;
+    border: 1px solid var(--md-outline-variant);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+}
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.modal-header .icon {
+    width: 32px;
+    height: 32px;
+    color: #ef5350;
+}
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--md-text);
+}
+.modal-body {
+    color: var(--md-text-variant);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
 </style>
 {% endblock %}
 
@@ -329,29 +383,29 @@
             </div>
             <div class="metrics-row">
                 <div class="metric-box">
-                    <div class="metric-number" style="color: #64b5f6;">{{ cloud_stats.get('polls_sent', 0) }}</div>
+                    <div class="metric-number" id="stat-polls" style="color: #64b5f6;">{{ cloud_stats.get('polls_sent', 0) }}</div>
                     <div class="metric-label">Sondeos API (Polls)</div>
                 </div>
                 <div class="metric-box">
-                    <div class="metric-number" style="color: #81c784;">{{ cloud_stats.get('syncs_sent', 0) }}</div>
+                    <div class="metric-number" id="stat-syncs" style="color: #81c784;">{{ cloud_stats.get('syncs_sent', 0) }}</div>
                     <div class="metric-label">Sincronizaciones (Syncs)</div>
                 </div>
                 <div class="metric-box">
-                    <div class="metric-number" style="color: #ffb74d;">{{ cloud_stats.get('commands_executed', 0) }}</div>
+                    <div class="metric-number" id="stat-cmds" style="color: #ffb74d;">{{ cloud_stats.get('commands_executed', 0) }}</div>
                     <div class="metric-label">Comandos Recibidos</div>
                 </div>
             </div>
             <div class="info-row">
                 <span class="info-label">Estado del Worker Cloud</span>
-                <span class="info-value" style="color: #81c784;">{{ cloud_stats.get('status', 'Inactivo') }}</span>
+                <span class="info-value" id="stat-status" style="color: #81c784;">{{ cloud_stats.get('status', 'Inactivo') }}</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Último Sondeo (Long-Poll)</span>
-                <span class="info-value" style="font-size: 0.82rem;">{{ cloud_stats.get('last_poll_time', 'No disponible') }}</span>
+                <span class="info-value" id="stat-last-poll" style="font-size: 0.82rem;">{{ cloud_stats.get('last_poll_time', 'No disponible') }}</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Último Sync de Estado</span>
-                <span class="info-value" style="font-size: 0.82rem;">{{ cloud_stats.get('last_sync_time', 'No disponible') }}</span>
+                <span class="info-value" id="stat-last-sync" style="font-size: 0.82rem;">{{ cloud_stats.get('last_sync_time', 'No disponible') }}</span>
             </div>
         </div>
 
@@ -424,5 +478,23 @@ document.getElementById('logoutModal')?.addEventListener('click', function(e) {
         hideLogoutModal();
     }
 });
+
+function pollCloudStats() {
+    fetch('/api/profile/stats')
+        .then(r => r.json())
+        .then(stats => {
+            if (stats) {
+                if (document.getElementById('stat-polls')) document.getElementById('stat-polls').textContent = stats.polls_sent || 0;
+                if (document.getElementById('stat-syncs')) document.getElementById('stat-syncs').textContent = stats.syncs_sent || 0;
+                if (document.getElementById('stat-cmds')) document.getElementById('stat-cmds').textContent = stats.commands_executed || 0;
+                if (document.getElementById('stat-status')) document.getElementById('stat-status').textContent = stats.status || 'Activo';
+                if (document.getElementById('stat-last-poll')) document.getElementById('stat-last-poll').textContent = stats.last_poll_time || 'No disponible';
+                if (document.getElementById('stat-last-sync')) document.getElementById('stat-last-sync').textContent = stats.last_sync_time || 'No disponible';
+            }
+        })
+        .catch(err => console.log('Poll stats err:', err));
+}
+
+setInterval(pollCloudStats, 3000);
 </script>
 {% endblock %}

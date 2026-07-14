@@ -46,7 +46,7 @@ def process_incoming_packet(data):
             if dev:
                 dev.status = "online"
                 dev.save()
-                was_active = (gateway.pairing_status == "active")
+                was_active = data.get("was_pairing_active", False) or (gateway.pairing_status in ("active", "success"))
                 gateway.pairing_status = "success"
                 gateway.last_paired_device = {
                     "id": device_id,
@@ -58,13 +58,14 @@ def process_incoming_packet(data):
                     try:
                         from hub.modules.communication.logic.notifier import PushNotifier
                         PushNotifier.notify_device_connected(dev)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[NOTIFIER] Error al notificar dispositivo connected: {e}")
                 try:
                     from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                    cloud_bridge._sync_devices()
                     cloud_bridge.send_event("device_paired", dev.to_dict())
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[CLOUD BRIDGE] Error en sync/send_event tras pairing_success: {e}")
         return {"ok": True, "action": "pairing_success_processed"}, 200
 
     # Soporte para paquetes RAW de RF24Mesh (origin, cmd, data)
@@ -131,7 +132,7 @@ def process_incoming_packet(data):
                 dev.save()
             
             if gateway.pairing_status in ("active", "success") and dev:
-                was_active = (gateway.pairing_status == "active")
+                was_active = data.get("was_pairing_active", False) or (gateway.pairing_status in ("active", "success"))
                 gateway.pairing_status = "success"
                 gateway.last_paired_device = {
                     "id": device_id,
@@ -143,13 +144,14 @@ def process_incoming_packet(data):
                     try:
                         from hub.modules.communication.logic.notifier import PushNotifier
                         PushNotifier.notify_device_connected(dev)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[NOTIFIER] Error al notificar dispositivo connected: {e}")
                 try:
                     from hub.modules.communication.logic.cloud_bridge import cloud_bridge
                     cloud_bridge._sync_devices()
-                except Exception:
-                    pass
+                    cloud_bridge.send_event("device_paired", dev.to_dict())
+                except Exception as e:
+                    print(f"[CLOUD BRIDGE] Error en sync/send_event tras CMD_DISCOVER: {e}")
                 
                 return {"ok": True, "action": "discovered", "registry": reg_info}, 200
 
@@ -474,11 +476,15 @@ def api_hub_pair():
     try:
         # Registrar el hub en el servidor usando el token del usuario
         headers = {"Authorization": f"Bearer {user_token}", "Content-Type": "application/json"}
-        payload = {"name": name, "local_url": f"http://{local_ip}"}
+        payload = {
+            "name": name,
+            "local_url": f"http://{local_ip}",
+            "hub_id": os.environ.get("HUB_ID", "")
+        }
         
         r = requests.post(f"{server_url}/api/hubs", json=payload, headers=headers, timeout=10)
         
-        if r.status_code == 201:
+        if r.status_code in [200, 201]:
             res_data = r.json()
             hub_id = res_data.get("hub_id")
             relay_secret = res_data.get("relay_secret")

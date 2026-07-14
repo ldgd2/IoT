@@ -173,8 +173,35 @@ def api_register_hub():
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "Nuevo Hub").strip()
     local_url = data.get("local_url", "")
+    req_hub_id = (data.get("hub_id") or "").strip()
     
-    hub_id = str(uuid.uuid4())
+    # Check if a hub already exists for this user with the requested hub_id or identical name/local_url
+    existing = None
+    if req_hub_id:
+        existing = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (req_hub_id, g.user["user_id"])).fetchone()
+    if not existing:
+        existing = db.execute(
+            "SELECT * FROM hubs WHERE user_id = ? AND (name = ? OR (local_url = ? AND local_url != '' AND local_url != 'http://127.0.0.1:5000'))",
+            (g.user["user_id"], name, local_url)
+        ).fetchone()
+
+    if existing:
+        hub_id = existing["hub_id"]
+        relay_secret = existing["relay_secret"]
+        db.execute(
+            "UPDATE hubs SET name = ?, local_url = ? WHERE hub_id = ?",
+            (name, local_url, hub_id)
+        )
+        return jsonify({
+            "ok": True,
+            "hub_id": hub_id,
+            "relay_secret": relay_secret,
+            "name": name,
+            "local_url": local_url,
+            "reused": True
+        }), 200
+
+    hub_id = req_hub_id if req_hub_id else str(uuid.uuid4())
     relay_secret = _generate_secret()
     
     db.execute(

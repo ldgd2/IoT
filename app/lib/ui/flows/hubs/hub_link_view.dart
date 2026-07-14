@@ -62,8 +62,11 @@ class _HubLinkViewState extends State<HubLinkView> {
       ).timeout(const Duration(seconds: 10));
 
       if (r.statusCode == 200) {
-        // Vinculación exitosa. Refrescar la lista de hubs del usuario.
+        // Vinculación exitosa. Refrescar la lista de hubs del usuario al instante y tras un breve margen por sincronización del backend.
         await authState.refreshHubs();
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          authState.refreshHubs();
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('¡Hub vinculado exitosamente!')),

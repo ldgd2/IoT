@@ -3,6 +3,7 @@
 // Estado global de autenticación — ChangeNotifier
 // =============================================================
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/room.dart';
 import '../models/hub.dart';
@@ -15,6 +16,9 @@ import 'package:http/http.dart' as http;
 enum AuthStatus { loading, authenticated, unauthenticated }
 
 class AuthState extends ChangeNotifier {
+  static const _hubsCacheKey = 'hubs_cache_v1';
+  static const _roomsCacheKey = 'rooms_cache_v1';
+
   AuthStatus _status = AuthStatus.loading;
   ColmenaUser? _user;
   String? _token;
@@ -36,6 +40,44 @@ class AuthState extends ChangeNotifier {
   bool get isLoggedIn => _status == AuthStatus.authenticated;
   String get userId => _user?.userId ?? '';
 
+  Future<void> _loadCachedHubs() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final rawHubs = sp.getString(_hubsCacheKey);
+      if (rawHubs != null && rawHubs.isNotEmpty) {
+        final list = (jsonDecode(rawHubs) as List).cast<Map<String, dynamic>>();
+        _hubs = list.map((j) => Hub.fromJson(j)).toList();
+        if (_hubs.isNotEmpty && _activeHub == null) {
+          _activeHub = _hubs.first;
+        }
+      }
+      final rawRooms = sp.getString(_roomsCacheKey);
+      if (rawRooms != null && rawRooms.isNotEmpty) {
+        final rlist = (jsonDecode(rawRooms) as List).cast<Map<String, dynamic>>();
+        _rooms = rlist.map((j) => Room.fromJson(j)).toList();
+      }
+      if (_hubs.isNotEmpty) {
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedHubs() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final list = _hubs.map((h) => h.toJson()).toList();
+      await sp.setString(_hubsCacheKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedRooms() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final list = _rooms.map((r) => r.toJson()).toList();
+      await sp.setString(_roomsCacheKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
   // ── Inicialización (lee sesión guardada) ──────────────────────
   Future<void> initialize() async {
     _status = AuthStatus.loading;
@@ -45,6 +87,7 @@ class AuthState extends ChangeNotifier {
     _user = await AuthService.getSavedUser();
 
     if (_token != null && _user != null) {
+      await _loadCachedHubs(); // Mostrar inmediatamente hubs y salas en caché
       // Validar que el token siga siendo válido en el servidor
       final valid = await AuthService.validateSession();
       if (valid) {
@@ -114,6 +157,11 @@ class AuthState extends ChangeNotifier {
     _hubs = [];
     _activeHub = null;
     _rooms = [];
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.remove(_hubsCacheKey);
+      await sp.remove(_roomsCacheKey);
+    } catch (_) {}
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -127,11 +175,12 @@ class AuthState extends ChangeNotifier {
       if (r.statusCode == 200) {
         final list = (jsonDecode(r.body) as List).cast<Map<String, dynamic>>();
         _hubs = list.map((j) => Hub.fromJson(j)).toList();
-        if (_hubs.isNotEmpty && _activeHub == null) {
+        if (_hubs.isNotEmpty && (_activeHub == null || !_hubs.any((h) => h.id == _activeHub!.id))) {
           _activeHub = _hubs.first;
         } else if (_hubs.isEmpty) {
           _activeHub = null;
         }
+        await _saveCachedHubs();
         await _loadRooms();
         notifyListeners();
       }
@@ -204,6 +253,7 @@ class AuthState extends ChangeNotifier {
            j['id'] = j['space_id'];
            return Room.fromJson(j);
         }).toList();
+        await _saveCachedRooms();
         notifyListeners();
       }
     } catch (_) {}

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:bthapp/src/models/notification_item.dart';
 import 'package:bthapp/src/state/app_state.dart';
+import 'package:bthapp/src/services/notification_storage_service.dart';
 
 class NotificationsView extends StatefulWidget {
   const NotificationsView({super.key});
@@ -155,6 +156,14 @@ class _NotificationsViewState extends State<NotificationsView> {
                           border: Border.all(color: color.withValues(alpha: 0.3)),
                         ),
                         child: ListTile(
+                          onTap: () {
+                            NotificationStorageService.routeFromNotification(
+                              context: context,
+                              eventType: item.eventType,
+                              title: item.title,
+                              body: item.body,
+                            );
+                          },
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           leading: Container(
                             padding: const EdgeInsets.all(12),
