@@ -33,55 +33,14 @@ def _find_credential_file() -> Path | None:
     return None
 
 
-# ── OAuth2 Token (sin librerías externas) ─────────────────────
+# ── OAuth2 Token (con google-auth oficial de Google) ──────────
 _token_cache = {"access_token": None, "expires_at": 0}
 _token_lock = threading.Lock()
 
-_SCOPES = "https://www.googleapis.com/auth/firebase.messaging"
-_TOKEN_URL = "https://oauth2.googleapis.com/token"
-
-def _build_jwt(service_account: dict) -> str:
-    """Construye un JWT firmado con la clave privada del Service Account."""
-    import base64
-    import hmac
-    import hashlib
-
-    now = int(time.time())
-    header = {"alg": "RS256", "typ": "JWT"}
-    payload = {
-        "iss": service_account["client_email"],
-        "scope": _SCOPES,
-        "aud": _TOKEN_URL,
-        "exp": now + 3600,
-        "iat": now,
-    }
-
-    def _b64(obj):
-        data = json.dumps(obj, separators=(",", ":")).encode()
-        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-    signing_input = f"{_b64(header)}.{_b64(payload)}"
-
-    # Firmar con RSA-SHA256 usando la private_key del JSON
-    try:
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
-
-        private_key = serialization.load_pem_private_key(
-            service_account["private_key"].encode(), password=None
-        )
-        signature = private_key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
-        sig_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
-        return f"{signing_input}.{sig_b64}"
-    except ImportError:
-        raise RuntimeError(
-            "Se requiere el paquete 'cryptography' para firmar el JWT. "
-            "Instálalo con: pip install cryptography"
-        )
-
+_SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 
 def _get_access_token() -> str | None:
-    """Obtiene (o reutiliza del caché) el Bearer token de OAuth2 de Google."""
+    """Obtiene (o reutiliza del caché) el Bearer token de OAuth2 de Google usando google-auth."""
     with _token_lock:
         if _token_cache["access_token"] and time.time() < _token_cache["expires_at"] - 60:
             return _token_cache["access_token"]
@@ -92,28 +51,27 @@ def _get_access_token() -> str | None:
             return None
 
         try:
-            service_account = json.loads(cred_file.read_text(encoding="utf-8"))
-            jwt_token = _build_jwt(service_account)
+            from google.oauth2 import service_account
+            import google.auth.transport.requests
 
-            resp = requests.post(
-                _TOKEN_URL,
-                data={
-                    "grant_type": "urn:ietf:params:oauth2:grant-type:jwt-bearer",
-                    "assertion": jwt_token,
-                },
-                timeout=10,
+            credentials = service_account.Credentials.from_service_account_file(
+                str(cred_file), scopes=_SCOPES
             )
-            if resp.status_code == 200:
-                token_data = resp.json()
-                _token_cache["access_token"] = token_data["access_token"]
-                _token_cache["expires_at"] = time.time() + token_data.get("expires_in", 3600)
-                return _token_cache["access_token"]
+            request = google.auth.transport.requests.Request()
+            credentials.refresh(request)
+            _token_cache["access_token"] = credentials.token
+            if credentials.expiry:
+                _token_cache["expires_at"] = credentials.expiry.timestamp()
             else:
-                print(f"[FCM] ⚠️  Error obteniendo token OAuth2: {resp.status_code} {resp.text}")
-                return None
-        except Exception as e:
-            print(f"[FCM] ⚠️  Excepción al obtener token OAuth2: {e}")
+                _token_cache["expires_at"] = time.time() + 3500
+            return _token_cache["access_token"]
+        except ImportError:
+            print("[FCM] ⚠️  Faltan dependencias de Google. Instálalas con: pip install google-auth cryptography requests")
             return None
+        except Exception as e:
+            print(f"[FCM] ⚠️  Excepción al obtener token OAuth2 con google-auth: {e}")
+            return None
+
 
 
 def _get_project_id() -> str | None:
