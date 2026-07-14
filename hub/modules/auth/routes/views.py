@@ -42,6 +42,11 @@ def login_view():
                 payload["email"] = identifier.lower()  # el servidor busca por email
                 payload["username"] = identifier
 
+            payload["is_hub"] = True
+            payload["hub_name"] = os.environ.get("HUB_NAME", "Central Colmena Hub")
+            if os.environ.get("HUB_ID"):
+                payload["hub_id"] = os.environ["HUB_ID"]
+
             r = requests.post(
                 f"{vps_url}/auth/login",
                 json=payload,
@@ -53,6 +58,36 @@ def login_view():
                 vps_user = data.get("user", {})
                 vps_username = vps_user.get("username", identifier.split('@')[0])
                 vps_email    = vps_user.get("email", identifier)
+
+                # Si el Hub no esta vinculado/registrado aun en .env o localmente, auto-vincular a esta cuenta
+                if not os.environ.get("HUB_ID") and data.get("token"):
+                    try:
+                        hub_name = os.environ.get("HUB_NAME", "Central Colmena Hub")
+                        reg_headers = {"Authorization": f"Bearer {data.get('token')}", "Content-Type": "application/json"}
+                        reg_r = requests.post(f"{vps_url}/hubs", json={"name": hub_name, "local_url": "http://127.0.0.1:5000"}, headers=reg_headers, timeout=5)
+                        if reg_r.status_code == 201:
+                            reg_data = reg_r.json()
+                            new_hub_id = reg_data.get("hub_id")
+                            relay_secret = reg_data.get("relay_secret")
+                            if new_hub_id and relay_secret:
+                                from dotenv import set_key
+                                from pathlib import Path
+                                env_file = Path(__file__).parent.parent.parent.parent / ".env"
+                                if not env_file.exists():
+                                    with open(env_file, "w", encoding="utf-8") as f:
+                                        pass
+                                set_key(str(env_file), "CLOUD_SERVER_URL", vps_url)
+                                set_key(str(env_file), "HUB_ID", new_hub_id)
+                                set_key(str(env_file), "HUB_RELAY_SECRET", relay_secret)
+                                os.environ["CLOUD_SERVER_URL"] = vps_url
+                                os.environ["HUB_ID"] = new_hub_id
+                                os.environ["HUB_RELAY_SECRET"] = relay_secret
+                                from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                                cloud_bridge.stop()
+                                cloud_bridge.start()
+                                print(f"[AUTH] Hub no registrado, auto-vinculado a cuenta '{vps_username}' (HUB_ID: {new_hub_id})")
+                    except Exception as e:
+                        print(f"[AUTH] Error al auto-vincular Hub en login: {e}")
 
                 # Cachear usuario en la BD local del Hub para futuros logins sin internet
                 local_user = User.get_by_username_or_email(vps_email)

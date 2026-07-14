@@ -120,6 +120,29 @@ def api_login():
     else:
         print(f"[AUTH] Login consumido por usuario '{user['username']}' (fcm_token enviado en body: VACIO/SIN TOKEN)")
 
+    # Auto-vinculacion en login si es un hub no registrado ("si se loguea el hub con su cuenta y no esta registrado")
+    hub_id = (data.get("hub_id") or request.headers.get("X-Hub-Id") or "").strip()
+    is_hub = data.get("is_hub") or data.get("register_hub")
+    if is_hub and not hub_id:
+        hub_id = str(uuid.uuid4())
+
+    if hub_id or is_hub:
+        target_hub_id = hub_id or str(uuid.uuid4())
+        hub_name = (data.get("hub_name") or data.get("name") or "Central Colmena Hub").strip()
+        row_hub = db.execute("SELECT * FROM hubs WHERE hub_id = ?", (target_hub_id,)).fetchone()
+        if not row_hub:
+            relay_secret = _generate_secret()
+            db.execute(
+                "INSERT INTO hubs (hub_id, user_id, name, local_url, relay_secret, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (target_hub_id, user["user_id"], hub_name, data.get("local_url", ""), relay_secret, _now())
+            )
+            try:
+                from server.modules.notifications.fcm import notify_hub_registered
+                notify_hub_registered(user["user_id"], hub_name, target_hub_id)
+            except Exception as e:
+                print(f"[NOTIF] Error al notificar auto-registro en login: {e}")
+            print(f"[AUTH] Hub no registrado '{hub_name}' ({target_hub_id}) vinculado automaticamente al usuario '{user['username']}' en login.")
+
     return jsonify({
         "ok": True,
         "token": generate_token(user["user_id"]),
