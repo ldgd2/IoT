@@ -240,8 +240,22 @@ class IoTGateway:
                                 part1 = bytes(data[:32]).rstrip(b'\x00')
                                 part2 = bytes(data[33:64]).rstrip(b'\x00')
                                 text = (part1 + part2).decode('utf-8', errors='ignore')
+                                if not hasattr(self, '_rx_json_buf'): self._rx_json_buf = ""
                                 if text.startswith("{") and text.endswith("}"):
-                                    event_dict = json.loads(text)
+                                    self._rx_json_buf = ""
+                                    text_to_parse = text
+                                elif text.startswith("{"):
+                                    self._rx_json_buf = text
+                                    text_to_parse = None
+                                elif self._rx_json_buf:
+                                    self._rx_json_buf += text
+                                    text_to_parse = self._rx_json_buf if self._rx_json_buf.endswith("}") else None
+                                else:
+                                    text_to_parse = None
+
+                                if text_to_parse and text_to_parse.startswith("{") and text_to_parse.endswith("}"):
+                                    self._rx_json_buf = ""
+                                    event_dict = json.loads(text_to_parse)
                                     if event_dict.get("event") == "pairing_timeout":
                                         self.pairing_status = "timeout"
                                         self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"
@@ -276,6 +290,10 @@ class IoTGateway:
                         if line.startswith("{") and line.endswith("}"):
                             try:
                                 packet_dict = json.loads(line)
+                                if "log" in packet_dict and isinstance(packet_dict["log"], str) and packet_dict["log"].startswith("{") and packet_dict["log"].endswith("}"):
+                                    try: packet_dict = json.loads(packet_dict["log"])
+                                    except Exception: pass
+
                                 if packet_dict.get("event") == "pairing_timeout":
                                     self.pairing_status = "timeout"
                                     self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"

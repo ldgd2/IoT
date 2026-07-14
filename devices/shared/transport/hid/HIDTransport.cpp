@@ -102,19 +102,28 @@ bool HIDTransport::sendAck(bool ok, uint8_t destId) {
 // Enviar mensajes de estado o eventos JSON (ej. pairing_timeout) al HUB usando flag 0x03
 void HIDTransport::sendStatus(const char* msg) {
     if (!_hid.ready() || !msg) return;
-    uint8_t report[64] = {0};
-    report[32] = 0x03; // Flag 0x03: STATUS / EVENTO
-    
     size_t len = strlen(msg);
-    if (len > 0) {
-        size_t part1 = len < 32 ? len : 32;
-        memcpy(report, msg, part1);
-        if (len > 32) {
-            size_t part2 = (len - 32) < 31 ? (len - 32) : 31;
-            memcpy(&report[33], msg + 32, part2);
+    size_t offset = 0;
+    while (offset < len || len == 0) {
+        uint8_t report[64] = {0};
+        report[32] = 0x03; // Flag 0x03: STATUS / EVENTO
+        
+        size_t remaining = len - offset;
+        size_t part1 = remaining < 32 ? remaining : 32;
+        if (part1 > 0) {
+            memcpy(report, msg + offset, part1);
+            offset += part1;
+            remaining = len - offset;
+            if (remaining > 0) {
+                size_t part2 = remaining < 31 ? remaining : 31;
+                memcpy(&report[33], msg + offset, part2);
+                offset += part2;
+            }
         }
+        _hid.sendReport(0, report, sizeof(report));
+        if (len == 0 || offset >= len) break;
+        delay(3);
     }
-    _hid.sendReport(0, report, sizeof(report));
 }
 
 // ── Callback estático (llamado por TinyUSB en IRQ) ────────────────────────────

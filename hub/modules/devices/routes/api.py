@@ -78,14 +78,20 @@ def api_update_device(device_id):
     if "type_name" in data:
         dev.type_name = data["type_name"]
     if "state" in data and isinstance(data["state"], dict):
-        dev.state = data["state"]
+        if isinstance(dev.state, dict):
+            dev.state.update(data["state"])
+        else:
+            dev.state = data["state"]
     dev.save()
 
     try:
         from hub.modules.communication.logic.cloud_bridge import cloud_bridge
-        cloud_bridge._sync_devices()
-    except Exception:
-        pass
+        if "state" in data and isinstance(data["state"], dict):
+            cloud_bridge._execute_local_command({"id": device_id, "cmd": "set", "params": data["state"]})
+        else:
+            cloud_bridge._sync_devices()
+    except Exception as e:
+        print(f"[HUB API] Error actualizando/transmitiendo al dispositivo {device_id}: {e}")
 
     return jsonify({"ok": True, "device": dev.to_dict()})
 

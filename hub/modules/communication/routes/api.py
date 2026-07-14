@@ -38,7 +38,11 @@ def process_incoming_packet(data):
                 dev = ctrl.orm_device if ctrl else Device.get(device_id)
                 if dev:
                     current_state = dev.state if isinstance(dev.state, dict) else {}
-                    if "relay" in reg_info["feature_keys"]: current_state.setdefault("on", False)
+                    if "relay" in reg_info["feature_keys"] or dev.category in ("switching", "light"):
+                        current_state.setdefault("on", False)
+                        current_state.setdefault("mask", 0)
+                        for i in range(1, 17):
+                            current_state.setdefault(f"ch{i}", False)
                     dev.state = current_state
                     dev.status = "online"
                     dev.save()
@@ -121,7 +125,11 @@ def process_incoming_packet(data):
             if dev:
                 current_state = dev.state if isinstance(dev.state, dict) else {}
                 keys = reg_info["feature_keys"]
-                if "relay" in keys: current_state.setdefault("on", False)
+                if "relay" in keys or dev.category in ("switching", "light"):
+                    current_state.setdefault("on", False)
+                    current_state.setdefault("mask", 0)
+                    for i in range(1, 17):
+                        current_state.setdefault(f"ch{i}", False)
                 if "dimmer" in keys: current_state.setdefault("brightness", 0)
                 if "temperature" in keys: current_state.setdefault("temperature", 0.0)
                 if "humidity" in keys: current_state.setdefault("humidity", 0.0)
@@ -174,16 +182,42 @@ def process_incoming_packet(data):
     dev = Device.get(device_id)
     from hub.modules.communication.logic.gateway import gateway
     if not dev:
-        # Si llega un paquete (que no es CMD_DISCOVER, ya que ese se procesó antes) de un nodo desconocido, no crear dispositivo.
-        log = RFLog(
-            ts=datetime.now().isoformat(),
-            device_id=device_id,
-            rssi=rssi if 'rssi' in locals() else 0,
-            payload=payload,
-            direction="RX"
-        )
-        log.save()
-        return {"ok": True, "action": "ignored_unpaired"}, 200
+        if gateway.pairing_status in ("active", "success") or data.get("was_pairing_active"):
+            device_type = data.get("type", 1)
+            features = data.get("features", 1)
+            ctrl = SmartDevice.recognize(device_id, type_code=device_type, features=features)
+            dev = ctrl.orm_device if ctrl else Device.get(device_id)
+            if dev:
+                current_state = dev.state if isinstance(dev.state, dict) else {}
+                if ctrl and (isinstance(ctrl, LightDevice) or "relay" in dev.feature_keys or dev.category in ("switching", "light")):
+                    current_state.setdefault("on", False)
+                    current_state.setdefault("mask", 0)
+                    for i in range(1, 17):
+                        current_state.setdefault(f"ch{i}", False)
+                dev.state = current_state
+                dev.status = "online"
+                dev.save()
+            try:
+                from hub.modules.automation.routes.push import PushNotifier
+                PushNotifier.notify_device_connected(dev)
+            except Exception:
+                pass
+            try:
+                from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+                cloud_bridge._sync_devices()
+                cloud_bridge.send_event("device_paired", dev.to_dict())
+            except Exception as e:
+                print(f"[CLOUD BRIDGE] Error en sync/send_event tras auto-pair: {e}")
+        else:
+            log = RFLog(
+                ts=datetime.now().isoformat(),
+                device_id=device_id,
+                rssi=rssi if 'rssi' in locals() else 0,
+                payload=payload,
+                direction="RX"
+            )
+            log.save()
+            return {"ok": True, "action": "ignored_unpaired"}, 200
     
     dev.update(payload, rssi if 'rssi' in locals() else 0)
 

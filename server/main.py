@@ -248,6 +248,15 @@ def hub_event():
                 cached_devices[hub_id] = [d for d in cached_devices[hub_id] if (d.get("device_id") or d.get("id")) != dev_id]
         return jsonify({"status": "ok", "action": "device_unpaired_processed"}), 200
 
+    elif event_type in ("device_updated", "state_changed") and isinstance(payload, dict):
+        _persist_hub_devices(hub_id, user_id, [payload])
+        if hub_id not in cached_devices:
+            cached_devices[hub_id] = []
+        dev_id = payload.get("device_id") or payload.get("id")
+        cached_devices[hub_id] = [d for d in cached_devices[hub_id] if (d.get("device_id") or d.get("id")) != dev_id]
+        cached_devices[hub_id].append(payload)
+        return jsonify({"status": "ok", "action": "device_updated_processed"}), 200
+
     return jsonify({"status": "ok"}), 200
 
 

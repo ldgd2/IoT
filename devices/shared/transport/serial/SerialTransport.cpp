@@ -101,8 +101,13 @@ bool SerialTransport::sendAck(bool ok, uint8_t destId) {
 }
 
 void SerialTransport::sendStatus(const char* msg) {
-    StaticJsonDocument<128> doc;
-    doc["log"] = msg;
-    serializeJson(doc, Serial);
-    Serial.println();
+    if (!msg) return;
+    if (msg[0] == '{') {
+        Serial.println(msg);
+    } else {
+        StaticJsonDocument<128> doc;
+        doc["log"] = msg;
+        serializeJson(doc, Serial);
+        Serial.println();
+    }
 }

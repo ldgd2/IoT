@@ -42,7 +42,10 @@ class Device(BaseModel):
                     pass  # Columna ya existe o error de tipo
 
     def update(self, payload: dict, rssi: int = None):
-        self.state = payload
+        if isinstance(self.state, dict) and isinstance(payload, dict):
+            self.state.update(payload)
+        else:
+            self.state = payload
         import datetime
         self.last_seen = datetime.datetime.now().isoformat()
         self.status = "online"
@@ -50,6 +53,12 @@ class Device(BaseModel):
             self.rssi = rssi
         self.msg_count += 1
         self.save()
+        try:
+            from hub.modules.communication.logic.cloud_bridge import cloud_bridge
+            cloud_bridge._sync_devices()
+            cloud_bridge.send_event("device_updated", self.to_dict())
+        except Exception:
+            pass
 
     @property
     def feature_labels(self):

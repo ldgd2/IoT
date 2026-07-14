@@ -84,6 +84,17 @@ class SmartDevice:
         elif dev.name in ("Unknown", "generic", None, ""):
             dev.name = f"{desc.get('type_name', 'Nodo')} {device_id}"
 
+        current_state = dev.state if isinstance(dev.state, dict) else {}
+        feature_keys = desc.get("feature_keys", [])
+        if "relay" in feature_keys or desc.get("category") in ("switching", "light", "actuator"):
+            current_state.setdefault("on", False)
+            current_state.setdefault("mask", 0)
+            for i in range(1, 17):
+                current_state.setdefault(f"ch{i}", False)
+        if "dimmer" in feature_keys:
+            current_state.setdefault("brightness", 0)
+        dev.state = current_state
+
         dev.save()
         return DeviceFactory.get_controller(dev)
 

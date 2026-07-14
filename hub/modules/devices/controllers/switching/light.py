@@ -112,7 +112,7 @@ class LightDevice(BaseDeviceController):
         # Si se comanda 'on' sin canales o máscara específica
         if "on" in params and not any(k.startswith("ch") and k[2:].isdigit() for k in params.keys()):
             if params["on"]:
-                mask = 0xFFFFFFFF if mask == 0 else mask | 1
+                mask = 1 if mask == 0 else mask | 1
             else:
                 mask = 0
 
