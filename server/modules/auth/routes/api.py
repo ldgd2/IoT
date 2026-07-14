@@ -217,10 +217,21 @@ def api_delete_hub(hub_id):
     row = db.execute("SELECT * FROM hubs WHERE hub_id = ?", (hub_id,)).fetchone()
     if not row or row["user_id"] != g.user["user_id"]:
         return jsonify({"error": "Hub no encontrado"}), 404
+    hub_name = row.get("name", "Hub")
     db.execute("DELETE FROM devices WHERE hub_id = ?", (hub_id,))
     db.execute("DELETE FROM spaces WHERE hub_id = ?", (hub_id,))
     db.execute("DELETE FROM hubs WHERE hub_id = ?", (hub_id,))
-    return jsonify({"ok": True}), 200
+    try:
+        from server.main import cached_devices
+        cached_devices.pop(hub_id, None)
+    except Exception:
+        pass
+    try:
+        from server.modules.notifications.fcm import notify_hub_deleted
+        notify_hub_deleted(g.user["user_id"], hub_name, hub_id)
+    except Exception as e:
+        print(f"[NOTIF] Error al notificar eliminacion de Hub: {e}")
+    return jsonify({"ok": True, "message": "Hub y dispositivos desvinculados"}), 200
 
 @auth_bp.route("/hubs/<hub_id>", methods=["PUT"])
 @require_auth

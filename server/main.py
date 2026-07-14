@@ -85,7 +85,7 @@ def require_hub_auth(f):
         from server.db import database as db
         row = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND relay_secret = ?", (hub_id, secret)).fetchone()
         if not row:
-            return jsonify({"error": "Credenciales inválidas"}), 401
+            return jsonify({"error": "Hub no encontrado o desvinculado", "code": "HUB_UNLINKED"}), 401
         
         # Actualizar last_seen
         from datetime import datetime

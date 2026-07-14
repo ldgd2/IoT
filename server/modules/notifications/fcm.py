@@ -311,3 +311,45 @@ def notify_device_registered(hub_id: str, device_name: str, device_id: str):
             print(f"[FCM] Usuario '{user.get('username')}' sin FCM tokens registrados para notificacion de dispositivo.")
 
 
+def notify_hub_deleted(user_id: str, hub_name: str, hub_id: str):
+    """
+    Notifica al usuario que un Hub y todos sus dispositivos fueron desvinculados/eliminados de su cuenta.
+    """
+    from server.db import database as db
+
+    user_row = db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    username = dict(user_row)["username"] if user_row else "Usuario"
+
+    title = "Hub desvinculado"
+    body = f"El Hub '{hub_name}' y todos sus dispositivos han sido eliminados de tu cuenta Colmena."
+
+    db.execute(
+        "INSERT INTO notifications (user_id, hub_id, device_id, title, body, event_type, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, hub_id, None, title, body, "hub_deleted", datetime.now().isoformat()),
+    )
+
+    token_rows = db.execute(
+        "SELECT DISTINCT fcm_token FROM ("
+        "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' "
+        "  UNION "
+        "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != ''"
+        ")",
+        (user_id, user_id)
+    ).fetchall()
+
+    tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+    if tokens:
+        for token in tokens:
+            threading.Thread(
+                target=send_push_notification,
+                args=(token, title, body),
+                kwargs={"data": {"hub_id": hub_id, "event": "hub_deleted"}},
+                daemon=True,
+            ).start()
+        print(f"[FCM] Notificacion de eliminacion de Hub enviada a {len(tokens)} telefonos del usuario '{username}'.")
+    else:
+        print(f"[FCM] Usuario '{username}' sin FCM tokens registrados para notificacion de eliminacion.")
+
+

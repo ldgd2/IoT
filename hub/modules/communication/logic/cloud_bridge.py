@@ -88,7 +88,26 @@ class CloudBridgeWorker:
                         if cmd_name != "pairing_status":
                             print(f"[CLOUD BRIDGE] Confirmación enviada al Bridge Server\n")
                 elif r.status_code == 401:
-                    print(f"[CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
+                    err_code = ""
+                    try:
+                        err_code = r.json().get("code", "")
+                    except Exception:
+                        pass
+                    if err_code == "HUB_UNLINKED":
+                        print("[CLOUD BRIDGE] Hub eliminado o desvinculado desde el exterior. Limpiando credenciales locales...")
+                        os.environ.pop("HUB_ID", None)
+                        os.environ.pop("HUB_RELAY_SECRET", None)
+                        try:
+                            from dotenv import unset_key
+                            from pathlib import Path
+                            env_file = Path(__file__).parent.parent.parent.parent / ".env"
+                            if env_file.exists():
+                                unset_key(str(env_file), "HUB_ID")
+                                unset_key(str(env_file), "HUB_RELAY_SECRET")
+                        except Exception as e:
+                            print(f"[CLOUD BRIDGE] Error al limpiar archivo .env: {e}")
+                    else:
+                        print("[CLOUD BRIDGE] Hub no autorizado. Verifica HUB_ID y HUB_RELAY_SECRET.")
                     time.sleep(10) # Backoff on auth error
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException):

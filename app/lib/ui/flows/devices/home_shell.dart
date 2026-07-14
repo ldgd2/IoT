@@ -9,6 +9,7 @@ import 'automation_scenes_view.dart';
 import 'network_health_view.dart';
 import '../provision/provision_guide_view.dart';
 import '../hubs/hub_link_view.dart';
+import '../hubs/hub_management_view.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -72,6 +73,15 @@ class _HomeShellState extends State<HomeShell> {
         scrolledUnderElevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings_remote_outlined),
+            tooltip: 'Administrar Hubs',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HubManagementView()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.add_link),
             tooltip: 'Vincular nuevo Hub',
             onPressed: () {
@@ -112,6 +122,16 @@ class _HomeShellState extends State<HomeShell> {
               ),
               const PopupMenuDivider(),
               const PopupMenuItem(
+                value: 'manage_hubs',
+                child: Row(
+                  children: [
+                    Icon(Icons.hub_outlined),
+                    SizedBox(width: 10),
+                    Text('Administrar Hubs'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'logout',
                 child: Row(
                   children: [
@@ -123,7 +143,11 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ],
             onSelected: (val) async {
-              if (val == 'logout') {
+              if (val == 'manage_hubs') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const HubManagementView()),
+                );
+              } else if (val == 'logout') {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(

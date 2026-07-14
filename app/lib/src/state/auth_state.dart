@@ -150,6 +150,43 @@ class AuthState extends ChangeNotifier {
     await _loadHubs();
   }
 
+  Future<bool> renameHub(String hubId, String newName) async {
+    if (_token == null) return false;
+    try {
+      final uri = Uri.parse('${ApiConstants.serverBaseUrl}/hubs/$hubId');
+      final r = await http.put(
+        uri,
+        headers: authHeaders,
+        body: jsonEncode({'name': newName}),
+      ).timeout(const Duration(seconds: 5));
+      if (r.statusCode == 200) {
+        await _loadHubs();
+        return true;
+      }
+    } catch (e) {
+      print("Error renombrando hub: $e");
+    }
+    return false;
+  }
+
+  Future<bool> deleteHub(String hubId) async {
+    if (_token == null) return false;
+    try {
+      final uri = Uri.parse('${ApiConstants.serverBaseUrl}/hubs/$hubId');
+      final r = await http.delete(uri, headers: authHeaders).timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) {
+        if (_activeHub?.id == hubId) {
+          _activeHub = null;
+        }
+        await _loadHubs();
+        return true;
+      }
+    } catch (e) {
+      print("Error eliminando hub: $e");
+    }
+    return false;
+  }
+
   // ── Salas (Spaces) ────────────────────────────────────────────
   Future<void> _loadRooms() async {
     if (_token == null || _activeHub == null) {
