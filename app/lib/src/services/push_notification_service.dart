@@ -162,7 +162,7 @@ class PushNotificationService {
 
       // 1) Registro en Nube VPS (relación M:N usuario <-> tokens)
       if (jwtToken.isNotEmpty) {
-        final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
+        final Uri uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/fcm-token');
         await http.post(
           uri,
           headers: {
@@ -221,7 +221,7 @@ class PushNotificationService {
 
       // 1) Eliminar en Nube VPS
       if (jwtToken.isNotEmpty) {
-        final Uri uri = Uri.parse('${ApiConstants.mainBaseUrl}/api/auth/fcm-token');
+        final Uri uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/fcm-token');
         await http.delete(
           uri,
           headers: {

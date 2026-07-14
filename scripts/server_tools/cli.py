@@ -17,10 +17,10 @@ def notif():
 
 @notif.command(name="test")
 @click.option("--hub-id", default=None, help="Hub ID destino (opcional, usa el primero registrado si no se indica)")
-@click.option("--title", default="🔔 Prueba de Notificación", help="Título del push")
+@click.option("--title", default="Prueba de Notificacion", help="Titulo del push")
 @click.option("--body", default="Este es un mensaje de prueba enviado desde el servidor Colmena.", help="Cuerpo del mensaje")
 def notif_test(hub_id, title, body):
-    """Envía una notificación push de prueba a los usuarios de un Hub"""
+    """Envia una notificacion push de prueba a los usuarios de un Hub"""
     from server.db import database as sdb
 
     # Si no hay hub_id, intentar obtener el primero registrado
@@ -40,31 +40,43 @@ def notif_test(hub_id, title, body):
     ).fetchall()
 
     if not rows:
-        console.print("[yellow]No se encontraron usuarios/tokens FCM para este Hub.[/yellow]")
+        console.print("[yellow]No se encontraron usuarios para este Hub.[/yellow]")
         return
 
     console.print()
-    console.print(Panel.fit(f"[bold]📤 Enviando notificación de prueba a {len(rows)} usuario(s)[/bold]", border_style="magenta"))
-    console.print(f"  [bold]Título:[/bold] {title}")
+    console.print(Panel.fit(f"[bold]Enviando notificacion de prueba a {len(rows)} usuario(s)[/bold]", border_style="magenta"))
+    console.print(f"  [bold]Titulo:[/bold] {title}")
     console.print(f"  [bold]Cuerpo:[/bold] {body}")
     console.print()
 
     sent = 0
     for row in rows:
         u = dict(row)
-        fcm_token = u.get("fcm_token", "")
-        if not fcm_token:
-            console.print(f"  [yellow]⚠️  Usuario '{u['username']}' sin token FCM (omitido).[/yellow]")
+        user_id = u["user_id"]
+        token_rows = sdb.execute(
+            "SELECT DISTINCT fcm_token FROM ("
+            "  SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token != '' AND fcm_token IS NOT NULL "
+            "  UNION "
+            "  SELECT fcm_token FROM user_fcm_tokens WHERE user_id = ? AND fcm_token != '' AND fcm_token IS NOT NULL"
+            ")",
+            (user_id, user_id)
+        ).fetchall()
+        tokens = [dict(t)["fcm_token"] for t in token_rows if dict(t).get("fcm_token")]
+
+        if not tokens:
+            console.print(f"  [yellow][WARN] Usuario '{u['username']}' sin token FCM (omitido).[/yellow]")
             continue
 
         try:
             from server.modules.notifications.fcm import send_push_notification
-            send_push_notification(fcm_token, title, body, data={"event": "test", "hub_id": hub_id})
-            console.print(f"  [green]✔[/green] Notificación enviada a '{u['username']}'")
+            for token in tokens:
+                send_push_notification(token, title, body, data={"event": "test", "hub_id": hub_id})
+            console.print(f"  [green][OK][/green] Notificacion enviada a {len(tokens)} dispositivo(s) de '{u['username']}'")
             sent += 1
         except Exception as e:
-            console.print(f"  [red]✗ Error al enviar a '{u['username']}': {e}[/red]")
+            console.print(f"  [red][ERROR] Error al enviar a '{u['username']}': {e}[/red]")
 
     console.print()
     console.print(f"[bold green]Resultado: {sent}/{len(rows)} notificaciones enviadas exitosamente.[/bold green]")
     console.print()
+
