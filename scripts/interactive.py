@@ -14,18 +14,18 @@ def clear_screen():
 def show_main_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold cyan]📡 IoT RF Gateway & Servidor Puente - Orquestador Maestro[/bold cyan]", border_style="cyan"))
+        console.print(Panel.fit("[bold cyan][IoT Gateway & Servidor Puente - Orquestador Maestro][/bold cyan]", border_style="cyan"))
         console.print()
         
         choice = questionary.select(
-            "Selecciona una opción de gestión:",
+            "Selecciona una opcion de gestion:",
             choices=[
-                "🏢 Gestión del Central Hub (Red Local)",
-                "☁️ Gestión del Servidor Colmena (Cloud/Bridge)",
+                "[HUB] Gestion del Central Hub (Red Local)",
+                "[SERVER] Gestion del Servidor Colmena (Cloud/Bridge)",
                 questionary.Separator(),
-                "🛠️ Utilidades Generales (Red, Configuración, Compilación)",
+                "[TOOLS] Utilidades Generales (Red, Configuración, Compilación)",
                 questionary.Separator(),
-                "❌ Salir"
+                "[EXIT] Salir"
             ],
             style=questionary.Style([
                 ('qmark', 'fg:#673ab7 bold'),
@@ -38,100 +38,100 @@ def show_main_menu():
             ])
         ).ask()
         
-        if choice == "❌ Salir" or choice is None:
-            console.print("[green]¡Hasta luego![/green]")
+        if choice == "[EXIT] Salir" or choice is None:
+            console.print("[green]Hasta luego![/green]")
             break
-        elif choice.startswith("🏢"):
+        elif choice.startswith("[HUB]"):
             show_hub_menu()
-        elif choice.startswith("☁️"):
+        elif choice.startswith("[SERVER]"):
             show_server_menu()
-        elif choice.startswith("🛠️"):
+        elif choice.startswith("[TOOLS]"):
             show_utilities_menu()
 
 def show_hub_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold yellow]🏢 Gestión del Central Hub (Puerto 5000)[/bold yellow]", border_style="yellow"))
+        console.print(Panel.fit("[bold yellow][HUB] Gestion del Central Hub (Puerto 5000)[/bold yellow]", border_style="yellow"))
         console.print()
         
         choice = questionary.select(
-            "Selecciona una categoría:",
+            "Selecciona una categoria:",
             choices=[
-                "⚙️ Servicios (Iniciar, Detener, Logs)",
-                "🗄️ Base de Datos y Usuarios",
-                "🔌 Dispositivos y Estado de Red",
+                "[SERVICE] Servicios (Iniciar, Detener, Logs)",
+                "[DB] Base de Datos y Usuarios",
+                "[DEVICES] Dispositivos y Estado de Red",
                 questionary.Separator(),
-                "⬅️ Volver al menú principal"
+                "[BACK] Volver al menu principal"
             ],
             style=questionary.Style([('pointer', 'fg:#ffc107 bold'), ('highlighted', 'fg:#ffc107 bold')])
         ).ask()
 
-        if choice == "⬅️ Volver al menú principal" or choice is None:
+        if choice == "[BACK] Volver al menu principal" or choice is None:
             break
-        elif choice.startswith("⚙️"):
+        elif choice.startswith("[SERVICE]"):
             show_hub_service_menu()
-        elif choice.startswith("🗄️"):
+        elif choice.startswith("[DB]"):
             show_hub_db_menu()
-        elif choice.startswith("🔌"):
+        elif choice.startswith("[DEVICES]"):
             show_hub_devices_menu()
 
 def show_server_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold magenta]☁️ Gestión del Servidor Colmena (Cloud / Puerto 8000)[/bold magenta]", border_style="magenta"))
+        console.print(Panel.fit("[bold magenta][SERVER] Gestion del Servidor Colmena (Cloud / Puerto 8000)[/bold magenta]", border_style="magenta"))
         console.print()
         
         choice = questionary.select(
-            "Selecciona una categoría:",
+            "Selecciona una categoria:",
             choices=[
-                "⚙️ Servicios (Iniciar, Detener, Logs)",
-                "🗄️ Base de Datos y Administración",
-                "🔔 Pruebas de Notificaciones Push",
+                "[SERVICE] Servicios (Iniciar, Detener, Logs)",
+                "[DB] Base de Datos y Administracion",
+                "[NOTIF] Pruebas de Notificaciones Push",
                 questionary.Separator(),
-                "⬅️ Volver al menú principal"
+                "[BACK] Volver al menu principal"
             ],
             style=questionary.Style([('pointer', 'fg:#e91e63 bold'), ('highlighted', 'fg:#e91e63 bold')])
         ).ask()
 
-        if choice == "⬅️ Volver al menú principal" or choice is None:
+        if choice == "[BACK] Volver al menu principal" or choice is None:
             break
-        elif choice.startswith("⚙️"):
+        elif choice.startswith("[SERVICE]"):
             show_server_service_menu()
-        elif choice.startswith("🗄️"):
+        elif choice.startswith("[DB]"):
             show_server_db_menu()
-        elif choice.startswith("🔔"):
+        elif choice.startswith("[NOTIF]"):
             show_server_notif_menu()
 
 def show_utilities_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold green]🛠️ Utilidades Generales[/bold green]", border_style="green"))
+        console.print(Panel.fit("[bold green][TOOLS] Utilidades Generales[/bold green]", border_style="green"))
         console.print()
         
         choice = questionary.select(
             "Selecciona una utilidad:",
             choices=[
-                "🌐 Escáner de Red RF",
-                "⚙️ Asistente de Configuración (.env)",
-                "🛠️ Instalar Dependencias (VENV y PIP)",
-                "🔨 Compilar Firmware C++",
+                "[SCAN] Escaner de Red RF",
+                "[ENV] Asistente de Configuracion (.env)",
+                "[DEPS] Instalar Dependencias (VENV y PIP)",
+                "[FW] Compilar Firmware C++",
                 questionary.Separator(),
-                "⬅️ Volver al menú principal"
+                "[BACK] Volver al menu principal"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver al menú principal" or choice is None:
+        if choice == "[BACK] Volver al menu principal" or choice is None:
             break
-        elif choice.startswith("🌐"):
+        elif choice.startswith("[SCAN]"):
             subprocess.run([sys.executable, "iot.py", "network", "scan"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
-        elif choice.startswith("⚙️"):
+        elif choice.startswith("[ENV]"):
             subprocess.run([sys.executable, "iot.py", "setup", "env"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
-        elif choice.startswith("🛠️"):
+        elif choice.startswith("[DEPS]"):
             subprocess.run([sys.executable, "iot.py", "setup", "install-deps"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
-        elif choice.startswith("🔨"):
+        elif choice.startswith("[FW]"):
             subprocess.run([sys.executable, "iot.py", "firmware", "wizard"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")
 
@@ -139,35 +139,35 @@ def show_utilities_menu():
 def show_hub_service_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold yellow]⚙️ Servicios del Central Hub[/bold yellow]", border_style="yellow"))
+        console.print(Panel.fit("[bold yellow][SERVICE] Servicios del Central Hub[/bold yellow]", border_style="yellow"))
         
         choice = questionary.select(
-            "Selecciona una acción:",
+            "Selecciona una accion:",
             choices=[
-                "ℹ️ Ver Estado, IP y Puerto de la Central Hub",
-                "🚀 Arrancar Central Hub en Vivo (Foreground)",
-                "▶️ Iniciar Central Hub en Segundo Plano (Background)",
-                "⏹️ Detener Central Hub",
-                "🔄 Reiniciar Central Hub",
-                "📜 Ver Logs en vivo (hub.log)",
-                "📦 Instalar Servicio en Sistema (Linux/Systemd)",
-                "🗑️ Eliminar y Limpiar Servicio de Central Hub",
+                "[STATUS] Ver Estado, IP y Puerto de la Central Hub",
+                "[START-FG] Arrancar Central Hub en Vivo (Foreground)",
+                "[START-BG] Iniciar Central Hub en Segundo Plano (Background)",
+                "[STOP] Detener Central Hub",
+                "[RESTART] Reiniciar Central Hub",
+                "[LOGS] Ver Logs en vivo (hub.log)",
+                "[INSTALL] Instalar Servicio en Sistema (Linux/Systemd)",
+                "[UNINSTALL] Eliminar y Limpiar Servicio de Central Hub",
                 questionary.Separator(),
-                "⬅️ Volver"
+                "[BACK] Volver"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver" or choice is None: break
+        if choice == "[BACK] Volver" or choice is None: break
             
         cmds = {
-            "ℹ️ Ver Estado, IP y Puerto de la Central Hub": ["iot.py", "hub", "service-status"],
-            "🚀 Arrancar Central Hub en Vivo (Foreground)": ["iot.py", "hub", "start"],
-            "▶️ Iniciar Central Hub en Segundo Plano (Background)": ["iot.py", "hub", "service-start"],
-            "⏹️ Detener Central Hub": ["iot.py", "hub", "service-stop"],
-            "🔄 Reiniciar Central Hub": ["iot.py", "hub", "service-restart"],
-            "📜 Ver Logs en vivo (hub.log)": ["iot.py", "hub", "service-logs"],
-            "📦 Instalar Servicio en Sistema (Linux/Systemd)": ["iot.py", "hub", "service-install"],
-            "🗑️ Eliminar y Limpiar Servicio de Central Hub": ["iot.py", "hub", "service-uninstall"]
+            "[STATUS] Ver Estado, IP y Puerto de la Central Hub": ["iot.py", "hub", "service-status"],
+            "[START-FG] Arrancar Central Hub en Vivo (Foreground)": ["iot.py", "hub", "start"],
+            "[START-BG] Iniciar Central Hub en Segundo Plano (Background)": ["iot.py", "hub", "service-start"],
+            "[STOP] Detener Central Hub": ["iot.py", "hub", "service-stop"],
+            "[RESTART] Reiniciar Central Hub": ["iot.py", "hub", "service-restart"],
+            "[LOGS] Ver Logs en vivo (hub.log)": ["iot.py", "hub", "service-logs"],
+            "[INSTALL] Instalar Servicio en Sistema (Linux/Systemd)": ["iot.py", "hub", "service-install"],
+            "[UNINSTALL] Eliminar y Limpiar Servicio de Central Hub": ["iot.py", "hub", "service-uninstall"]
         }
         
         if choice in cmds:
@@ -177,29 +177,29 @@ def show_hub_service_menu():
 def show_hub_db_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold yellow]🗄️ Base de Datos del Central Hub[/bold yellow]", border_style="yellow"))
+        console.print(Panel.fit("[bold yellow][DB] Base de Datos del Central Hub[/bold yellow]", border_style="yellow"))
         
         choice = questionary.select(
-            "Selecciona una acción:",
+            "Selecciona una accion:",
             choices=[
-                "🔄 Ejecutar Migraciones (Recursivo BaseModel)",
-                "👥 Ver Usuarios Registrados",
-                "📦 Crear Backup de BD",
-                "❌ Formatear Base de Datos (Requiere Login)",
+                "[MIGRATE] Ejecutar Migraciones (Recursivo BaseModel)",
+                "[USERS] Ver Usuarios Registrados",
+                "[BACKUP] Crear Backup de BD",
+                "[FORMAT] Formatear Base de Datos (Requiere Login)",
                 questionary.Separator(),
-                "⬅️ Volver"
+                "[BACK] Volver"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver" or choice is None: break
+        if choice == "[BACK] Volver" or choice is None: break
         
-        if choice.startswith("🔄"):
+        if choice.startswith("[MIGRATE]"):
             subprocess.run([sys.executable, "iot.py", "db", "hub", "migrate"])
-        elif choice.startswith("👥"):
+        elif choice.startswith("[USERS]"):
             subprocess.run([sys.executable, "iot.py", "db", "hub", "users"])
-        elif choice.startswith("📦"):
+        elif choice.startswith("[BACKUP]"):
             subprocess.run([sys.executable, "iot.py", "db", "backups", "create"])
-        elif choice.startswith("❌"):
+        elif choice.startswith("[FORMAT]"):
             if authenticate_hub_cli():
                 subprocess.run([sys.executable, "iot.py", "db", "hub", "format"])
         
@@ -207,7 +207,7 @@ def show_hub_db_menu():
 
 def show_hub_devices_menu():
     clear_screen()
-    console.print(Panel.fit("[bold yellow]🔌 Dispositivos del Central Hub[/bold yellow]", border_style="yellow"))
+    console.print(Panel.fit("[bold yellow][DEVICES] Dispositivos del Central Hub[/bold yellow]", border_style="yellow"))
     console.print("[dim]Funcionalidad en desarrollo para administrar equipos desde la CLI.[/dim]")
     console.input("\n[dim]Presiona Enter para continuar...[/dim]")
 
@@ -215,35 +215,35 @@ def show_hub_devices_menu():
 def show_server_service_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold magenta]⚙️ Servicios del Servidor Colmena[/bold magenta]", border_style="magenta"))
+        console.print(Panel.fit("[bold magenta][SERVICE] Servicios del Servidor Colmena[/bold magenta]", border_style="magenta"))
         
         choice = questionary.select(
-            "Selecciona una acción:",
+            "Selecciona una accion:",
             choices=[
-                "ℹ️ Ver Estado, IP y Puerto del Servidor",
-                "🚀 Arrancar Servidor en Vivo (Foreground)",
-                "▶️ Iniciar Servidor en Segundo Plano (Background)",
-                "⏹️ Detener Servidor",
-                "🔄 Reiniciar Servidor",
-                "📜 Ver Logs en vivo (bridge.log)",
-                "📦 Instalar Servicio en Sistema (Linux Systemd / Windows Task)",
-                "🗑️ Eliminar y Limpiar Servicio",
+                "[STATUS] Ver Estado, IP y Puerto del Servidor",
+                "[START-FG] Arrancar Servidor en Vivo (Foreground)",
+                "[START-BG] Iniciar Servidor en Segundo Plano (Background)",
+                "[STOP] Detener Servidor",
+                "[RESTART] Reiniciar Servidor",
+                "[LOGS] Ver Logs en vivo (bridge.log)",
+                "[INSTALL] Instalar Servicio en Sistema (Linux Systemd / Windows Task)",
+                "[UNINSTALL] Eliminar y Limpiar Servicio",
                 questionary.Separator(),
-                "⬅️ Volver"
+                "[BACK] Volver"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver" or choice is None: break
+        if choice == "[BACK] Volver" or choice is None: break
             
         cmds = {
-            "ℹ️ Ver Estado, IP y Puerto del Servidor": ["iot.py", "bridge", "service-status"],
-            "🚀 Arrancar Servidor en Vivo (Foreground)": ["iot.py", "bridge", "start"],
-            "▶️ Iniciar Servidor en Segundo Plano (Background)": ["iot.py", "bridge", "service-start"],
-            "⏹️ Detener Servidor": ["iot.py", "bridge", "service-stop"],
-            "🔄 Reiniciar Servidor": ["iot.py", "bridge", "service-restart"],
-            "📜 Ver Logs en vivo (bridge.log)": ["iot.py", "bridge", "service-logs"],
-            "📦 Instalar Servicio en Sistema (Linux Systemd / Windows Task)": ["iot.py", "bridge", "service-install"],
-            "🗑️ Eliminar y Limpiar Servicio": ["iot.py", "bridge", "service-uninstall"]
+            "[STATUS] Ver Estado, IP y Puerto del Servidor": ["iot.py", "bridge", "service-status"],
+            "[START-FG] Arrancar Servidor en Vivo (Foreground)": ["iot.py", "bridge", "start"],
+            "[START-BG] Iniciar Servidor en Segundo Plano (Background)": ["iot.py", "bridge", "service-start"],
+            "[STOP] Detener Servidor": ["iot.py", "bridge", "service-stop"],
+            "[RESTART] Reiniciar Servidor": ["iot.py", "bridge", "service-restart"],
+            "[LOGS] Ver Logs en vivo (bridge.log)": ["iot.py", "bridge", "service-logs"],
+            "[INSTALL] Instalar Servicio en Sistema (Linux Systemd / Windows Task)": ["iot.py", "bridge", "service-install"],
+            "[UNINSTALL] Eliminar y Limpiar Servicio": ["iot.py", "bridge", "service-uninstall"]
         }
         
         if choice in cmds:
@@ -253,27 +253,27 @@ def show_server_service_menu():
 def show_server_db_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold magenta]🗄️ Base de Datos del Servidor Colmena[/bold magenta]", border_style="magenta"))
+        console.print(Panel.fit("[bold magenta][DB] Base de Datos del Servidor Colmena[/bold magenta]", border_style="magenta"))
         
         choice = questionary.select(
-            "Selecciona una acción:",
+            "Selecciona una accion:",
             choices=[
-                "🔄 Ejecutar Migraciones Automáticas",
-                "👥 Ver Todos los Usuarios/Hubs (Requiere Root)",
-                "❌ Formatear Base de Datos (Requiere Root)",
+                "[MIGRATE] Ejecutar Migraciones Automaticas",
+                "[USERS] Ver Todos los Usuarios/Hubs (Requiere Root)",
+                "[FORMAT] Formatear Base de Datos (Requiere Root)",
                 questionary.Separator(),
-                "⬅️ Volver"
+                "[BACK] Volver"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver" or choice is None: break
+        if choice == "[BACK] Volver" or choice is None: break
         
-        if choice.startswith("🔄"):
+        if choice.startswith("[MIGRATE]"):
             subprocess.run([sys.executable, "iot.py", "db", "server", "migrate"])
-        elif choice.startswith("👥"):
+        elif choice.startswith("[USERS]"):
             if authenticate_server_cli():
                 subprocess.run([sys.executable, "iot.py", "db", "server", "users"])
-        elif choice.startswith("❌"):
+        elif choice.startswith("[FORMAT]"):
             if authenticate_server_cli():
                 subprocess.run([sys.executable, "iot.py", "db", "server", "format"])
                 
@@ -282,19 +282,19 @@ def show_server_db_menu():
 def show_server_notif_menu():
     while True:
         clear_screen()
-        console.print(Panel.fit("[bold magenta]🔔 Herramientas de Notificaciones (Servidor)[/bold magenta]", border_style="magenta"))
+        console.print(Panel.fit("[bold magenta][NOTIF] Herramientas de Notificaciones (Servidor)[/bold magenta]", border_style="magenta"))
         
         choice = questionary.select(
-            "Selecciona una acción:",
+            "Selecciona una accion:",
             choices=[
-                "🧪 Prueba de Notificación (Test Push)",
+                "[TEST] Prueba de Notificacion (Test Push)",
                 questionary.Separator(),
-                "⬅️ Volver"
+                "[BACK] Volver"
             ]
         ).ask()
         
-        if choice == "⬅️ Volver" or choice is None: break
+        if choice == "[BACK] Volver" or choice is None: break
         
-        if choice.startswith("🧪"):
+        if choice.startswith("[TEST]"):
             subprocess.run([sys.executable, "iot.py", "server-tools", "notif", "test"])
             console.input("\n[dim]Presiona Enter para continuar...[/dim]")

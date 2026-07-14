@@ -105,18 +105,35 @@ def ensure_tables():
         )
     """)
 
-    # Migrar columnas adicionales a devices si no existen
-    for col_def in [
-        "user_id TEXT DEFAULT ''",
-        "room TEXT DEFAULT ''",
-        "type_name TEXT DEFAULT 'generic'",
-        "state TEXT DEFAULT '{}'"
-    ]:
-        col_name = col_def.split()[0]
-        try:
-            execute(f"ALTER TABLE devices ADD COLUMN {col_def}")
-        except Exception:
-            pass
+    # Migrar columnas adicionales a todas las tablas principales si ya existian
+    migrations = {
+        "devices": [
+            "user_id TEXT DEFAULT ''",
+            "room TEXT DEFAULT ''",
+            "type_name TEXT DEFAULT 'generic'",
+            "state TEXT DEFAULT '{}'"
+        ],
+        "users": [
+            "fcm_token TEXT DEFAULT ''"
+        ],
+        "hubs": [
+            "local_url TEXT DEFAULT ''",
+            "relay_secret TEXT DEFAULT ''",
+            "last_seen TEXT DEFAULT ''",
+            "online INTEGER DEFAULT 0"
+        ],
+        "user_fcm_tokens": [
+            "platform TEXT DEFAULT 'android'",
+            "device_name TEXT DEFAULT 'Android Device'"
+        ]
+    }
+    for table, cols in migrations.items():
+        for col_def in cols:
+            try:
+                execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
+            except Exception:
+                pass
 
-    print("[SERVER DB] Tablas de la arquitectura Multi-Hub verificadas/creadas con relacion muchos a muchos de tokens.")
+    print("[SERVER DB] Tablas y columnas de la arquitectura Multi-Hub verificadas/migradas exitosamente.")
+
 

@@ -24,8 +24,17 @@ except ImportError:
 from server.db.database import ensure_tables
 from server.modules.auth.routes.api import auth_bp
 
-# Asegurar codificación UTF-8 en consola de Windows
-if sys.stdout.encoding != 'utf-8':
+# Asegurar codificacion UTF-8 y manejo de logs en segundo plano
+if os.environ.get("BRIDGE_BACKGROUND") == "1":
+    try:
+        from server.config import LOG_DIR
+        LOG_DIR.mkdir(exist_ok=True)
+        log_file = open(LOG_DIR / "bridge.log", "a", encoding="utf-8", errors="replace")
+        sys.stdout = log_file
+        sys.stderr = log_file
+    except Exception as e:
+        pass
+elif sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 app = Flask(__name__)

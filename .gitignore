@@ -17,7 +17,7 @@ hub\db\data.sqlite
 logs/
 *.log
 .server.pid
-server/db/data.sqlite
+server/db/server.sqlite
 
 # Windows / OS
 Thumbs.db

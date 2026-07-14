@@ -158,13 +158,12 @@ def service_start():
     env_vars["BRIDGE_BACKGROUND"] = "1"
 
     try:
-        log_handle = open(BRIDGE_LOG_FILE, "a", encoding="utf-8")
         if is_windows():
             flags = 0x00000008 | 0x00000200
             proc = subprocess.Popen(
                 [py_exec, str(SERVER_DIR / "main.py")],
-                stdout=log_handle,
-                stderr=log_handle,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 creationflags=flags,
                 cwd=str(ROOT_DIR),
                 env=env_vars
@@ -172,8 +171,8 @@ def service_start():
         else:
             proc = subprocess.Popen(
                 [py_exec, str(SERVER_DIR / "main.py")],
-                stdout=log_handle,
-                stderr=log_handle,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 start_new_session=True,
                 cwd=str(ROOT_DIR),
                 env=env_vars
@@ -182,20 +181,20 @@ def service_start():
         time.sleep(1.5)
         if proc.poll() is None:
             BRIDGE_PID_FILE.write_text(str(proc.pid))
-            console.print(f"[bold green]✔ Servidor Puente iniciado correctamente (PID: {proc.pid}).[/bold green]")
+            console.print(f"[bold green]Servidor Puente iniciado correctamente (PID: {proc.pid}).[/bold green]")
         else:
-            console.print(f"[bold red]❌ El Servidor Puente se cerró inesperadamente (código: {proc.returncode}). Revisa {BRIDGE_LOG_FILE}[/bold red]")
+            console.print(f"[bold red]El Servidor Puente se cerro inesperadamente (codigo: {proc.returncode}). Revisa {BRIDGE_LOG_FILE}[/bold red]")
             return
 
         time.sleep(1)
         if is_port_open(SERVER_PORT):
-            console.print(f"[bold cyan]🚀 ¡Servidor Puente respondiendo en http://127.0.0.1:{SERVER_PORT}![/bold cyan]")
+            console.print(f"[bold cyan]Servidor Puente respondiendo en http://127.0.0.1:{SERVER_PORT}![/bold cyan]")
         else:
-            console.print("[yellow]⏳ El proceso sigue ejecutándose; el puerto tardará un momento en responder.[/yellow]")
+            console.print("[yellow]El proceso sigue ejecutandose; el puerto tardara un momento en responder.[/yellow]")
             
         _show_bridge_status()
     except Exception as e:
-        console.print(f"[red]❌ Error al arrancar Servidor Puente: {e}[/red]")
+        console.print(f"[red] Error al arrancar Servidor Puente: {e}[/red]")
 
 @bridge.command(name="service-stop")
 def service_stop():
@@ -347,10 +346,7 @@ WantedBy=multi-user.target
 @bridge.command(name="service-logs")
 def service_logs():
     """Muestra los logs en vivo del servidor puente"""
-    if is_linux_systemd():
-        console.print(f"[yellow]Mostrando journalctl para {BRIDGE_SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
-        subprocess.run(["sudo", "journalctl", "-u", BRIDGE_SERVICE_NAME, "-f", "-n", "50"])
-    elif BRIDGE_LOG_FILE.exists():
+    if BRIDGE_LOG_FILE.exists():
         console.print(f"[yellow]Mostrando registros en tiempo real de {BRIDGE_LOG_FILE} (Ctrl+C para salir)...[/yellow]\n")
         try:
             with open(BRIDGE_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
@@ -366,5 +362,8 @@ def service_logs():
                     console.print(line.rstrip())
         except KeyboardInterrupt:
             console.print("\n[dim]Monitoreo de logs detenido.[/dim]")
+    elif is_linux_systemd():
+        console.print(f"[yellow]Mostrando journalctl para {BRIDGE_SERVICE_NAME} (Ctrl+C para salir)...[/yellow]")
+        subprocess.run(["sudo", "journalctl", "-u", BRIDGE_SERVICE_NAME, "-f", "-n", "50"])
     else:
-        console.print("[dim]No hay archivo de registro bridge.log generado aún. Inicia el servidor para generar logs.[/dim]")
+        console.print("[dim]No hay archivo de registro bridge.log generado aun. Inicia el servidor para generar logs.[/dim]")

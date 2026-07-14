@@ -48,10 +48,20 @@ class BaseModel:
 
     @classmethod
     def create_table(cls) -> str:
-        # Check if table exists
         cursor = Database.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (cls.__table__,))
         if cursor.fetchone():
-            return "exists"
+            try:
+                existing_rows = Database.execute(f"PRAGMA table_info({cls.__table__})").fetchall()
+                existing_cols = [dict(row)["name"] for row in existing_rows]
+                migrated = False
+                for name, field in cls._get_fields().items():
+                    if name not in existing_cols:
+                        Database.execute(f"ALTER TABLE {cls.__table__} ADD COLUMN {name} {field.type_name}")
+                        migrated = True
+                return "migrated" if migrated else "exists"
+            except Exception as e:
+                print(f"[HUB DB] Error al verificar columnas de '{cls.__table__}': {e}")
+                return "exists"
             
         fields = []
         for name, field in cls._get_fields().items():
