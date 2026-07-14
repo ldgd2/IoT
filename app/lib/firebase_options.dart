@@ -39,8 +39,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC_MockApiKeyForAndroidsi2parcial',
-    appId: '1:76539049876:android:si2parcial9e9e9',
+    apiKey: 'AIzaSyC6YfEqFoSld9rscnMv_BLYUT2d65r6jro',
+    appId: '1:76539049876:android:670d903356b8dcdd51c181',
     messagingSenderId: '76539049876',
     projectId: 'si2parcial-9e9e9',
     storageBucket: 'si2parcial-9e9e9.firebasestorage.app',
