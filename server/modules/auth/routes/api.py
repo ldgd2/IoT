@@ -56,10 +56,25 @@ def api_signup():
         return jsonify({"error": "Correo en uso"}), 409
 
     user_id = str(uuid.uuid4())
+    fcm_token = (data.get("fcm_token") or data.get("token") or "").strip()
+    platform = data.get("platform", "android")
+    device_name = data.get("device_name", "Android Mobile")
+
     db.execute(
-        "INSERT INTO users (user_id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-        (user_id, username, email, _hash_pw(password), _now())
+        "INSERT INTO users (user_id, username, email, password_hash, fcm_token, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, username, email, _hash_pw(password), fcm_token, _now())
     )
+    if fcm_token:
+        try:
+            db.execute(
+                "INSERT INTO user_fcm_tokens (user_id, fcm_token, platform, device_name, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id, fcm_token) DO UPDATE SET updated_at = excluded.updated_at, platform = excluded.platform, device_name = excluded.device_name",
+                (user_id, fcm_token, platform, device_name, _now())
+            )
+        except Exception as e:
+            print(f"[FCM] Error al insertar en user_fcm_tokens en signup: {e}")
+
     return jsonify({
         "ok": True,
         "token": generate_token(user_id),
@@ -87,6 +102,22 @@ def api_login():
         return jsonify({"error": "Credenciales inválidas"}), 401
 
     user = dict(row)
+    fcm_token = (data.get("fcm_token") or data.get("token") or "").strip()
+    if fcm_token:
+        platform = data.get("platform", "android")
+        device_name = data.get("device_name", "Android Mobile")
+        try:
+            db.execute(
+                "INSERT INTO user_fcm_tokens (user_id, fcm_token, platform, device_name, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id, fcm_token) DO UPDATE SET updated_at = excluded.updated_at, platform = excluded.platform, device_name = excluded.device_name",
+                (user["user_id"], fcm_token, platform, device_name, _now())
+            )
+            db.execute("UPDATE users SET fcm_token = ? WHERE user_id = ?", (fcm_token, user["user_id"]))
+            print(f"[FCM] Token M:N registrado en login para usuario '{user['username']}': {fcm_token[:20]}...")
+        except Exception as e:
+            print(f"[FCM] Error al registrar token en login: {e}")
+
     return jsonify({
         "ok": True,
         "token": generate_token(user["user_id"]),

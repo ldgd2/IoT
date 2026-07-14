@@ -79,14 +79,17 @@ class PushNotificationService {
       }
 
       // 3. Obtener y Registrar Token FCM
-      String? token = await _firebaseMessaging.getToken();
+      String? token = await getTokenSafe();
       if (token != null) {
         log("FCM Token obtenido: $token");
         await registerTokenWithBackend(token);
       }
 
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
         log("FCM Token refrescado: $newToken");
+        _cachedFcmToken = newToken;
+        final sp = await SharedPreferences.getInstance();
+        await sp.setString('fcm_token_v1', newToken);
         registerTokenWithBackend(newToken);
       });
 
@@ -145,12 +148,42 @@ class PushNotificationService {
     }
   }
 
-  /// Registra (o actualiza) el FCM token en el servidor Nube y en el Hub local para recibir notificaciones push M:N.
-  /// Se autentica con el JWT guardado en SharedPreferences (clave 'auth_token_v1').
-  static Future<void> registerTokenWithBackend(String token) async {
+  static String? _cachedFcmToken;
+
+  static Future<String?> getTokenSafe() async {
+    if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
+      return _cachedFcmToken;
+    }
     try {
       final sp = await SharedPreferences.getInstance();
-      final jwtToken = sp.getString('auth_token_v1') ?? '';
+      _cachedFcmToken = sp.getString('fcm_token_v1');
+      if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
+        // Tentar obtener token de FCM en background
+        _firebaseMessaging.getToken().then((tok) {
+          if (tok != null && tok.isNotEmpty) {
+            _cachedFcmToken = tok;
+            sp.setString('fcm_token_v1', tok);
+          }
+        }).catchError((_) {});
+        return _cachedFcmToken;
+      }
+      final token = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 4));
+      if (token != null && token.isNotEmpty) {
+        _cachedFcmToken = token;
+        await sp.setString('fcm_token_v1', token);
+      }
+    } catch (e) {
+      log("No se pudo obtener el token FCM en línea: $e");
+    }
+    return _cachedFcmToken;
+  }
+
+  /// Registra (o actualiza) el FCM token en el servidor Nube y en el Hub local para recibir notificaciones push M:N.
+  /// Se autentica con el JWT guardado o explícito.
+  static Future<void> registerTokenWithBackend(String token, {String? explicitJwt}) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final jwtToken = explicitJwt ?? sp.getString('auth_token_v1') ?? '';
       final userRaw = sp.getString('auth_user_v1');
       String userId = '';
       if (userRaw != null && userRaw.isNotEmpty) {
@@ -163,17 +196,22 @@ class PushNotificationService {
       // 1) Registro en Nube VPS (relación M:N usuario <-> tokens)
       if (jwtToken.isNotEmpty) {
         final Uri uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/fcm-token');
-        await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $jwtToken',
-          },
-          body: jsonEncode({'fcm_token': token, 'device_name': 'Android Mobile'}),
-        ).timeout(const Duration(seconds: 5));
-        log("[OK] Token FCM registrado M:N en la nube VPS.");
+        log("Sincronizando token FCM M:N con Nube VPS: $uri");
+        try {
+          final res = await http.post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $jwtToken',
+            },
+            body: jsonEncode({'fcm_token': token, 'platform': 'android', 'device_name': 'Android Mobile'}),
+          ).timeout(const Duration(seconds: 6));
+          log("[OK] Token FCM registrado M:N en la nube VPS. Status: ${res.statusCode}");
+        } catch (e) {
+          log("[WARN] Excepción HTTP registrando FCM en nube: $e");
+        }
       } else {
-        log("[WARN] No hay JWT disponible para registrar FCM token en la nube.");
+        log("[WARN] No hay JWT disponible en registerTokenWithBackend para registrar en nube.");
       }
 
       // 2) Registro local en el Hub Colmena (para funcionar sin internet o modo local)
@@ -199,11 +237,13 @@ class PushNotificationService {
   }
 
   /// Sincroniza el FCM token en cuanto el usuario inicia sesión.
-  static Future<void> syncTokenWithBackend() async {
+  static Future<void> syncTokenWithBackend({String? explicitJwt}) async {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await getTokenSafe();
       if (token != null && token.isNotEmpty) {
-        await registerTokenWithBackend(token);
+        await registerTokenWithBackend(token, explicitJwt: explicitJwt);
+      } else {
+        log("[WARN] No se obtuvo ningún token FCM para sincronizar al backend.");
       }
     } catch (e) {
       log("Error en syncTokenWithBackend: $e");

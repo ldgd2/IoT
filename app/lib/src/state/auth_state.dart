@@ -49,7 +49,7 @@ class AuthState extends ChangeNotifier {
       final valid = await AuthService.validateSession();
       if (valid) {
         _status = AuthStatus.authenticated;
-        PushNotificationService.syncTokenWithBackend();
+        PushNotificationService.syncTokenWithBackend(explicitJwt: _token);
         await _loadHubs();
       } else {
         await AuthService.clearSession();
@@ -72,7 +72,7 @@ class AuthState extends ChangeNotifier {
       _token = result.token;
       _user = result.user;
       _status = AuthStatus.authenticated;
-      PushNotificationService.syncTokenWithBackend();
+      PushNotificationService.syncTokenWithBackend(explicitJwt: _token);
       await _loadHubs();
       notifyListeners();
       return true;
@@ -94,7 +94,7 @@ class AuthState extends ChangeNotifier {
       _token = result.token;
       _user = result.user;
       _status = AuthStatus.authenticated;
-      PushNotificationService.syncTokenWithBackend();
+      PushNotificationService.syncTokenWithBackend(explicitJwt: _token);
       notifyListeners();
       return true;
     } else {

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 import '../models/user.dart';
+import 'push_notification_service.dart';
 
 class AuthResult {
   final bool success;
@@ -66,12 +67,20 @@ class AuthService {
     required String password,
   }) async {
     try {
+      final fcmToken = await PushNotificationService.getTokenSafe();
       final uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/signup');
       final r = await http
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'username': username, 'email': email, 'password': password}),
+            body: jsonEncode({
+              'username': username,
+              'email': email,
+              'password': password,
+              'fcm_token': fcmToken ?? '',
+              'platform': 'android',
+              'device_name': 'Android Mobile'
+            }),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -94,12 +103,19 @@ class AuthService {
     required String password,
   }) async {
     try {
+      final fcmToken = await PushNotificationService.getTokenSafe();
       final uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/login');
       final r = await http
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email, 'password': password}),
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              'fcm_token': fcmToken ?? '',
+              'platform': 'android',
+              'device_name': 'Android Mobile'
+            }),
           )
           .timeout(const Duration(seconds: 8));
 
