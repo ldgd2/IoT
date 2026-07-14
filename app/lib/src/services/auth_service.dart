@@ -45,6 +45,25 @@ class AuthService {
     }
   }
 
+  static Future<void> logoutRemote() async {
+    try {
+      final token = await getSavedToken();
+      if (token == null || token.isEmpty) return;
+      final fcmToken = await PushNotificationService.getTokenSafe();
+      final uri = Uri.parse('${ApiConstants.serverBaseUrl}/auth/logout');
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fcm_token': fcmToken ?? '',
+        }),
+      ).timeout(const Duration(seconds: 4));
+    } catch (_) {}
+  }
+
   static Future<void> clearSession() async {
     final sp = await SharedPreferences.getInstance();
     await sp.remove(_tokenKey);

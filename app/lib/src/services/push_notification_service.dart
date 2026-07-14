@@ -158,22 +158,32 @@ class PushNotificationService {
       final sp = await SharedPreferences.getInstance();
       _cachedFcmToken = sp.getString('fcm_token_v1');
       if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
-        // Tentar obtener token de FCM en background
         _firebaseMessaging.getToken().then((tok) {
-          if (tok != null && tok.isNotEmpty) {
+          if (tok != null && tok.isNotEmpty && tok != _cachedFcmToken) {
             _cachedFcmToken = tok;
             sp.setString('fcm_token_v1', tok);
+            registerTokenWithBackend(tok);
           }
         }).catchError((_) {});
         return _cachedFcmToken;
       }
-      final token = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 4));
+      
+      // Intentar obtener el token con 10s de timeout y guardar siempre
+      _firebaseMessaging.getToken().then((tok) async {
+        if (tok != null && tok.isNotEmpty) {
+          _cachedFcmToken = tok;
+          final spLocal = await SharedPreferences.getInstance();
+          await spLocal.setString('fcm_token_v1', tok);
+        }
+      }).catchError((_) {});
+
+      final token = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 10));
       if (token != null && token.isNotEmpty) {
         _cachedFcmToken = token;
         await sp.setString('fcm_token_v1', token);
       }
     } catch (e) {
-      log("No se pudo obtener el token FCM en línea: $e");
+      log("No se pudo obtener el token FCM en línea en getTokenSafe: $e");
     }
     return _cachedFcmToken;
   }
@@ -268,10 +278,10 @@ class PushNotificationService {
   /// Elimina el FCM token del servidor (Nube VPS y Hub local) al cerrar sesión.
   static Future<void> unregisterTokenFromBackend() async {
     try {
-      final token = await getTokenSafe();
-      if (token == null || token.isEmpty) return;
-
       final sp = await SharedPreferences.getInstance();
+      String token = await getTokenSafe() ?? sp.getString('fcm_token_v1') ?? '';
+      if (token.isEmpty) return;
+
       final jwtToken = sp.getString('auth_token_v1') ?? '';
 
       // 1) Eliminar en Nube VPS
