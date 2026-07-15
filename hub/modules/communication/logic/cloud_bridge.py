@@ -62,6 +62,8 @@ class CloudBridgeWorker:
     def _loop(self):
         # Pequeño retraso inicial para permitir que el Hub levante la DB
         time.sleep(2)
+        if os.environ.get("HUB_ID"):
+            self._sync_devices()
         while self.running:
             try:
                 if not os.environ.get("HUB_ID"):
@@ -137,10 +139,11 @@ class CloudBridgeWorker:
         if not os.environ.get("HUB_ID") or not getattr(self, "bridge_url", None):
             return
         try:
+            from hub.core.config import get_hub_lan_url
             devices = [d.to_dict() for d in Device.all()]
             requests.post(
                 f"{self.bridge_url}/api/hub/sync",
-                json={"devices": devices, "ts": datetime.now().isoformat()},
+                json={"devices": devices, "local_url": get_hub_lan_url(), "ts": datetime.now().isoformat()},
                 headers=self._get_headers(),
                 timeout=(5, 12)
             )

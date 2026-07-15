@@ -188,6 +188,8 @@ def api_register_hub():
     if existing:
         hub_id = existing["hub_id"]
         relay_secret = existing["relay_secret"]
+        if not local_url or "127.0.0.1" in local_url or "localhost" in local_url:
+            local_url = existing["local_url"]
         db.execute(
             "UPDATE hubs SET name = ?, local_url = ? WHERE hub_id = ?",
             (name, local_url, hub_id)
@@ -203,6 +205,8 @@ def api_register_hub():
 
     hub_id = req_hub_id if req_hub_id else str(uuid.uuid4())
     relay_secret = _generate_secret()
+    if (not local_url or "127.0.0.1" in local_url or "localhost" in local_url) and request.remote_addr and request.remote_addr not in ("127.0.0.1", "::1"):
+        local_url = f"http://{request.remote_addr}:5000"
     
     db.execute(
         "INSERT INTO hubs (hub_id, user_id, name, local_url, relay_secret, created_at) VALUES (?, ?, ?, ?, ?, ?)",

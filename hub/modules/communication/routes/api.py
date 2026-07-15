@@ -499,20 +499,14 @@ def api_hub_pair():
         server_url = server_url[:-4]
     server_url = server_url.rstrip('/')
     
-    # Intentar obtener la IP local del hub para enviarla al servidor
-    local_ip = "127.0.0.1:5000"
-    try:
-        local_ip = request.host
-    except:
-        pass
-
+    from hub.core.config import get_hub_lan_url
     import requests
     try:
         # Registrar el hub en el servidor usando el token del usuario
         headers = {"Authorization": f"Bearer {user_token}", "Content-Type": "application/json"}
         payload = {
             "name": name,
-            "local_url": f"http://{local_ip}",
+            "local_url": get_hub_lan_url(),
             "hub_id": os.environ.get("HUB_ID", "")
         }
         

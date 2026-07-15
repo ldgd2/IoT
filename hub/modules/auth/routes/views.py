@@ -20,8 +20,9 @@ def _auto_link_with_vps(vps_url, token, identifier):
     if not os.environ.get("HUB_ID") and token:
         try:
             hub_name = os.environ.get("HUB_NAME", "Central Colmena Hub")
+            from hub.core.config import get_hub_lan_url
             reg_headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-            reg_r = requests.post(f"{vps_url}/hubs", json={"name": hub_name, "local_url": "http://127.0.0.1:5000", "hub_id": os.environ.get("HUB_ID", "")}, headers=reg_headers, timeout=5)
+            reg_r = requests.post(f"{vps_url}/hubs", json={"name": hub_name, "local_url": get_hub_lan_url(), "hub_id": os.environ.get("HUB_ID", "")}, headers=reg_headers, timeout=5)
             if reg_r.status_code in [200, 201]:
                 reg_data = reg_r.json()
                 new_hub_id = reg_data.get("hub_id")

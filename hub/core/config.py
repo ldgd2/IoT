@@ -26,3 +26,15 @@ RF_BAUD = int(os.getenv("RF_BAUD", 9600))
 # Coordenadas por defecto para el Clima (Ej: La Paz, Bolivia)
 LATITUDE = float(os.getenv("LATITUDE", -16.5000))
 LONGITUDE = float(os.getenv("LONGITUDE", -68.1193))
+
+def get_hub_lan_url():
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return f"http://{ip}:{API_PORT}"
+    except Exception:
+        return f"http://127.0.0.1:{API_PORT}"
+

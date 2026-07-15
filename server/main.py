@@ -149,14 +149,15 @@ def hub_response():
     cmd_id = data.get("cmd_id")
     result = data.get("result", {})
     
-    if cmd_id and hub_id in pending_commands and cmd_id in pending_commands[hub_id]:
+    if cmd_id:
         with condition_lock:
-            del pending_commands[hub_id][cmd_id]
+            if hub_id in pending_commands and cmd_id in pending_commands[hub_id]:
+                del pending_commands[hub_id][cmd_id]
             completed_responses[cmd_id] = result
             condition_lock.notify_all()
         return jsonify({"status": "ok"}), 200
         
-    return jsonify({"status": "error", "message": "Trabajo no encontrado"}), 404
+    return jsonify({"status": "error", "message": "ID no encontrado"}), 400
 
 
 def _persist_hub_devices(hub_id: str, user_id: str, devs: list):
@@ -204,6 +205,13 @@ def hub_sync():
     hub_id = request.hub_record["hub_id"]
     user_id = request.hub_record["user_id"]
     data = request.get_json(silent=True) or {}
+    local_url = data.get("local_url")
+    if local_url and isinstance(local_url, str) and local_url.startswith("http") and "127.0.0.1" not in local_url and "localhost" not in local_url:
+        try:
+            from server.db.database import execute
+            execute("UPDATE hubs SET local_url = ? WHERE hub_id = ?", (local_url, hub_id))
+        except Exception:
+            pass
     devs = data.get("devices")
     if isinstance(devs, list):
         _detect_and_notify_offline(hub_id, devs)
@@ -467,7 +475,7 @@ def relay_api_pairing(hub_id=None):
     target_hub = _get_target_hub_id(hub_id)
     data = request.get_json(silent=True) or {}
     action = data.get("action", "start")
-    res, status = _execute_relay_job(target_hub, {"cmd": "pairing", "action": action})
+    res, status = _execute_relay_job(target_hub, {"cmd": "pairing", "action": action}, timeout=7.0)
     return jsonify(res), status
 
 
@@ -476,7 +484,7 @@ def relay_api_pairing(hub_id=None):
 @require_auth
 def relay_api_pairing_status(hub_id=None):
     target_hub = _get_target_hub_id(hub_id)
-    res, status = _execute_relay_job(target_hub, {"cmd": "pairing_status"}, timeout=3.5)
+    res, status = _execute_relay_job(target_hub, {"cmd": "pairing_status"}, timeout=6.0)
     return jsonify(res), status
 
 
