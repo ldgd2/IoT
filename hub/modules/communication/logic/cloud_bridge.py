@@ -142,7 +142,7 @@ class CloudBridgeWorker:
                 f"{self.bridge_url}/api/hub/sync",
                 json={"devices": devices, "ts": datetime.now().isoformat()},
                 headers=self._get_headers(),
-                timeout=3
+                timeout=(5, 12)
             )
             self.stats["syncs_sent"] += 1
             self.stats["last_sync_time"] = datetime.now().strftime("%H:%M:%S")
@@ -151,16 +151,19 @@ class CloudBridgeWorker:
             pass
 
     def send_event(self, event_type, payload):
-        """Notifica eventos instantáneos del Hub al Servidor exterior (ej. device_paired, device_unpaired)"""
+        """Notifica eventos instantáneos del Hub al Servidor exterior de forma asíncrona"""
         if not os.environ.get("HUB_ID") or not getattr(self, "bridge_url", None):
             return
+        threading.Thread(target=self._send_event_thread, args=(event_type, payload), daemon=True).start()
+
+    def _send_event_thread(self, event_type, payload):
         try:
             self._sync_devices()
             requests.post(
                 f"{self.bridge_url}/api/hub/event",
                 json={"event": event_type, "payload": payload, "ts": datetime.now().isoformat()},
                 headers=self._get_headers(),
-                timeout=4
+                timeout=(5, 12)
             )
             print(f"[CLOUD BRIDGE] Evento saliente '{event_type}' notificado al servidor en nube.")
         except Exception as e:

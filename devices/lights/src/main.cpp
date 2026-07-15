@@ -160,10 +160,10 @@ void loop() {
                         break;
 
                     case CMD_CONTROL: {
-                        // Soportar formato bitwise en data[0..3] junto con bytes individuales en data[4..25] o data[0..]
+                        // Soportar formato bitwise en data[0..3] junto con bytes individuales en data[4..25]
                         uint32_t receivedMask = ((uint32_t)pkt.data[3] << 24) | ((uint32_t)pkt.data[2] << 16) | ((uint32_t)pkt.data[1] << 8) | pkt.data[0];
                         for (uint8_t i = 0; i < RELAY_COUNT && i < RelayBank::MAX_RELAYS; i++) {
-                            bool chOn = (receivedMask & (1UL << i)) || (pkt.data[i] != 0) || (i + 4 < 26 && pkt.data[i + 4] != 0);
+                            bool chOn = (receivedMask & (1UL << i)) || (i + 4 < 26 && pkt.data[i + 4] != 0);
                             relays.setState(i, chOn);
                         }
                         if (isRadioOk) {
@@ -173,21 +173,33 @@ void loop() {
                     }
 
                     case CMD_ON:
-                        relays.setState(pkt.data[0], true);
+                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
+                            relays.setState(pkt.data[0], true);
+                        } else {
+                            relays.setAll(true);
+                        }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());
                         }
                         break;
 
                     case CMD_OFF:
-                        relays.setState(pkt.data[0], false);
+                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
+                            relays.setState(pkt.data[0], false);
+                        } else {
+                            relays.setAll(false);
+                        }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());
                         }
                         break;
 
                     case CMD_TOGGLE:
-                        relays.toggle(pkt.data[0]);
+                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
+                            relays.toggle(pkt.data[0]);
+                        } else {
+                            relays.toggleAll();
+                        }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());
                         }

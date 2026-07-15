@@ -76,12 +76,12 @@
     #define RELAY_PIN_2      7
     #define RELAY_PIN_3      8
     #define RELAY_COUNT      4
-    #define RELAY_ACTIVE_LOW false
+    #define RELAY_ACTIVE_LOW true
 
 #elif defined(IS_ESP8266)
     #define RELAY_PIN_0      5    // D1 = GPIO5
     #define RELAY_COUNT      1
-    #define RELAY_ACTIVE_LOW false
+    #define RELAY_ACTIVE_LOW true
 
 #elif defined(IS_ESP32)
     #define RELAY_PIN_0      25
@@ -89,13 +89,13 @@
     // #define RELAY_PIN_2    27
     // #define RELAY_PIN_3    14
     #define RELAY_COUNT      1
-    #define RELAY_ACTIVE_LOW false
+    #define RELAY_ACTIVE_LOW true
 
 #else
     // Arduino
     #define RELAY_PIN_0      5
     #define RELAY_COUNT      1
-    #define RELAY_ACTIVE_LOW false
+    #define RELAY_ACTIVE_LOW true
 #endif
 
 // ─── Botón de Vinculación (pair / táctil) ──────────────────────────────────

@@ -34,7 +34,7 @@ class LightDevice(BaseDeviceController):
                 "default": 255
             })
             
-        # Si tiene relés/switches, informar la capacidad multicanal por máscara
+        # Si tiene relés/switches, informar la capacidad multicanal y cada switch individual
         if "relay" in self.feature_keys or self.category in ("switching", "light"):
             params.append({
                 "key": "mask",
@@ -44,6 +44,17 @@ class LightDevice(BaseDeviceController):
                 "desc": "Control autogestionado multicanal donde cada bit representa el estado lógico de un switch (bit 0 = ch1, bit 1 = ch2...).",
                 "default": 0
             })
+            for i in range(1, 9):
+                k = f"ch{i}"
+                if k in self.state or i <= 4 or "relay" in self.feature_keys:
+                    params.append({
+                        "key": k,
+                        "label": f"Canal {i}",
+                        "type": "Booleano (True / False)",
+                        "control": "switch",
+                        "desc": f"Control individual independiente para el relé/canal {i}.",
+                        "default": False
+                    })
             
         return params
 
@@ -54,6 +65,13 @@ class LightDevice(BaseDeviceController):
         ]
         if "dimmer" in self.feature_keys or self.type_code in (0x02, 0x04, 0x09):
             params.append({"key": "brightness", "unit": "PWM", "label": "Nivel de Brillo", "desc": "Valor reportado de brillo (0-255)."})
+        if "relay" in self.feature_keys or self.category in ("switching", "light"):
+            for i in range(1, 9):
+                k = f"ch{i}"
+                if k in self.state or i <= 4 or "relay" in self.feature_keys:
+                    params.append({
+                        "key": k, "unit": "", "label": f"Canal {i}", "desc": f"Estado reportado del relé individual {i}."
+                    })
         return params
 
     def decode_rx(self, cmd: int, raw_data: List[int]) -> Dict[str, Any]:
@@ -134,9 +152,5 @@ class LightDevice(BaseDeviceController):
             except Exception:
                 pass
 
-        # Si solo enviamos encendido o apagado general (sin canales ni mask explícito)
-        if "on" in params and not any(k.startswith("ch") and k[2:].isdigit() for k in params.keys()) and "mask" not in params:
-            cmd_byte = 0x01 if params["on"] else 0x02
-            return (cmd_byte, data_payload)
-
+        # Mandar siempre CMD_CONTROL (0x10) con el bitmask exacto para que el nodo aplique el estado exacto de cada canal
         return (0x10, data_payload)

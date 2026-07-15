@@ -334,8 +334,21 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
         print(f"[SYNC] Error al detectar cambios de dispositivos: {e}")
 
 
+@app.route("/api/hub/event", methods=["POST"])
+@require_hub_auth
+def hub_event():
+    hub_id = request.hub_record["hub_id"]
+    user_id = request.hub_record["user_id"]
+    _update_hub_last_seen(hub_id)
+    data = request.get_json(silent=True) or {}
+    event_type = data.get("event")
+    payload = data.get("payload", {})
+    if event_type in ("device_updated", "device_paired") and isinstance(payload, dict):
+        _persist_hub_devices(hub_id, user_id, [payload])
+    return jsonify({"status": "received", "event": event_type}), 200
+
 # =============================================================
-# RUTAS PARA EL TELÉFONO MÓVIL (APP)
+# 4. COMANDO HACIA EL HUB DESDE EL TELÉFONO (MODO RELAY)
 # =============================================================
 from server.modules.auth.middleware import require_auth
 
@@ -352,7 +365,7 @@ def relay_command(hub_id):
 
     from server.db import database as db
     # Validar que el hub pertenece al usuario
-    hub = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (hub_id, request.environ.get('flask.g').user["user_id"])).fetchone()
+    hub = db.execute("SELECT * FROM hubs WHERE hub_id = ? AND user_id = ?", (hub_id, g.user["user_id"])).fetchone()
     if not hub:
         return jsonify({"error": "Hub no encontrado o no pertenece al usuario"}), 404
 
