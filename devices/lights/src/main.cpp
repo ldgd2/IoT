@@ -97,7 +97,8 @@ void setup() {
     } else {
         isRadioOk = true;
         colmena.startPairingWindow(NODE_NAME);   // Activar ventana de búsqueda automática por 50s
-        rgbLed.startPairing();         // Iniciar animación de vinculación al alimentar el nodo
+        rgbLed.startPairing();                   // Iniciar animación de vinculación al alimentar el nodo
+        colmena.sendHeartbeat(relays.getMask()); // Enviar estado real (apagado al arranque) de inmediato al Hub
         testSerial.printRfDiagnostics(true);
     }
 
@@ -173,10 +174,10 @@ void loop() {
                     }
 
                     case CMD_ON:
-                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
-                            relays.setState(pkt.data[0], true);
-                        } else {
+                        if (pkt.data[0] == 0xFF) {
                             relays.setAll(true);
+                        } else if (pkt.data[0] < RELAY_COUNT) {
+                            relays.setState(pkt.data[0], true);
                         }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());
@@ -184,10 +185,10 @@ void loop() {
                         break;
 
                     case CMD_OFF:
-                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
-                            relays.setState(pkt.data[0], false);
-                        } else {
+                        if (pkt.data[0] == 0xFF) {
                             relays.setAll(false);
+                        } else if (pkt.data[0] < RELAY_COUNT) {
+                            relays.setState(pkt.data[0], false);
                         }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());
@@ -195,10 +196,10 @@ void loop() {
                         break;
 
                     case CMD_TOGGLE:
-                        if (pkt.dataLen > 0 && pkt.data[0] < RELAY_COUNT) {
-                            relays.toggle(pkt.data[0]);
-                        } else {
+                        if (pkt.data[0] == 0xFF) {
                             relays.toggleAll();
+                        } else if (pkt.data[0] < RELAY_COUNT) {
+                            relays.toggle(pkt.data[0]);
                         }
                         if (isRadioOk) {
                             colmena.sendHeartbeat(relays.getMask());

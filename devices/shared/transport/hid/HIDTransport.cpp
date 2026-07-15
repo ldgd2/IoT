@@ -21,7 +21,7 @@ bool HIDTransport::begin() {
     TinyUSBDevice.setProductDescriptor(USBD_PRODUCT_STRING);
     TinyUSBDevice.setID(HID_VID, HID_PID);
 
-    // Registrar callback de recepción ANTES de begin()
+    // Registrar callbacks de recepción ANTES de begin()
     _hid.setReportCallback(NULL, _onSetReport);
 
     // Iniciar stack HID — esto gatilla la enumeración USB con los descriptores ya configurados
@@ -132,10 +132,15 @@ void HIDTransport::_onSetReport(uint8_t report_id, hid_report_type_t report_type
     (void)report_id;
     (void)report_type;
 
-    if (bufsize >= sizeof(RFPacket)) {
-        memcpy(_rxBuf, buffer, 64 < bufsize ? 64 : bufsize);
-        _hasPacket = true;
+    if (!buffer || bufsize < sizeof(RFPacket)) return;
+
+    // Si el primer byte es 0x00 (Report ID devuelto por el stack USB) y detrás vienen al menos 32 bytes de RFPacket
+    if (buffer[0] == 0x00 && bufsize >= (sizeof(RFPacket) + 1)) {
+        memcpy(_rxBuf, buffer + 1, sizeof(RFPacket));
+    } else {
+        memcpy(_rxBuf, buffer, sizeof(RFPacket));
     }
+    _hasPacket = true;
 }
 
 #endif // IS_RP2040 && USE_TINYUSB

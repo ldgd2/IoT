@@ -9,7 +9,7 @@ import os
 import time
 import uuid
 import threading
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 import requests
 from datetime import datetime
 
@@ -218,7 +218,6 @@ def hub_sync():
 def hub_event():
     hub_id = request.hub_record["hub_id"]
     user_id = request.hub_record["user_id"]
-    _update_hub_last_seen(hub_id)
     data = request.get_json(silent=True) or {}
     event_type = data.get("event")
     payload = data.get("payload", {})

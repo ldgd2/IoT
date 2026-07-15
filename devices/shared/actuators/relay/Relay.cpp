@@ -6,8 +6,8 @@ void Relay::init(uint8_t pin, bool activeLow) {
     _pin       = pin;
     _activeLow = activeLow;
     _state     = false;
-    pinMode(_pin, OUTPUT);
-    digitalWrite(_pin, _physicalLevel(false));  // Asegurar estado apagado al inicio
+    digitalWrite(_pin, _physicalLevel(false));  // Escribir nivel apagado antes de habilitar el buffer de salida
+    pinMode(_pin, OUTPUT);                      // Ahora al pasar a salida, el pin se mantiene en apagado (sin click de encendido)
 }
 
 void Relay::setState(bool on) {

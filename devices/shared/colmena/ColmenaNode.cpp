@@ -112,6 +112,7 @@ void ColmenaNode::applySync(const RFPacket& pkt) {
     _p.heartbeatInterval = GatewayPayload::getConfigHeartbeat(pkt);
     GatewayPayload::getConfigName(pkt, _p.colmenaName, sizeof(_p.colmenaName));
     save();
+    sendHeartbeat(0, 0); // Notificar al Hub y a la nube del estado real de inmediato tras sincronizar
     Serial.println("[RX RF] Configuración de red sincronizada y guardada.");
 }
 
