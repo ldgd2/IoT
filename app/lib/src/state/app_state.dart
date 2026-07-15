@@ -213,7 +213,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     if (d != null && (d.isRf || d.hubIp != null || _hubHost.isNotEmpty)) {
-      final target = d.hubIp ?? _hubHost;
+      final target = _hubHost.isNotEmpty ? _hubHost : (d.hubIp ?? _hubHost);
       try {
         final headers = await _getAuthHeaders();
         final uri1 = Uri.parse('http://$target/api/device/$id');
@@ -270,7 +270,7 @@ class AppState extends ChangeNotifier {
   /// Registra o actualiza un dispositivo en la base de datos SQLite del Hub.
   /// Debe llamarse siempre que el usuario vincule un dispositivo RF manualmente.
   Future<bool> registerDeviceOnHub(Device d) async {
-    final target = d.hubIp ?? _hubHost;
+    final target = _hubHost.isNotEmpty ? _hubHost : (d.hubIp ?? _hubHost);
     try {
       final sp = await SharedPreferences.getInstance();
       final userRaw = sp.getString('auth_user_v1');
@@ -344,7 +344,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> sendRfCommand(Device d, String cmd, Map<String, dynamic> params) async {
-    final target = d.hubIp ?? _hubHost;
+    final target = _hubHost.isNotEmpty ? _hubHost : (d.hubIp ?? _hubHost);
     final payload = {
       'id': d.rfNodeId ?? d.id,
       'cmd': cmd,
@@ -386,7 +386,7 @@ class AppState extends ChangeNotifier {
   Future<Device?> refreshDevice(Device d) async {
     try {
       if (d.isRf) {
-        final target = d.hubIp ?? _hubHost;
+        final target = _hubHost.isNotEmpty ? _hubHost : (d.hubIp ?? _hubHost);
         final uri = Uri.parse('http://$target/api/device/${d.rfNodeId ?? d.id}');
         final r = await http.get(uri).timeout(const Duration(seconds: 8));
         if (r.statusCode == 200) {

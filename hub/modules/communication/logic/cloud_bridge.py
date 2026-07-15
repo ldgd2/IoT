@@ -282,6 +282,17 @@ class CloudBridgeWorker:
             devices = [d.to_dict() for d in Device.all()]
             return {"ok": True, "devices": devices}
 
+        if cmd == "get_device":
+            reg_id = payload.get("device_id") or payload.get("id")
+            dev = Device.get(reg_id) if reg_id else None
+            if not dev and str(reg_id).startswith("dev_"):
+                dev = Device.get(str(reg_id).split("_", 1)[1])
+            if not dev and not str(reg_id).startswith("dev_"):
+                dev = Device.get(f"dev_{reg_id}")
+            if not dev:
+                return {"ok": False, "error": "not found"}
+            return {"ok": True, "device": dev.to_dict()}
+
         if cmd in ("register_device", "update_device"):
             reg_id = payload.get("device_id") or payload.get("id")
             if not reg_id:
@@ -335,7 +346,7 @@ class CloudBridgeWorker:
         if isinstance(dev.state, dict):
             dev.state.update(params)
         dev.status = "online"
-        dev.save()
+        dev.update(dev.state if isinstance(dev.state, dict) else params)
 
         # 2. Registrar en el log de comunicaciones RF
         log = RFLog(

@@ -538,6 +538,26 @@ def relay_api_update_device(device_id):
     return jsonify(res), status
 
 
+@app.route("/api/device/<device_id>", methods=["GET"])
+@app.route("/api/devices/<device_id>", methods=["GET"])
+@require_auth
+def relay_api_get_device(device_id):
+    target_hub = _get_target_hub_id()
+    if not target_hub:
+        return jsonify({"error": "Hub no encontrado"}), 404
+    if target_hub in cached_devices and cached_devices[target_hub]:
+        for d in cached_devices[target_hub]:
+            if str(d.get("device_id") or d.get("id")) == str(device_id) or str(d.get("rfNodeId")) == str(device_id):
+                return jsonify(d), 200
+    payload = {"cmd": "get_device", "device_id": device_id}
+    res, status = _execute_relay_job(target_hub, payload, timeout=3.5)
+    if status == 200 and isinstance(res, dict) and res.get("ok"):
+        return jsonify(res.get("device") or res), 200
+    elif status == 200 and isinstance(res, dict) and "device_id" in res:
+        return jsonify(res), 200
+    return jsonify({"error": "Dispositivo no encontrado"}), status
+
+
 @app.route("/api/device/<device_id>", methods=["DELETE"])
 @app.route("/api/devices/<device_id>", methods=["DELETE"])
 @app.route("/api/hubs/<hub_id>/devices/<device_id>", methods=["DELETE"])

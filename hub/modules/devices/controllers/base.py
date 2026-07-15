@@ -112,8 +112,7 @@ class BaseDeviceController:
         self.orm_device.status = "online"
         if rssi is not None:
             self.orm_device.rssi = rssi
-        self.orm_device.msg_count = getattr(self.orm_device, "msg_count", 0) + 1
-        self.orm_device.save()
+        self.orm_device.update(current_state, rssi)
 
     def execute_command(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """

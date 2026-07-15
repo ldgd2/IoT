@@ -267,7 +267,7 @@ def api_command():
     else:
         if isinstance(dev.state, dict):
             dev.state.update(params)
-        dev.save()
+        dev.update(dev.state if isinstance(dev.state, dict) else params)
 
     log = RFLog(
         ts=datetime.now().isoformat(),

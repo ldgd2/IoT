@@ -222,7 +222,7 @@ class EvaluatorEngine:
                         dev.state["on"] = False
                     elif str(cmd_str).upper() == "TOGGLE":
                         dev.state["on"] = not dev.state.get("on", False)
-                    dev.save()
+                    dev.update(dev.state)
                 
             elif atype == "action_dimmer":
                 bright = act.get("brightness") if "brightness" in act else cfg.get("brightness", 100)
@@ -232,7 +232,7 @@ class EvaluatorEngine:
                     if not isinstance(dev.state, dict): dev.state = {}
                     dev.state["brightness"] = int(bright)
                     dev.state["on"] = int(bright) > 0
-                    dev.save()
+                    dev.update(dev.state)
                 
             elif atype == "action_color":
                 color = act.get("color") or cfg.get("color", "#FFFFFF")
@@ -244,7 +244,7 @@ class EvaluatorEngine:
                     dev.state["color"] = color
                     dev.state["brightness"] = int(bright)
                     dev.state["on"] = int(bright) > 0
-                    dev.save()
+                    dev.update(dev.state)
                 
             elif atype == "action_buzzer":
                 seconds = act.get("seconds") if "seconds" in act else cfg.get("seconds", 3)

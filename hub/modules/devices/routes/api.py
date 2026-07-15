@@ -82,7 +82,7 @@ def api_update_device(device_id):
             dev.state.update(data["state"])
         else:
             dev.state = data["state"]
-    dev.save()
+    dev.update(dev.state if isinstance(dev.state, dict) else {})
 
     try:
         from hub.modules.communication.logic.cloud_bridge import cloud_bridge
