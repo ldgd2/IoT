@@ -187,7 +187,7 @@
                         setTimeout(() => { window.location.href = '/devices'; }, 2000);
                         return;
                     }
-                    if (pairData.status === 'success' || (initialDeviceCount !== null && statsData && statsData.total > initialDeviceCount)) {
+                    if (pairData.status === 'success' || (isPairingActive && initialDeviceCount !== null && statsData && statsData.total > initialDeviceCount)) {
                         let devInfo = pairData.last_device || null;
                         if (!devInfo) {
                             try {

@@ -240,12 +240,25 @@ void loop() {
         // 3. Verificación y Heartbeat natural reactivo
         if (colmena.isHeartbeatDue()) {
             if (!connection.getRadio().isChipConnected()) {
-                // Si se desconectó físicamente: avisa y se olvida (quedó desactivado)
-                isRadioOk = false;
-                rgbLed.showRfError();
-                testSerial.printRfDiagnostics(false);
+                safe_delay(10);
+                if (!connection.getRadio().isChipConnected()) {
+                    isRadioOk = false;
+                    rgbLed.showRfError();
+                    testSerial.printRfDiagnostics(false);
+                }
             } else {
                 colmena.tickHeartbeat(relays.getMask());
+            }
+        }
+    } else {
+        static unsigned long lastRadioRetry = 0;
+        if (millis() - lastRadioRetry > 3000UL) {
+            lastRadioRetry = millis();
+            if (connection.begin() && connection.getRadio().isChipConnected()) {
+                isRadioOk = true;
+                rgbLed.clearRfError();
+                colmena.announce(NODE_NAME);
+                testSerial.printRfDiagnostics(true);
             }
         }
     }
@@ -254,18 +267,15 @@ void loop() {
 #ifdef PAIR_BUTTON_PIN
     ButtonEvent btn = colmena.checkButtonEvent(NODE_NAME);
 
-    // Si la radio estaba desactivada por error, re-verificar ÚNICAMENTE al presionar botón o al tocar el heartbeat programado
-    if (!isRadioOk && (btn != BTN_NONE || colmena.isHeartbeatDue())) {
+    // Si la radio estaba desactivada por error, intentar reconexión al presionar un botón físico
+    if (!isRadioOk && btn != BTN_NONE) {
         if (connection.begin() && connection.getRadio().isChipConnected()) {
-            // ¡Lo arreglaron o reconectaron! Al tiro todo nice y se olvida el error
             isRadioOk = true;
             rgbLed.clearRfError();
             colmena.announce(NODE_NAME);
             testSerial.printRfDiagnostics(true);
         } else {
-            // Volvió a fallar o sigue desconectado: marca error
             rgbLed.showRfError();
-            colmena.resetHeartbeatTimer();
         }
     }
 

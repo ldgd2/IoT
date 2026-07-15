@@ -60,32 +60,29 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     final app = context.read<AppState>();
     if (app.hubHost.isNotEmpty) {
       hostCtrl.text = app.hubHost;
-      step = _RfStep.chooseKind;
     } else {
       hostCtrl.text = '192.168.1.48:5000';
+      app.setHubHost('192.168.1.48:5000');
     }
+    step = _RfStep.chooseKind;
+
     AuthService.getUserHubs().then((list) {
       if (mounted && list.isNotEmpty) {
         setState(() {
           myHubs = list;
-          if (app.hubHost.isEmpty) {
+          if (app.hubHost.isEmpty || app.hubHost == '192.168.1.48:5000') {
             final firstUrl = list.first['local_url']?.toString() ?? list.first['cloud_url']?.toString() ?? '';
             final target = firstUrl.isNotEmpty ? firstUrl : '192.168.1.48:5000';
             hostCtrl.text = target;
             app.setHubHost(target);
-            step = _RfStep.chooseKind;
           }
         });
       }
     });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (app.hubConnected || app.hubHost.isNotEmpty) {
-        if (app.hubHost.isNotEmpty && hostCtrl.text.isEmpty) hostCtrl.text = app.hubHost;
-        if (step == _RfStep.connectHub && hostCtrl.text.isNotEmpty) {
-          setState(() => step = _RfStep.chooseKind);
-        }
-        _verifyHubConnection(silent: true);
-      }
+      if (hostCtrl.text.isEmpty) hostCtrl.text = '192.168.1.48:5000';
+      _verifyHubConnection(silent: true);
     });
   }
 

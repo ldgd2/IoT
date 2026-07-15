@@ -154,18 +154,16 @@ void loop() {
                     // Registrar siempre en tabla interna para recuperar nodos tras reinicio de RAM del traductor
                     colmena.onPacketReceived(pkt);
 
-                    if (isDiscover || (isUnknown && !isPairingMode)) {
+                    if (isPairingMode && (isDiscover || isUnknown)) {
                         const NodeInfo* n = colmena.findNode(pkt.originId);
                         if (n) {
                             snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
                             ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
-                            if (isPairingMode && isDiscover) {
-                                isPairingMode = false;
-                                char pairBuf[192];
-                                snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\",\"type\":%u,\"features\":%u}", n->nodeId, n->name, n->deviceType, n->features);
-                                pTransport->sendStatus(pairBuf);
-                                snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
-                            }
+                            isPairingMode = false;
+                            char pairBuf[192];
+                            snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\",\"type\":%u,\"features\":%u}", n->nodeId, n->name, n->deviceType, n->features);
+                            pTransport->sendStatus(pairBuf);
+                            snprintf(lastActivityStr, sizeof(lastActivityStr), "Nuevo nodo detectado");
                         }
                     }
 
@@ -187,6 +185,12 @@ void loop() {
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Error #%u aceptado", errCodeAck);
                 pTransport->sendAck(true, pkt.destId);
             } else if (pkt.command == CMD_PAIR_START) {
+                if (!isRadioOk) {
+                    if (connection.begin() && connection.getRadio().isChipConnected()) {
+                        isRadioOk = true;
+                    }
+                }
+                ColmenaError::clear();
                 isPairingMode = true;
                 pairingStartTime = millis();
                 snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: Buscando...");
@@ -207,15 +211,31 @@ void loop() {
                 pTransport->sendAck(true, pkt.destId);
             } else {
                 bool ok = false;
+                if (!isRadioOk) {
+                    if (connection.begin() && connection.getRadio().isChipConnected()) {
+                        isRadioOk = true;
+                        ColmenaError::clear();
+                    }
+                }
                 if (isRadioOk) {
                     ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
-                    // Si el envío falló, verificamos de forma reactiva si el chip se desconectó físicamente
+                    if (!ok) {
+                        safe_delay(15);
+                        ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                    }
+                    if (!ok) {
+                        safe_delay(15);
+                        ok = connection.send(&pkt, sizeof(pkt), pkt.destId);
+                    }
+                    // Verificamos de forma reactiva si el chip se desconectó físicamente SOLO si falló 3 veces
                     if (!ok && !connection.getRadio().isChipConnected()) {
-                        // Avisa y se olvida (quedó desactivado)
-                        isRadioOk = false;
-                        ColmenaError::raise(ERR_RADIO_INIT_FAIL, "NRF24 Desconectado");
-                        pTransport->sendStatus("{\"error\":\"radio_lost\",\"code\":101}");
-                        snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Radio NRF24 Desconectado");
+                        safe_delay(10);
+                        if (!connection.getRadio().isChipConnected()) {
+                            isRadioOk = false;
+                            ColmenaError::raise(ERR_RADIO_INIT_FAIL, "NRF24 Desconectado");
+                            pTransport->sendStatus("{\"error\":\"radio_lost\",\"code\":101}");
+                            snprintf(lastActivityStr, sizeof(lastActivityStr), "ERR: Radio NRF24 Desconectado");
+                        }
                     }
                 }
                 snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: ID %u CMD 0x%02X", pkt.destId, pkt.command);
@@ -232,9 +252,9 @@ void loop() {
     if (isRadioOk) {
         connection.update();
     } else {
-        // Si el radio estaba desactivado por error, intentamos recuperar ÚNICAMENTE al llegar una orden por USB/Serial o en eventos largos
+        // Si el radio estaba desactivado por error, intentamos recuperar periódicamente sin chequear cada milisegundo (3s)
         static unsigned long lastReactiveEvent = 0;
-        if (millis() - lastReactiveEvent > 30000UL) { // Evento espaciado largo natural (30s) sin chequear cada foking rato
+        if (millis() - lastReactiveEvent > 3000UL) {
             lastReactiveEvent = millis();
             if (connection.begin() && connection.getRadio().isChipConnected()) {
                 // Al tiro todo nice y se olvida el error
