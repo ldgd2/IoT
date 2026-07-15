@@ -16,7 +16,10 @@ _HUB_SECRET = None
 def _init_bridge():
     global _BRIDGE_URL, _HUB_ID, _HUB_SECRET
     if _BRIDGE_URL is None:
-        _BRIDGE_URL = (os.environ.get("CLOUD_SERVER_URL") or os.environ.get("CLOUD_BRIDGE_URL", "")).rstrip("/")
+        url = (os.environ.get("CLOUD_SERVER_URL") or os.environ.get("CLOUD_BRIDGE_URL", "")).rstrip("/")
+        if url.endswith("/api"):
+            url = url[:-4]
+        _BRIDGE_URL = url.rstrip("/")
         _HUB_ID = os.environ.get("HUB_ID", "")
         _HUB_SECRET = os.environ.get("HUB_RELAY_SECRET", "")
 

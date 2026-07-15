@@ -277,6 +277,31 @@ class CloudBridgeWorker:
             except Exception as e:
                 return {"ok": True, "notifications": []}
 
+        if cmd == "pairing":
+            action = payload.get("action", "").lower()
+            if not gateway.is_connected:
+                return {"ok": False, "error": "Gateway no conectado"}
+            if action == "start":
+                gateway.last_paired_device = None
+                res = gateway.send_command(0x00, 0x0D)
+                return {"ok": res, "mode": "pairing_started"}
+            elif action == "stop":
+                gateway.pairing_start_time = 0
+                res = gateway.send_command(0x00, 0x0E)
+                return {"ok": res, "mode": "pairing_stopped"}
+            else:
+                return {"ok": False, "error": "Accion invalida"}
+
+        if cmd == "pairing_status":
+            elapsed = int(time.time() - gateway.pairing_start_time) if getattr(gateway, "pairing_start_time", 0) > 0 else 0
+            return {
+                "status": getattr(gateway, "pairing_status", "idle"),
+                "last_tx": getattr(gateway, "last_tx", ""),
+                "last_rx": getattr(gateway, "last_rx", ""),
+                "elapsed": elapsed,
+                "last_device": getattr(gateway, "last_paired_device", None)
+            }
+
         # 4. Sincronización y Registro de dispositivos vía Relay
         if cmd in ("sync_devices", "get_devices"):
             devices = [d.to_dict() for d in Device.all()]

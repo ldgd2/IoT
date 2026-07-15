@@ -11,6 +11,7 @@ import uuid
 import threading
 from flask import Flask, request, jsonify
 import requests
+from datetime import datetime
 
 import sys as _sys
 from pathlib import Path as _Path
@@ -163,6 +164,7 @@ def _persist_hub_devices(hub_id: str, user_id: str, devs: list):
     try:
         from server.db.database import execute
         import json
+        from datetime import datetime
         now_str = datetime.now().isoformat()
         for dev in devs:
             if not isinstance(dev, dict):
