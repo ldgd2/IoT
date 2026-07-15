@@ -218,6 +218,7 @@ def hub_sync():
 def hub_event():
     hub_id = request.hub_record["hub_id"]
     user_id = request.hub_record["user_id"]
+    _update_hub_last_seen(hub_id)
     data = request.get_json(silent=True) or {}
     event_type = data.get("event")
     payload = data.get("payload", {})
@@ -334,18 +335,7 @@ def _detect_and_notify_offline(hub_id: str, new_devices: list):
         print(f"[SYNC] Error al detectar cambios de dispositivos: {e}")
 
 
-@app.route("/api/hub/event", methods=["POST"])
-@require_hub_auth
-def hub_event():
-    hub_id = request.hub_record["hub_id"]
-    user_id = request.hub_record["user_id"]
-    _update_hub_last_seen(hub_id)
-    data = request.get_json(silent=True) or {}
-    event_type = data.get("event")
-    payload = data.get("payload", {})
-    if event_type in ("device_updated", "device_paired") and isinstance(payload, dict):
-        _persist_hub_devices(hub_id, user_id, [payload])
-    return jsonify({"status": "received", "event": event_type}), 200
+
 
 # =============================================================
 # 4. COMANDO HACIA EL HUB DESDE EL TELÉFONO (MODO RELAY)
