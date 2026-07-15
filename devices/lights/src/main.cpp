@@ -270,7 +270,7 @@ void loop() {
     }
 
     if (btn == BTN_SHORT_PRESS) {
-        relays.toggleAll();
+        relays.toggle(0);
         if (isRadioOk) {
             colmena.sendHeartbeat(relays.getMask());
         }

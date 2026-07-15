@@ -240,19 +240,18 @@ class Device {
     final parsed = _parseRelaysFromJson(v);
     if (parsed != null && parsed.isNotEmpty) return parsed;
 
-    // Si no vino lista en 'relays', revisemos si vinieron canales ch1, ch2, ch3, ch4 en el dict de estado
+    // Si no vino lista en 'relays', revisemos si vinieron canales ch1, ch2... en el dict de estado
     final extracted = <bool>[];
-    for (int i = 1; i <= 16; i++) {
+    final int maxChannels = status['ch_count'] is num ? (status['ch_count'] as num).toInt() : fallback.length;
+    for (int i = 1; i <= maxChannels; i++) {
       if (status.containsKey('ch$i')) {
         final val = status['ch$i'];
         extracted.add(val == true || val == 1 || val == '1' || val == 'ON' || val == 'on');
       } else {
-        // Si ya encontramos al menos 1 canal anterior pero no el chX, cortamos
-        if (extracted.isNotEmpty) break;
+        if (extracted.isNotEmpty && status['ch_count'] == null) break;
       }
     }
     if (extracted.isNotEmpty) {
-      // Si la lista extraída tiene menos canales que el fallback, rellenamos con el fallback
       if (extracted.length < fallback.length) {
         for (int i = extracted.length; i < fallback.length; i++) {
           extracted.add(fallback[i]);

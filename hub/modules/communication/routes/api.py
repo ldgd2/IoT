@@ -41,8 +41,12 @@ def process_incoming_packet(data):
                     if "relay" in reg_info["feature_keys"] or dev.category in ("switching", "light"):
                         current_state.setdefault("on", False)
                         current_state.setdefault("mask", 0)
-                        for i in range(1, 17):
+                        ch_count = current_state.get("ch_count", 4)
+                        current_state["ch_count"] = ch_count
+                        for i in range(1, ch_count + 1):
                             current_state.setdefault(f"ch{i}", False)
+                        for i in range(ch_count + 1, 17):
+                            current_state.pop(f"ch{i}", None)
                     dev.state = current_state
                     dev.status = "online"
                     dev.save()
@@ -128,8 +132,12 @@ def process_incoming_packet(data):
                 if "relay" in keys or dev.category in ("switching", "light"):
                     current_state.setdefault("on", False)
                     current_state.setdefault("mask", 0)
-                    for i in range(1, 17):
+                    ch_count = current_state.get("ch_count", 4)
+                    current_state["ch_count"] = ch_count
+                    for i in range(1, ch_count + 1):
                         current_state.setdefault(f"ch{i}", False)
+                    for i in range(ch_count + 1, 17):
+                        current_state.pop(f"ch{i}", None)
                 if "dimmer" in keys: current_state.setdefault("brightness", 0)
                 if "temperature" in keys: current_state.setdefault("temperature", 0.0)
                 if "humidity" in keys: current_state.setdefault("humidity", 0.0)

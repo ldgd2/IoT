@@ -7,7 +7,7 @@ class ApiConstants {
   // ── SERVIDOR REMOTO (Nube / Fuera de casa) ────────────────────────
   // Maneja: Auth, Usuarios, Salas, Notificaciones, Skills
   static const String remoteHostFromEnv =
-      String.fromEnvironment('HUB_HOST', defaultValue: 'localhost:8000');
+      String.fromEnvironment('HUB_HOST', defaultValue: '157.173.102.129:8000');
 
   /// URL base del Servidor — siempre apunta a la nube
   static String get serverBaseUrl => 'http://$remoteHostFromEnv/api';

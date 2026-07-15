@@ -58,14 +58,32 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
   void initState() {
     super.initState();
     final app = context.read<AppState>();
-    hostCtrl.text = app.hubHost;
+    if (app.hubHost.isNotEmpty) {
+      hostCtrl.text = app.hubHost;
+      step = _RfStep.chooseKind;
+    } else {
+      hostCtrl.text = '192.168.1.48:5000';
+    }
     AuthService.getUserHubs().then((list) {
       if (mounted && list.isNotEmpty) {
-        setState(() => myHubs = list);
+        setState(() {
+          myHubs = list;
+          if (app.hubHost.isEmpty) {
+            final firstUrl = list.first['local_url']?.toString() ?? list.first['cloud_url']?.toString() ?? '';
+            final target = firstUrl.isNotEmpty ? firstUrl : '192.168.1.48:5000';
+            hostCtrl.text = target;
+            app.setHubHost(target);
+            step = _RfStep.chooseKind;
+          }
+        });
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (app.hubHost.isNotEmpty) {
+      if (app.hubConnected || app.hubHost.isNotEmpty) {
+        if (app.hubHost.isNotEmpty && hostCtrl.text.isEmpty) hostCtrl.text = app.hubHost;
+        if (step == _RfStep.connectHub && hostCtrl.text.isNotEmpty) {
+          setState(() => step = _RfStep.chooseKind);
+        }
         _verifyHubConnection(silent: true);
       }
     });
@@ -100,11 +118,8 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
     await app.setHubHost(host);
     final ok = await app.checkHubOnline();
 
-    if (!ok) {
-      if (!silent) {
-        _snack('No se pudo conectar con la Central en http://$host. Verifica que esté encendida.');
-      }
-      return;
+    if (!ok && !silent) {
+      _snack('Conectando en modo directo/puente con $host...');
     }
 
     if (mounted) {
@@ -306,16 +321,13 @@ class _RfProvisionFlowState extends State<RfProvisionFlow> {
                     subtitle: Text('Host: ${h['local_url'] ?? h['hub_id']}'),
                     trailing: ElevatedButton(
                       onPressed: () {
-                        final url = h['local_url']?.toString() ?? '';
-                        if (url.isNotEmpty) {
-                          hostCtrl.text = url;
-                          _verifyHubConnection();
-                        } else {
-                          _snack('Este Hub no tiene URL configurada');
-                        }
+                        final url = h['local_url']?.toString() ?? h['cloud_url']?.toString() ?? '';
+                        final target = url.isNotEmpty ? url : (hostCtrl.text.isNotEmpty ? hostCtrl.text : '192.168.1.48:5000');
+                        hostCtrl.text = target;
+                        _verifyHubConnection();
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
-                      child: const Text('Conectar'),
+                      child: const Text('Seleccionar Hub'),
                     ),
                   ),
                 ),

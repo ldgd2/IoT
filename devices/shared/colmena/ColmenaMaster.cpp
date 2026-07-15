@@ -14,6 +14,9 @@ ColmenaMaster::ColmenaMaster(IConnection& conn, IParamStore& store)
 
 void ColmenaMaster::onPacketReceived(const RFPacket& pkt) {
     Serial.printf("[RX RF] Paquete recibido de Nodo %u | CMD: 0x%02X | Tipo: 0x%02X\r\n", pkt.originId, pkt.command, pkt.deviceType);
+    if (pkt.originId > 0 && pkt.originId <= 255) {
+        _conn.registerNodeRoute(pkt.originId, pkt.originId);
+    }
     NodeInfo* node = _findOrCreate(pkt.originId);
     if (!node) return;
 

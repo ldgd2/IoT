@@ -216,8 +216,9 @@ class IoTGateway:
                             self.last_rx = f"ID {origin} ➔ Gateway | CMD: {cmd_str}"
                             if cmd == 5:
                                 was_pairing_active = (self.pairing_status == "active")
-                                self.pairing_status = "success"
-                                self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
+                                if was_pairing_active:
+                                    self.pairing_status = "success"
+                                    self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
                                 try:
                                     # 0x07 = CMD_CONFIG_SYNC: [rfChannel=76, rfDataRate=0, heartbeat=15, 'C','o','l','m','e']
                                     self.send_command(dest_id=origin, command=0x07, device_type=dev_type, data=[76, 0, 15, 67, 111, 108, 109, 101])
@@ -260,18 +261,20 @@ class IoTGateway:
                                         self.pairing_status = "timeout"
                                         self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"
                                     elif event_dict.get("event") == "pairing_success":
-                                        event_dict["was_pairing_active"] = (self.pairing_status == "active") or True
-                                        self.pairing_status = "success"
-                                        self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
-                                        node_id = event_dict.get("nodeId") or event_dict.get("origin")
-                                        if node_id:
-                                            self.last_paired_device = {
-                                                "id": f"dev_{node_id}",
-                                                "origin": node_id,
-                                                "name": event_dict.get("name", f"Nodo {node_id}"),
-                                                "type": event_dict.get("type", 1),
-                                                "features": event_dict.get("features", 1)
-                                            }
+                                        was_pairing_active = (self.pairing_status == "active")
+                                        event_dict["was_pairing_active"] = was_pairing_active
+                                        if was_pairing_active:
+                                            self.pairing_status = "success"
+                                            self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
+                                            node_id = event_dict.get("nodeId") or event_dict.get("origin")
+                                            if node_id:
+                                                self.last_paired_device = {
+                                                    "id": f"dev_{node_id}",
+                                                    "origin": node_id,
+                                                    "name": event_dict.get("name", f"Nodo {node_id}"),
+                                                    "type": event_dict.get("type", 1),
+                                                    "features": event_dict.get("features", 1)
+                                                }
                                             try:
                                                 self.send_command(dest_id=int(node_id), command=0x07, device_type=0, data=[76, 0, 15, 67, 111, 108, 109, 101])
                                             except Exception:
@@ -298,18 +301,20 @@ class IoTGateway:
                                     self.pairing_status = "timeout"
                                     self.last_rx = "TIMEOUT: El traductor reporta ventana agotada (50s)"
                                 elif packet_dict.get("event") == "pairing_success":
-                                    packet_dict["was_pairing_active"] = (self.pairing_status == "active") or True
-                                    self.pairing_status = "success"
-                                    self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
-                                    node_id = packet_dict.get("nodeId") or packet_dict.get("origin")
-                                    if node_id:
-                                        self.last_paired_device = {
-                                            "id": f"dev_{node_id}",
-                                            "origin": node_id,
-                                            "name": packet_dict.get("name", f"Nodo {node_id}"),
-                                            "type": packet_dict.get("type", 1),
-                                            "features": packet_dict.get("features", 1)
-                                        }
+                                    was_pairing_active = (self.pairing_status == "active")
+                                    packet_dict["was_pairing_active"] = was_pairing_active
+                                    if was_pairing_active:
+                                        self.pairing_status = "success"
+                                        self.last_rx = "EXITO: Nuevo nodo emparejado con el traductor"
+                                        node_id = packet_dict.get("nodeId") or packet_dict.get("origin")
+                                        if node_id:
+                                            self.last_paired_device = {
+                                                "id": f"dev_{node_id}",
+                                                "origin": node_id,
+                                                "name": packet_dict.get("name", f"Nodo {node_id}"),
+                                                "type": packet_dict.get("type", 1),
+                                                "features": packet_dict.get("features", 1)
+                                            }
                                     if self.on_packet_received:
                                         self.on_packet_received(packet_dict)
                                 elif "cmd" in packet_dict and "origin" in packet_dict:
@@ -319,9 +324,11 @@ class IoTGateway:
                                     cmd_str = cmd_names.get(cmd, f"0x{cmd:02X}")
                                     self.last_rx = f"ID {origin} -> Gateway | CMD: {cmd_str}"
                                     if cmd == 5:
-                                        packet_dict["was_pairing_active"] = (self.pairing_status == "active")
-                                        self.pairing_status = "success"
-                                        self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
+                                        was_pairing_active = (self.pairing_status == "active")
+                                        packet_dict["was_pairing_active"] = was_pairing_active
+                                        if was_pairing_active:
+                                            self.pairing_status = "success"
+                                            self.last_paired_device = {"id": f"dev_{origin}", "origin": origin}
                                     else:
                                         packet_dict["was_pairing_active"] = (self.pairing_status == "active")
                                     if self.on_packet_received: self.on_packet_received(packet_dict)

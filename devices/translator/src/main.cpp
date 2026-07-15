@@ -92,14 +92,14 @@ static bool isRadioOk = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
-    // 0. Si se usa SerialTransport, inicializar aquí el Serial.
-    // Si se usa HIDTransport, inicializar TinyUSB.
-    transport.begin();
-
     // 1. Inicializar Display PRIMERO y mostrar pantalla de carga ("Iniciando...")
     displayDriver.init();
     ui.drawBootScreen("Colmena IoT", "Gateway v1.0", "Iniciando...");
-    delay(1200);
+    delay(400);
+
+    // 0. Si se usa SerialTransport, inicializar aquí el Serial.
+    // Si se usa HIDTransport, inicializar TinyUSB.
+    transport.begin();
 
     ColmenaError::registerUI(&ui);
     ColmenaError::registerTransport(pTransport);
@@ -154,15 +154,13 @@ void loop() {
                     // Registrar siempre en tabla interna para recuperar nodos tras reinicio de RAM del traductor
                     colmena.onPacketReceived(pkt);
 
-                    if (isDiscover || isUnknown) {
+                    if (isDiscover || (isUnknown && !isPairingMode)) {
                         const NodeInfo* n = colmena.findNode(pkt.originId);
                         if (n) {
                             snprintf(lastTxPktStr, sizeof(lastTxPktStr), "TX: SYNC ID %u", n->nodeId);
                             ui.drawDeviceDetectedAnimation(n->name, n->nodeId, n->deviceType);
-                            if (isPairingMode || isDiscover) {
-                                if (isPairingMode) {
-                                    isPairingMode = false;
-                                }
+                            if (isPairingMode && isDiscover) {
+                                isPairingMode = false;
                                 char pairBuf[192];
                                 snprintf(pairBuf, sizeof(pairBuf), "{\"event\":\"pairing_success\",\"status\":\"paired\",\"nodeId\":%u,\"name\":\"%s\",\"type\":%u,\"features\":%u}", n->nodeId, n->name, n->deviceType, n->features);
                                 pTransport->sendStatus(pairBuf);
@@ -195,10 +193,7 @@ void loop() {
                 snprintf(lastRxPktStr, sizeof(lastRxPktStr), "RX: Ninguno");
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Modo vinculacion ACTIVO");
                 pTransport->sendAck(true, pkt.destId);
-                // Enviar un CMD_REPORT broadcast para que todos los dispositivos cercanos se anuncien de inmediato
-                if (isRadioOk) {
-                    colmena.broadcastPing();
-                }
+                // No hacemos broadcastPing aquí para no disparar CMD_DISCOVER de nodos viejos que cancelarían el emparejamiento inmediatamente
             } else if (pkt.command == CMD_PAIR_STOP) {
                 isPairingMode = false;
                 snprintf(lastActivityStr, sizeof(lastActivityStr), "Vinculacion finalizada");

@@ -80,6 +80,11 @@ public:
      * @return Node ID (0 = master, 1-254 = nodo leaf)
      */
     virtual uint8_t getNodeId() const = 0;
+
+    /**
+     * @brief Registra un nodo en la tabla de enrutamiento interna del transporte.
+     */
+    virtual void registerNodeRoute(uint8_t nodeId, uint16_t address) {}
 };
 
 #endif // ICONNECTION_H

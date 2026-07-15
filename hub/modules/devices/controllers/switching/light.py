@@ -44,17 +44,19 @@ class LightDevice(BaseDeviceController):
                 "desc": "Control autogestionado multicanal donde cada bit representa el estado lógico de un switch (bit 0 = ch1, bit 1 = ch2...).",
                 "default": 0
             })
-            for i in range(1, 9):
+            ch_count = self.state.get("ch_count", 4)
+            if not isinstance(ch_count, int) or ch_count <= 0:
+                ch_count = 4
+            for i in range(1, ch_count + 1):
                 k = f"ch{i}"
-                if k in self.state or i <= 4 or "relay" in self.feature_keys:
-                    params.append({
-                        "key": k,
-                        "label": f"Canal {i}",
-                        "type": "Booleano (True / False)",
-                        "control": "switch",
-                        "desc": f"Control individual independiente para el relé/canal {i}.",
-                        "default": False
-                    })
+                params.append({
+                    "key": k,
+                    "label": f"Canal {i}",
+                    "type": "Booleano (True / False)",
+                    "control": "switch",
+                    "desc": f"Control individual independiente para el relé/canal {i}.",
+                    "default": False
+                })
             
         return params
 
@@ -65,13 +67,14 @@ class LightDevice(BaseDeviceController):
         ]
         if "dimmer" in self.feature_keys or self.type_code in (0x02, 0x04, 0x09):
             params.append({"key": "brightness", "unit": "PWM", "label": "Nivel de Brillo", "desc": "Valor reportado de brillo (0-255)."})
-        if "relay" in self.feature_keys or self.category in ("switching", "light"):
-            for i in range(1, 9):
+            ch_count = self.state.get("ch_count", 4)
+            if not isinstance(ch_count, int) or ch_count <= 0:
+                ch_count = 4
+            for i in range(1, ch_count + 1):
                 k = f"ch{i}"
-                if k in self.state or i <= 4 or "relay" in self.feature_keys:
-                    params.append({
-                        "key": k, "unit": "", "label": f"Canal {i}", "desc": f"Estado reportado del relé individual {i}."
-                    })
+                params.append({
+                    "key": k, "unit": "", "label": f"Canal {i}", "desc": f"Estado reportado del relé individual {i}."
+                })
         return params
 
     def decode_rx(self, cmd: int, raw_data: List[int]) -> Dict[str, Any]:
@@ -99,8 +102,11 @@ class LightDevice(BaseDeviceController):
             relay_mask = b2 | (b3 << 8) | (b4 << 16) | (b5 << 24)
             payload["mask"] = relay_mask
             
-            # Desplegar los canales en el payload para sincronización instantánea
-            for i in range(16):
+            # Desplegar los canales en el payload para sincronización instantánea según ch_count del dispositivo
+            ch_count = self.state.get("ch_count", 4)
+            if not isinstance(ch_count, int) or ch_count <= 0:
+                ch_count = 4
+            for i in range(ch_count):
                 payload[f"ch{i+1}"] = bool(relay_mask & (1 << i))
             payload["on"] = bool(relay_mask != 0)
 

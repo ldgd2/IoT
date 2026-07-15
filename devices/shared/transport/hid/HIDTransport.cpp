@@ -134,8 +134,9 @@ void HIDTransport::_onSetReport(uint8_t report_id, hid_report_type_t report_type
 
     if (!buffer || bufsize < sizeof(RFPacket)) return;
 
-    // Si el primer byte es 0x00 (Report ID devuelto por el stack USB) y detrás vienen al menos 32 bytes de RFPacket
-    if (buffer[0] == 0x00 && bufsize >= (sizeof(RFPacket) + 1)) {
+    // En reportes genéricos de 64 bytes sin Report ID, buffer[0] es originId (0x00).
+    // Solo si el host envió 65 bytes (donde buffer[0] es Report ID 0x00) saltamos un byte.
+    if (bufsize > 64 && buffer[0] == 0x00) {
         memcpy(_rxBuf, buffer + 1, sizeof(RFPacket));
     } else {
         memcpy(_rxBuf, buffer, sizeof(RFPacket));

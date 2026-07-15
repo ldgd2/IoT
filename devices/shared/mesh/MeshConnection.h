@@ -53,6 +53,7 @@ public:
     bool    isConnected() override;
     bool    reconnect() override;
     uint8_t getNodeId() const override { return _nodeId; }
+    void    registerNodeRoute(uint8_t nodeId, uint16_t address) override { _mesh.setAddress(nodeId, address); }
 
     // ── Acceso interno (para extensiones) ────────────────────────────────────
     RF24&        getRadio()   { return _radio;   }

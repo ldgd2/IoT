@@ -39,6 +39,7 @@ class AppState extends ChangeNotifier {
   String get hubHost => _isLocalActive ? _localHubHost : ApiConstants.remoteHostFromEnv;
   String get _hubHost => hubHost; // Alias interno para enrutamiento dinámico (En Casa / Fuera de Casa)
   bool get isLocalActive => _isLocalActive;
+  bool get hubConnected => hubHost.isNotEmpty && hubHost != '0.0.0.0';
   String get remoteHubHost => ApiConstants.remoteHostFromEnv;
   String get localHubHost => _localHubHost;
 
@@ -48,6 +49,9 @@ class AppState extends ChangeNotifier {
     final sp = await SharedPreferences.getInstance();
 
     _localHubHost = sp.getString(_hubHostKey) ?? '192.168.1.100:5000';
+    if (_localHubHost.startsWith('http://')) _localHubHost = _localHubHost.substring(7);
+    if (_localHubHost.startsWith('https://')) _localHubHost = _localHubHost.substring(8);
+    if (_localHubHost.endsWith('/')) _localHubHost = _localHubHost.substring(0, _localHubHost.length - 1);
     ApiConstants.localHost = _localHubHost;
     
     // Al iniciar, probamos enrutamiento inteligente (En Casa o Fuera de Casa)
@@ -96,7 +100,16 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> setHubHost(String host) async {
-    _localHubHost = host.trim();
+    String cleanHost = host.trim();
+    if (cleanHost.startsWith('http://')) {
+      cleanHost = cleanHost.substring(7);
+    } else if (cleanHost.startsWith('https://')) {
+      cleanHost = cleanHost.substring(8);
+    }
+    if (cleanHost.endsWith('/')) {
+      cleanHost = cleanHost.substring(0, cleanHost.length - 1);
+    }
+    _localHubHost = cleanHost;
     ApiConstants.localHost = _localHubHost;
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_hubHostKey, _localHubHost);
